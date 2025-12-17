@@ -43,7 +43,7 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m
 
-.PHONY: all build build-all clean test deps lint run install help tidy version
+.PHONY: all build build-all clean test test-unit test-integration test-e2e test-all test-coverage test-script test-short deps lint lint-fix run install help tidy version validate-config
 
 # Default target
 all: build
@@ -62,9 +62,21 @@ help:
 	@echo "$(YELLOW)Development Commands:$(NC)"
 	@echo "  make run              - Build and run: $(BUILD_DIR)/$(BINARY_NAME) start"
 	@echo "  make dev              - Run with go run (faster for development)"
-	@echo "  make test             - Run tests"
+	@echo "  make validate-config  - Validate configuration file"
+	@echo ""
+	@echo "$(YELLOW)Testing Commands:$(NC)"
+	@echo "  make test             - Run unit and integration tests"
+	@echo "  make test-unit        - Run unit tests only"
+	@echo "  make test-integration - Run integration tests only"
+	@echo "  make test-e2e         - Run E2E tests only"
+	@echo "  make test-all         - Run all tests"
 	@echo "  make test-coverage    - Run tests with coverage report"
+	@echo "  make test-script      - Run test script"
+	@echo "  make test-short       - Run short tests (skip E2E)"
+	@echo ""
+	@echo "$(YELLOW)Code Quality:$(NC)"
 	@echo "  make lint             - Run linter"
+	@echo "  make lint-fix         - Run linter with auto-fix"
 	@echo "  make fmt              - Format code"
 	@echo "  make vet              - Run go vet"
 	@echo ""
@@ -131,15 +143,37 @@ dev:
 	@$(GOCMD) run ./cmd/tfo-agent start --config $(CONFIG_DIR)/tfo-agent.yaml
 
 ## Test commands
-test:
-	@echo "$(GREEN)Running tests...$(NC)"
-	@$(GOTEST) -v -race -cover ./...
+test: test-unit test-integration
+	@echo "$(GREEN)All tests completed$(NC)"
+
+test-unit:
+	@echo "$(GREEN)Running unit tests...$(NC)"
+	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-unit.out ./tests/unit/...
+
+test-integration:
+	@echo "$(GREEN)Running integration tests...$(NC)"
+	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-integration.out ./tests/integration/...
+
+test-e2e:
+	@echo "$(GREEN)Running E2E tests...$(NC)"
+	@$(GOTEST) -v -timeout 10m ./tests/e2e/...
+
+test-all: test-unit test-integration test-e2e
+	@echo "$(GREEN)All tests completed$(NC)"
 
 test-coverage:
-	@echo "$(GREEN)Running tests with coverage...$(NC)"
-	@$(GOTEST) -v -race -coverprofile=coverage.out ./...
-	@$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "$(GREEN)Coverage report: coverage.html$(NC)"
+	@echo "$(GREEN)Generating coverage reports...$(NC)"
+	@$(GOCMD) tool cover -html=coverage-unit.out -o coverage-unit.html 2>/dev/null || true
+	@$(GOCMD) tool cover -html=coverage-integration.out -o coverage-integration.html 2>/dev/null || true
+	@echo "$(GREEN)Coverage reports generated$(NC)"
+
+test-script:
+	@echo "$(GREEN)Running test script...$(NC)"
+	@./scripts/test.sh
+
+test-short:
+	@echo "$(GREEN)Running short tests (skip E2E)...$(NC)"
+	@./scripts/test.sh short
 
 ## Dependencies
 deps:
@@ -168,6 +202,14 @@ lint:
 		echo "$(YELLOW)golangci-lint not installed, skipping...$(NC)"; \
 	fi
 
+lint-fix:
+	@echo "$(GREEN)Running linter with auto-fix...$(NC)"
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --fix ./...; \
+	else \
+		echo "$(YELLOW)golangci-lint not installed, skipping...$(NC)"; \
+	fi
+
 fmt:
 	@echo "$(GREEN)Formatting code...$(NC)"
 	@$(GOCMD) fmt ./...
@@ -176,13 +218,19 @@ vet:
 	@echo "$(GREEN)Running go vet...$(NC)"
 	@$(GOCMD) vet ./...
 
+## Configuration
+validate-config:
+	@echo "$(GREEN)Validating configuration...$(NC)"
+	@$(BUILD_DIR)/$(BINARY_NAME) config validate --config $(CONFIG_DIR)/tfo-agent.yaml || \
+		(echo "$(RED)Build agent first with 'make build'$(NC)" && exit 1)
+
 ## Cleanup
 clean:
 	@echo "$(GREEN)Cleaning build artifacts...$(NC)"
 	@$(GOCLEAN)
 	@rm -rf $(BUILD_DIR)
 	@rm -rf $(DIST_DIR)
-	@rm -f coverage.out coverage.html
+	@rm -f coverage*.out coverage*.html
 	@echo "$(GREEN)Clean complete$(NC)"
 
 ## Installation

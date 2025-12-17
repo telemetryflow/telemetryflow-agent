@@ -1,0 +1,58 @@
+# TelemetryFlow Agent - E2E Test Configuration
+#
+# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+
+agent:
+  id: "e2e-test-agent"
+  hostname: "e2e-test-host"
+
+api:
+  endpoint: "http://mock-backend:8080"
+  api_key_id: "test-key-id"
+  api_key_secret: "test-key-secret"
+  workspace_id: "test-workspace"
+  tenant_id: "test-tenant"
+  timeout: "10s"
+  retry_attempts: 3
+  retry_delay: "1s"
+  tls:
+    enabled: false
+
+heartbeat:
+  interval: "5s"
+  timeout: "5s"
+  include_system_info: true
+
+collectors:
+  system:
+    enabled: true
+    interval: "5s"
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+  logs:
+    enabled: false
+  process:
+    enabled: false
+
+exporter:
+  otlp:
+    enabled: true
+    endpoint: "otel-collector:4317"
+    batch_size: 100
+    flush_interval: "5s"
+    compression: "gzip"
+    tls:
+      enabled: false
+
+buffer:
+  enabled: true
+  max_size_mb: 50
+  path: "/tmp/tfo-agent-buffer"
+  flush_interval: "10s"
+
+logging:
+  level: "debug"
+  format: "text"
