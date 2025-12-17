@@ -1,0 +1,330 @@
+# TelemetryFlow Agent
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/telemetryflow/.github/raw/main/docs/assets/tfo-logo-agent-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://github.com/telemetryflow/.github/raw/main/docs/assets/tfo-logo-agent-light.svg">
+    <img src="https://github.com/telemetryflow/.github/raw/main/docs/assets/tfo-logo-agent-light.svg" alt="TelemetryFlow Logo" width="80%">
+  </picture>
+
+  <h3>TelemetryFlow Agent (OTEL Agent)</h3>
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
+[![OTEL](https://img.shields.io/badge/OpenTelemetry-Agent-blueviolet)](https://opentelemetry.io/)
+
+</div>
+
+---
+
+Enterprise-grade telemetry collection agent based on **OpenTelemetry Agent Community**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
+
+This agent works as the **client-side counterpart** to the TelemetryFlow Backend Agent Module (NestJS), providing:
+
+- Agent registration & lifecycle management
+- Heartbeat & health monitoring
+- System metrics collection
+- OTLP telemetry export
+
+## Features
+
+### OpenTelemetry Core
+
+- **OpenTelemetry Native**: Built on OTEL Agent Community standards
+- **OTLP Export**: OpenTelemetry Protocol for metrics, logs, and traces
+- **Multi-Signal Support**: Metrics, logs, and traces collection
+
+### Agent Lifecycle (Backend Integration)
+
+- **Agent Registration**: Auto-register with TelemetryFlow backend
+- **Heartbeat Monitoring**: Regular health checks to backend
+- **Health Status Sync**: Report agent health and system info
+- **Activation/Deactivation**: Remote agent control from backend
+
+### System Monitoring
+
+- **System Metrics Collection**: CPU, memory, disk, and network metrics
+- **Process Monitoring**: Track running processes
+- **Resource Detection**: Auto-detect host, OS, and container info
+
+### Reliability
+
+- **Disk-Backed Buffer**: Resilient retry buffer for offline scenarios
+- **Auto-Reconnection**: Automatic retry with exponential backoff
+- **Graceful Shutdown**: Signal handling (SIGINT, SIGTERM, SIGHUP)
+
+### Platform
+
+- **Cross-Platform**: Linux, macOS, and Windows support
+- **LEGO Building Blocks**: Modular architecture for easy extensibility
+
+## Quick Start
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/telemetryflow/telemetryflow-agent.git
+cd telemetryflow-agent
+
+# Build
+make build
+
+# Run
+./build/tfo-agent --help
+```
+
+### Docker
+
+#### Using Docker Compose (Recommended)
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your configuration
+vim .env
+
+# Build and start
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f tfo-agent
+
+# Stop
+docker-compose down
+```
+
+#### Using Docker Directly
+
+```bash
+# Build image
+docker build \
+  --build-arg VERSION=1.0.0 \
+  --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
+  --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
+  --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
+  -t telemetryflow/tfo-agent:1.0.0 .
+
+# Run container
+docker run -d --name tfo-agent \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  -p 8888:8888 \
+  -p 13133:13133 \
+  -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
+  -v /var/lib/tfo-agent:/var/lib/tfo-agent \
+  telemetryflow/tfo-agent:1.0.0
+```
+
+## Configuration
+
+Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
+
+```yaml
+api:
+  endpoint: "https://api.telemetryflow.id"
+  api_key_id: "your-api-key"
+  api_key_secret: "your-api-secret"
+
+agent:
+  hostname: ""  # Auto-detected if empty
+
+heartbeat:
+  interval: 30s
+  timeout: 10s
+
+collector:
+  system:
+    enabled: true
+    interval: 30s
+```
+
+### Environment Variables
+
+```bash
+export TELEMETRYFLOW_API_ENDPOINT="https://api.telemetryflow.id"
+export TELEMETRYFLOW_API_KEY_ID="your-key"
+export TELEMETRYFLOW_API_KEY_SECRET="your-secret"
+export TELEMETRYFLOW_LOG_LEVEL="debug"
+```
+
+## Usage
+
+```bash
+# Start agent
+tfo-agent start
+
+# Start with custom config
+tfo-agent start --config /path/to/config.yaml
+
+# Validate configuration
+tfo-agent config validate
+
+# Show version
+tfo-agent version
+```
+
+## Project Structure
+
+```
+tfo-agent/
+├── cmd/tfo-agent/           # CLI entry point
+├── internal/
+│   ├── agent/             # Core agent lifecycle
+│   ├── buffer/            # Disk-backed retry buffer
+│   ├── collector/         # Metric collectors
+│   │   └── system/        # System metrics collector
+│   ├── config/            # Configuration management
+│   ├── exporter/          # OTLP data exporters
+│   └── version/           # Version and banner info
+├── pkg/                   # LEGO Building Blocks
+│   ├── api/               # HTTP API client
+│   ├── banner/            # Startup banner
+│   ├── config/            # Config loader utilities
+│   └── plugin/            # Plugin registry system
+├── configs/               # Configuration templates
+├── scripts/               # Build/install scripts
+├── build/                 # Build output
+├── Makefile
+├── Dockerfile             # Docker build
+├── docker-compose.yml     # Docker Compose
+├── .env.example           # Environment template
+└── README.md
+```
+
+## LEGO Building Blocks
+
+The `pkg/` directory contains reusable building blocks:
+
+| Block | Description |
+|-------|-------------|
+| `pkg/banner` | ASCII art startup banner |
+| `pkg/config` | Flexible configuration loader |
+| `pkg/plugin` | Plugin registry for extensibility |
+| `pkg/api` | HTTP client for backend communication |
+
+### Adding Custom Plugins
+
+```go
+import "github.com/telemetryflow/telemetryflow/tfo-agent/pkg/plugin"
+
+// Register a custom collector
+plugin.Register("my-collector", func() plugin.Plugin {
+    return &MyCustomCollector{}
+})
+
+// Use the plugin
+p, _ := plugin.Get("my-collector")
+p.Init(config)
+p.Start()
+```
+
+## Collected Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `system.cpu.usage` | gauge | CPU usage percentage |
+| `system.cpu.cores` | gauge | Number of CPU cores |
+| `system.memory.total` | gauge | Total memory (bytes) |
+| `system.memory.used` | gauge | Used memory (bytes) |
+| `system.memory.usage` | gauge | Memory usage percentage |
+| `system.disk.total` | gauge | Total disk space (bytes) |
+| `system.disk.used` | gauge | Used disk space (bytes) |
+| `system.disk.usage` | gauge | Disk usage percentage |
+| `system.network.bytes_sent` | counter | Total bytes sent |
+| `system.network.bytes_recv` | counter | Total bytes received |
+
+## Development
+
+### Prerequisites
+
+- Go 1.24 or later
+- Make
+
+### Build Commands
+
+```bash
+# Show all commands
+make help
+
+# Build Commands
+make                # Build agent (default)
+make build          # Build agent for current platform
+make build-all      # Build agent for all platforms
+make build-linux    # Build for Linux (amd64 and arm64)
+make build-darwin   # Build for macOS (amd64 and arm64)
+
+# Development Commands
+make run            # Build and run agent
+make dev            # Run with go run (faster for development)
+make test           # Run tests
+make test-coverage  # Run tests with coverage report
+make lint           # Run linter
+make fmt            # Format code
+make vet            # Run go vet
+
+# Dependencies
+make deps           # Download dependencies
+make deps-update    # Update dependencies
+make tidy           # Tidy go modules
+
+# Other Commands
+make clean          # Clean build artifacts
+make install        # Install binary to /usr/local/bin
+make uninstall      # Uninstall binary
+make docker-build   # Build Docker image
+make docker-push    # Push Docker image
+make version        # Show version information
+```
+
+## Systemd Service
+
+```ini
+# /etc/systemd/system/tfo-agent.service
+[Unit]
+Description=TelemetryFlow Agent - CEOP
+After=network.target
+
+[Service]
+Type=simple
+User=telemetryflow
+ExecStart=/usr/local/bin/tfo-agent start --config /etc/tfo-agent/tfo-agent.yaml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable tfo-agent
+sudo systemctl start tfo-agent
+```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [README](docs/README.md) | Documentation overview |
+| [INSTALLATION](docs/INSTALLATION.md) | Installation guide for all platforms |
+| [CONFIGURATION](docs/CONFIGURATION.md) | Configuration options and examples |
+| [COMMANDS](docs/COMMANDS.md) | CLI commands reference |
+| [GITHUB-WORKFLOWS](docs/GITHUB-WORKFLOWS.md) | CI/CD workflows documentation |
+| [CHANGELOG](CHANGELOG.md) | Version history and changes |
+
+## License
+
+Apache License 2.0 - See [LICENSE](../LICENSE)
+
+## Links
+
+- **Website**: [https://telemetryflow.id](https://telemetryflow.id)
+- **Documentation**: [https://docs.telemetryflow.id](https://docs.telemetryflow.id)
+- **OpenTelemetry**: [https://opentelemetry.io](https://opentelemetry.io)
+- **Developer**: [DevOpsCorner Indonesia](https://devopscorner.id)
+
+---
+
+**Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.**

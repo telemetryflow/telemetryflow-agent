@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "timestamp": "2024-01-01T12:00:00Z",
+  "server_time": 1640995200,
+  "next_interval": 60,
+  "agent_status": "active",
+  "config_version": "1.0.0"
+}

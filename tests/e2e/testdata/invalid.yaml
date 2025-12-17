@@ -1,0 +1,8 @@
+agent:
+  id: "e2e-test-agent"
+
+api:
+  endpoint: ""  # Invalid: empty endpoint
+
+heartbeat:
+  interval: 100ms  # Invalid: too short

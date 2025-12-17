@@ -1,0 +1,73 @@
+agent:
+  id: "full-test-agent"
+  hostname: "test-host"
+  description: "Full Test Configuration"
+  tags:
+    environment: "test"
+    datacenter: "local"
+    team: "platform"
+
+api:
+  endpoint: "http://localhost:3100"
+  api_key_id: "test-key-id"
+  api_key_secret: "test-key-secret"
+  workspace_id: "test-workspace"
+  tenant_id: "test-tenant"
+  timeout: 30s
+  retry_attempts: 3
+  retry_delay: 1s
+  tls:
+    enabled: false
+    skip_verify: false
+
+heartbeat:
+  interval: 60s
+  timeout: 10s
+  include_system_info: true
+
+collectors:
+  system:
+    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+    disk_paths:
+      - "/"
+      - "/data"
+  logs:
+    enabled: true
+    paths:
+      - "/var/log/*.log"
+      - "/var/log/app/*.log"
+    include_patterns: []
+    exclude_patterns:
+      - "*.gz"
+  process:
+    enabled: false
+    interval: 30s
+    processes: []
+
+exporter:
+  otlp:
+    enabled: true
+    batch_size: 100
+    flush_interval: 10s
+    compression: "gzip"
+    metrics_endpoint: "/api/v2/otlp/metrics"
+    logs_endpoint: "/api/v2/otlp/logs"
+
+buffer:
+  enabled: true
+  max_size_mb: 100
+  path: "/tmp/test-buffer"
+  flush_interval: 30s
+
+logging:
+  level: "info"
+  format: "json"
+  file: ""
+  max_size_mb: 100
+  max_backups: 3
+  max_age_days: 7

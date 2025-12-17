@@ -1,0 +1,128 @@
+# TelemetryFlow Agent Configuration
+# =================================
+# This is the default configuration file for the TelemetryFlow agent.
+# Copy this file and modify as needed for your environment.
+
+# Agent identification
+agent:
+  # Agent ID (leave empty to auto-generate)
+  id: ""
+
+  # Hostname (leave empty to auto-detect)
+  hostname: ""
+
+  # Optional description
+  description: ""
+
+  # Custom tags for the agent
+  tags: {}
+    # environment: production
+    # region: us-west-2
+    # team: platform
+
+# TelemetryFlow Backend API settings
+api:
+  # Backend endpoint URL
+  endpoint: "http://localhost:3100"
+
+  # API Key authentication
+  api_key_id: ""
+  api_key_secret: ""
+
+  # Workspace and Tenant IDs (for multi-tenant setups)
+  workspace_id: ""
+  tenant_id: ""
+
+  # Request timeout
+  timeout: 30s
+
+  # Retry settings
+  retry_attempts: 3
+  retry_delay: 1s
+
+  # TLS settings
+  tls:
+    enabled: false
+    skip_verify: false
+    # cert_file: /path/to/client.crt
+    # key_file: /path/to/client.key
+    # ca_file: /path/to/ca.crt
+
+# Heartbeat settings
+heartbeat:
+  # Heartbeat interval (how often to send heartbeats)
+  interval: 60s
+
+  # Heartbeat request timeout
+  timeout: 10s
+
+  # Include system info in heartbeat
+  include_system_info: true
+
+# Collector settings
+collectors:
+  # System metrics collector
+  system:
+    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+    # Specific disk paths to monitor (empty = all)
+    disk_paths: []
+
+  # Log collector (future feature)
+  logs:
+    enabled: false
+    paths: []
+    # - /var/log/syslog
+    # - /var/log/messages
+    include_patterns: []
+    exclude_patterns: []
+
+  # Process monitoring (future feature)
+  process:
+    enabled: false
+    interval: 30s
+    processes: []
+    # - nginx
+    # - postgres
+    # - redis
+
+# Exporter settings
+exporter:
+  otlp:
+    enabled: true
+    # Maximum batch size before sending
+    batch_size: 100
+    # Flush interval
+    flush_interval: 10s
+    # Compression (none, gzip)
+    compression: gzip
+    # OTLP endpoints (relative to api.endpoint)
+    metrics_endpoint: "/api/v2/otlp/metrics"
+    logs_endpoint: "/api/v2/otlp/logs"
+
+# Disk buffer for offline/retry scenarios
+buffer:
+  enabled: true
+  # Maximum buffer size in MB
+  max_size_mb: 100
+  # Buffer directory path
+  path: "/var/lib/tfo-agent/buffer"
+  # Flush interval for buffered data
+  flush_interval: 30s
+
+# Logging settings
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+  # Log format: json, text
+  format: json
+  # Log file path (empty = stdout)
+  file: ""
+  # Log rotation settings
+  max_size_mb: 100
+  max_backups: 3
+  max_age_days: 7

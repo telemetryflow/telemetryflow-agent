@@ -1,0 +1,66 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "test-service"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "test-host"
+            }
+          }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "test-scope",
+            "version": "1.0.0"
+          },
+          "metrics": [
+            {
+              "name": "system.cpu.usage",
+              "description": "CPU usage percentage",
+              "unit": "percent",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "cpu",
+                        "value": {
+                          "stringValue": "total"
+                        }
+                      }
+                    ],
+                    "asDouble": 45.5,
+                    "timeUnixNano": "1640995200000000000"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "system.memory.usage",
+              "description": "Memory usage in bytes",
+              "unit": "bytes",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "asInt": "4294967296",
+                    "timeUnixNano": "1640995200000000000"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

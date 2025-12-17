@@ -1,0 +1,45 @@
+agent:
+  id: "test-agent-001"
+  hostname: "test-host"
+  description: "Test Agent"
+  tags:
+    environment: "test"
+    datacenter: "local"
+
+api:
+  endpoint: "http://localhost:3100"
+  api_key_id: "test-key"
+  api_key_secret: "test-secret"
+  timeout: 30s
+  retry_attempts: 3
+  retry_delay: 1s
+
+heartbeat:
+  interval: 60s
+  timeout: 10s
+  include_system_info: true
+
+collectors:
+  system:
+    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+
+exporter:
+  otlp:
+    enabled: true
+    batch_size: 100
+    flush_interval: 10s
+    compression: gzip
+
+buffer:
+  enabled: true
+  max_size_mb: 50
+  path: "/tmp/test-buffer"
+
+logging:
+  level: info
+  format: json

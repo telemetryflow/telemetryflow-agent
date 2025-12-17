@@ -1,0 +1,103 @@
+# =============================================================================
+# TelemetryFlow Agent - Docker Compose
+# =============================================================================
+#
+# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+#
+# Usage:
+#   # Start with default .env
+#   docker-compose up -d
+#
+#   # Build and start
+#   docker-compose up -d --build
+#
+#   # View logs
+#   docker-compose logs -f tfo-agent
+#
+#   # Stop
+#   docker-compose down
+#
+# =============================================================================
+
+services:
+  tfo-agent:
+    container_name: ${CONTAINER_NAME:-tfo-agent}
+    image: ${IMAGE_NAME:-telemetryflow/tfo-agent}:${IMAGE_TAG:-1.0.0}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-1.0.0}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-main}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    hostname: ${AGENT_HOSTNAME:-tfo-agent}
+    restart: unless-stopped
+
+    # Environment variables
+    environment:
+      - TELEMETRYFLOW_API_ENDPOINT=${TELEMETRYFLOW_API_ENDPOINT:-http://localhost:3100}
+      - TELEMETRYFLOW_API_KEY_ID=${TELEMETRYFLOW_API_KEY_ID:-}
+      - TELEMETRYFLOW_API_KEY_SECRET=${TELEMETRYFLOW_API_KEY_SECRET:-}
+      - COLLECTOR_ENDPOINT=${COLLECTOR_ENDPOINT:-http://tfo-collector:4317}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+    # Port mappings
+    ports:
+      - "${OTLP_GRPC_PORT:-4317}:4317"     # OTLP gRPC
+      - "${OTLP_HTTP_PORT:-4318}:4318"     # OTLP HTTP
+      - "${METRICS_PORT:-8888}:8888"       # Prometheus metrics
+      - "${HEALTH_PORT:-13133}:13133"      # Health check
+
+    # Volume mounts
+    volumes:
+      - ./configs/tfo-agent.yaml:/etc/tfo-agent/tfo-agent.yaml:ro
+      - tfo-agent-buffer:/var/lib/tfo-agent
+      - tfo-agent-logs:/var/log/tfo-agent
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT:-512M}
+          cpus: "${CPU_LIMIT:-0.5}"
+        reservations:
+          memory: 128M
+          cpus: "0.1"
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Network
+    networks:
+      - telemetryflow
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  tfo-agent-buffer:
+    driver: local
+  tfo-agent-logs:
+    driver: local
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
+networks:
+  telemetryflow:
+    driver: bridge
+    name: telemetryflow-network
