@@ -1,0 +1,43 @@
+# TelemetryFlow Agent - Docker Ignore
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts (not source)
+/build/
+/dist/
+
+# Documentation
+*.md
+LICENSE
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.test
+coverage.out
+coverage.html
+
+# Logs
+*.log
+logs/
+
+# Local config
+tfo-agent.local.yaml
+*.secret.yaml
+
+# Buffer data
+/buffer/
+
+# Docker files (avoid recursive builds)
+Dockerfile*
+docker-compose*.yaml
+docker-compose*.yml
