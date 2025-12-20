@@ -89,6 +89,11 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            goarch: amd64
+          - arch: arm64
+            goarch: arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -346,17 +351,24 @@ jobs:
           - Release version ${{ needs.prepare.outputs.version }}
           EOF
 
-      - name: Setup RPM platform for cross-arch
-        if: matrix.rpm_arch == 'aarch64'
+      - name: Setup cross-architecture RPM platform
+        if: matrix.rpm_arch != 'x86_64'
         run: |
-          # Create aarch64 platform definition for cross-architecture packaging
-          sudo mkdir -p /usr/lib/rpm/platform/aarch64-linux
-          echo "%_arch aarch64" | sudo tee /usr/lib/rpm/platform/aarch64-linux/macros
+          # Create complete platform definition for cross-architecture packaging
+          # This is required for rpmbuild --target to recognize non-native architectures
+          sudo mkdir -p /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux
+          cat << EOF | sudo tee /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux/macros > /dev/null
+          %_arch ${{ matrix.rpm_arch }}
+          %_build_arch ${{ matrix.rpm_arch }}
+          %_gnu -gnu
+          %_target_cpu ${{ matrix.rpm_arch }}
+          %_target_platform %{_target_cpu}-linux-gnu
+          %_vendor redhat
+          EOF
 
       - name: Build RPM
         run: |
           rpmbuild --define "_topdir $(pwd)/rpmbuild" \
-                   --define "_arch ${{ matrix.rpm_arch }}" \
                    --target ${{ matrix.rpm_arch }}-linux \
                    -bb rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec
 
