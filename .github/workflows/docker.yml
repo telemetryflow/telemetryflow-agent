@@ -199,7 +199,7 @@ jobs:
         if: needs.prepare.outputs.push == 'true'
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY_DOCKER }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          image: ${{ env.REGISTRY_DOCKER }}/${{ env.IMAGE_NAME }}:sha-${{ needs.prepare.outputs.commit }}
           format: spdx-json
           output-file: sbom-${{ steps.version.outputs.version }}.spdx.json
 
@@ -207,7 +207,7 @@ jobs:
         if: needs.prepare.outputs.push == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ steps.version.outputs.version }}
+          name: sbom-${{ needs.prepare.outputs.commit }}
           path: sbom-*.spdx.json
           retention-days: 90
 
