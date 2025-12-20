@@ -349,6 +349,7 @@ jobs:
       - name: Build RPM
         run: |
           rpmbuild --define "_topdir $(pwd)/rpmbuild" \
+                   --target ${{ matrix.rpm_arch }} \
                    -bb rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec
 
       - name: Upload RPM artifact
