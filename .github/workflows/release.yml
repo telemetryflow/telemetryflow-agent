@@ -357,7 +357,7 @@ jobs:
           # Create complete platform definition for cross-architecture packaging
           # This is required for rpmbuild --target to recognize non-native architectures
           sudo mkdir -p /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux
-          cat << EOF | sudo tee /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux/macros > /dev/null
+          sudo tee /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux/macros > /dev/null <<EOF
           %_arch ${{ matrix.rpm_arch }}
           %_build_arch ${{ matrix.rpm_arch }}
           %_gnu -gnu
@@ -365,6 +365,8 @@ jobs:
           %_target_platform %{_target_cpu}-linux-gnu
           %_vendor redhat
           EOF
+          # Strip leading whitespace from macros file
+          sudo sed -i 's/^[[:space:]]*//' /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux/macros
 
       - name: Build RPM
         run: |
