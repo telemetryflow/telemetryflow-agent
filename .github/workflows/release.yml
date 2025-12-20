@@ -346,10 +346,18 @@ jobs:
           - Release version ${{ needs.prepare.outputs.version }}
           EOF
 
+      - name: Setup RPM platform for cross-arch
+        if: matrix.rpm_arch == 'aarch64'
+        run: |
+          # Create aarch64 platform definition for cross-architecture packaging
+          sudo mkdir -p /usr/lib/rpm/platform/aarch64-linux
+          echo "%_arch aarch64" | sudo tee /usr/lib/rpm/platform/aarch64-linux/macros
+
       - name: Build RPM
         run: |
           rpmbuild --define "_topdir $(pwd)/rpmbuild" \
-                   --target ${{ matrix.rpm_arch }} \
+                   --define "_arch ${{ matrix.rpm_arch }}" \
+                   --target ${{ matrix.rpm_arch }}-linux \
                    -bb rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec
 
       - name: Upload RPM artifact
