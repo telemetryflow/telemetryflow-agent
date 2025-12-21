@@ -220,7 +220,7 @@ jobs:
     name: Package RPM (${{ matrix.arch }})
     runs-on: ubuntu-latest
     container:
-      image: fedora:latest
+      image: rockylinux:9
     needs: [prepare, build-linux]
     strategy:
       matrix:
@@ -232,7 +232,7 @@ jobs:
             rpm_arch: aarch64
     steps:
       - name: Install dependencies
-        run: dnf install -y rpm-build tar gzip
+        run: dnf install -y rpm-build tar gzip git
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -267,7 +267,10 @@ jobs:
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          cat > rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec << 'EOF'
+          # Compute changelog date (RPM requires specific format)
+          CHANGELOG_DATE=$(date '+%a %b %d %Y')
+
+          cat > rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec << EOF
           Name:           ${{ env.BINARY_NAME }}
           Version:        ${{ needs.prepare.outputs.version }}
           Release:        1%{?dist}
@@ -331,7 +334,7 @@ jobs:
           systemctl daemon-reload
 
           %preun
-          if [ $1 -eq 0 ]; then
+          if [ \$1 -eq 0 ]; then
             systemctl stop tfo-agent >/dev/null 2>&1 || :
             systemctl disable tfo-agent >/dev/null 2>&1 || :
           fi
@@ -349,7 +352,7 @@ jobs:
           %dir /var/log/tfo-agent
 
           %changelog
-          * $(date '+%a %b %d %Y') ${{ env.VENDOR }} <${{ env.MAINTAINER }}> - ${{ needs.prepare.outputs.version }}-1
+          * ${CHANGELOG_DATE} ${{ env.VENDOR }} <${{ env.MAINTAINER }}> - ${{ needs.prepare.outputs.version }}-1
           - Release version ${{ needs.prepare.outputs.version }}
           EOF
 
