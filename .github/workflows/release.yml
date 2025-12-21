@@ -219,6 +219,8 @@ jobs:
   package-rpm:
     name: Package RPM (${{ matrix.arch }})
     runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
     needs: [prepare, build-linux]
     strategy:
       matrix:
@@ -229,6 +231,9 @@ jobs:
           - arch: arm64
             rpm_arch: aarch64
     steps:
+      - name: Install dependencies
+        run: dnf install -y rpm-build tar gzip
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -237,9 +242,6 @@ jobs:
         with:
           name: binary-linux-${{ matrix.arch }}
           path: dist
-
-      - name: Install RPM tools
-        run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Create RPM structure
         env:
@@ -350,23 +352,6 @@ jobs:
           * $(date '+%a %b %d %Y') ${{ env.VENDOR }} <${{ env.MAINTAINER }}> - ${{ needs.prepare.outputs.version }}-1
           - Release version ${{ needs.prepare.outputs.version }}
           EOF
-
-      - name: Setup cross-architecture RPM platform
-        if: matrix.rpm_arch != 'x86_64'
-        run: |
-          # Create complete platform definition for cross-architecture packaging
-          # This is required for rpmbuild --target to recognize non-native architectures
-          sudo mkdir -p /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux
-          sudo tee /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux/macros > /dev/null <<EOF
-          %_arch ${{ matrix.rpm_arch }}
-          %_build_arch ${{ matrix.rpm_arch }}
-          %_gnu -gnu
-          %_target_cpu ${{ matrix.rpm_arch }}
-          %_target_platform %{_target_cpu}-linux-gnu
-          %_vendor redhat
-          EOF
-          # Strip leading whitespace from macros file
-          sudo sed -i 's/^[[:space:]]*//' /usr/lib/rpm/platform/${{ matrix.rpm_arch }}-linux/macros
 
       - name: Build RPM
         run: |
