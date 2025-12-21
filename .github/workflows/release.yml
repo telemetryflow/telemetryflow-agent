@@ -219,8 +219,6 @@ jobs:
   package-rpm:
     name: Package RPM (${{ matrix.arch }})
     runs-on: ubuntu-latest
-    container:
-      image: rockylinux:9
     needs: [prepare, build-linux]
     strategy:
       matrix:
@@ -231,8 +229,10 @@ jobs:
           - arch: arm64
             rpm_arch: aarch64
     steps:
-      - name: Install dependencies
-        run: dnf install -y rpm-build tar gzip git
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
 
       - name: Checkout code
         uses: actions/checkout@v4
