@@ -1,5 +1,3 @@
-# Changelog
-
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/telemetryflow/.github/raw/main/docs/assets/tfo-logo-agent-dark.svg">
@@ -16,6 +14,8 @@
 </div>
 
 ---
+
+# Changelog
 
 All notable changes to TelemetryFlow Agent will be documented in this file.
 
