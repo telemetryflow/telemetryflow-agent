@@ -178,7 +178,7 @@ func runAgent() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	// Print startup banner
 	fmt.Print(version.Banner())

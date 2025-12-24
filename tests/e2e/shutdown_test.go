@@ -18,8 +18,11 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 
 	t.Run("should handle SIGTERM gracefully", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
 		// Build agent binary
-		buildCmd := exec.Command("go", "build", "-o", "../../build/tfo-agent", "../../cmd/tfo-agent")
+		buildCmd := exec.CommandContext(ctx, "go", "build", "-o", "../../build/tfo-agent", "../../cmd/tfo-agent")
 		err := buildCmd.Run()
 		require.NoError(t, err, "Failed to build agent binary")
 
@@ -46,7 +49,7 @@ func TestGracefulShutdown(t *testing.T) {
 			assert.NoError(t, err, "Agent should shutdown gracefully")
 		case <-time.After(5 * time.Second):
 			t.Fatal("Agent did not shutdown within timeout")
-			agentCmd.Process.Kill()
+			_ = agentCmd.Process.Kill()
 		}
 	})
 
@@ -74,7 +77,7 @@ func TestGracefulShutdown(t *testing.T) {
 			assert.NoError(t, err, "Agent should shutdown gracefully")
 		case <-time.After(5 * time.Second):
 			t.Fatal("Agent did not shutdown within timeout")
-			agentCmd.Process.Kill()
+			_ = agentCmd.Process.Kill()
 		}
 	})
 }

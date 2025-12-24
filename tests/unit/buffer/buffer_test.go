@@ -25,7 +25,7 @@ func TestBuffer(t *testing.T) {
 		b, err := buffer.New(cfg)
 		require.NoError(t, err)
 		assert.NotNil(t, b)
-		defer b.Close()
+		defer func() { _ = b.Close() }()
 	})
 
 	t.Run("should handle disabled buffer", func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestBuffer(t *testing.T) {
 
 		b, err := buffer.New(cfg)
 		require.NoError(t, err)
-		defer b.Close()
+		defer func() { _ = b.Close() }()
 
 		// Push test data
 		testData := map[string]interface{}{
@@ -82,7 +82,7 @@ func TestBuffer(t *testing.T) {
 
 		b, err := buffer.New(cfg)
 		require.NoError(t, err)
-		defer b.Close()
+		defer func() { _ = b.Close() }()
 
 		err = b.Push("logs", map[string]interface{}{"message": "test"})
 		require.NoError(t, err)
@@ -111,7 +111,7 @@ func TestBuffer(t *testing.T) {
 
 		b, err := buffer.New(cfg)
 		require.NoError(t, err)
-		defer b.Close()
+		defer func() { _ = b.Close() }()
 
 		// Create test entries
 		entries := []buffer.Entry{
@@ -126,9 +126,9 @@ func TestBuffer(t *testing.T) {
 
 		// Retry should increment retry count
 		b.Retry(entries)
-		
+
 		time.Sleep(200 * time.Millisecond)
-		
+
 		retrieved := b.Pop(10)
 		assert.Len(t, retrieved, 1)
 		assert.Equal(t, 1, retrieved[0].Retries)
@@ -144,12 +144,38 @@ func TestBuffer(t *testing.T) {
 
 		b, err := buffer.New(cfg)
 		require.NoError(t, err)
-		defer b.Close()
+		defer func() { _ = b.Close() }()
 
 		stats := b.Stats()
 		assert.True(t, stats.Enabled)
 		assert.Equal(t, int64(10), stats.MaxSizeMB)
 		assert.Equal(t, 0, stats.EntryCount)
+	})
+
+	t.Run("should use subdirectory path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		bufferPath := filepath.Join(tmpDir, "buffer", "data")
+
+		// Create nested directory
+		err := os.MkdirAll(bufferPath, 0755)
+		require.NoError(t, err)
+
+		cfg := buffer.Config{
+			Enabled:       true,
+			Path:          bufferPath,
+			MaxSizeMB:     10,
+			FlushInterval: time.Second,
+		}
+
+		b, err := buffer.New(cfg)
+		require.NoError(t, err)
+		assert.NotNil(t, b)
+		defer func() { _ = b.Close() }()
+
+		// Verify directory exists
+		info, err := os.Stat(bufferPath)
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
 	})
 }
 

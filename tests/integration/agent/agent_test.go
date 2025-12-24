@@ -24,7 +24,7 @@ func TestAgentIntegration(t *testing.T) {
 		cfg.Collector.System.Enabled = true
 		cfg.Collector.System.Interval = 2 * time.Second
 		cfg.Heartbeat.Interval = 5 * time.Second
-		
+
 		logger, _ := zap.NewDevelopment()
 
 		ag, err := agent.New(cfg, logger)
@@ -44,7 +44,7 @@ func TestAgentIntegration(t *testing.T) {
 
 		// Verify agent is running
 		assert.True(t, ag.IsRunning())
-		
+
 		stats := ag.Stats()
 		assert.True(t, stats.Running)
 		assert.Greater(t, stats.Uptime, time.Duration(0))
@@ -70,7 +70,7 @@ func TestAgentIntegration(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 
 			go func() {
-				ag.Run(ctx)
+				_ = ag.Run(ctx)
 			}()
 
 			time.Sleep(100 * time.Millisecond)

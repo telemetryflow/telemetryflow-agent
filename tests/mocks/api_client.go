@@ -8,6 +8,8 @@ import (
 	"context"
 
 	"github.com/stretchr/testify/mock"
+
+	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 )
 
 // HeartbeatRequest represents a heartbeat request
@@ -72,5 +74,11 @@ func (m *MockAPIClient) Deregister(ctx context.Context, agentID string) error {
 // Close mocks closing the client connection
 func (m *MockAPIClient) Close() error {
 	args := m.Called()
+	return args.Error(0)
+}
+
+// Heartbeat mocks the heartbeat API call (implements exporter.HeartbeatClient)
+func (m *MockAPIClient) Heartbeat(ctx context.Context, agentID string, sysInfo *api.SystemInfoPayload) error {
+	args := m.Called(ctx, agentID, sysInfo)
 	return args.Error(0)
 }

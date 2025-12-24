@@ -68,17 +68,17 @@ const (
 // SystemInfo contains system information for heartbeat
 type SystemInfo struct {
 	// Host information
-	Hostname     string `json:"hostname"`
-	OS           string `json:"os"`
-	OSVersion    string `json:"osVersion,omitempty"`
+	Hostname      string `json:"hostname"`
+	OS            string `json:"os"`
+	OSVersion     string `json:"osVersion,omitempty"`
 	KernelVersion string `json:"kernelVersion,omitempty"`
-	Architecture string `json:"architecture"`
-	Uptime       uint64 `json:"uptime"`
+	Architecture  string `json:"architecture"`
+	Uptime        uint64 `json:"uptime"`
 
 	// CPU information
-	CPUCores     int     `json:"cpuCores"`
-	CPUModel     string  `json:"cpuModel,omitempty"`
-	CPUUsage     float64 `json:"cpuUsage"`
+	CPUCores int     `json:"cpuCores"`
+	CPUModel string  `json:"cpuModel,omitempty"`
+	CPUUsage float64 `json:"cpuUsage"`
 
 	// Memory information
 	MemoryTotal     uint64  `json:"memoryTotal"`

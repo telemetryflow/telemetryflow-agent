@@ -20,7 +20,7 @@ func TestHeartbeatIntegration(t *testing.T) {
 
 	t.Run("should handle heartbeat lifecycle", func(t *testing.T) {
 		logger, _ := zap.NewDevelopment()
-		
+
 		// Create API client with test config
 		client := api.NewClient(api.ClientConfig{
 			BaseURL:       "http://localhost:3100",

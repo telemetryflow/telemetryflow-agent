@@ -60,7 +60,7 @@ func TestAgentLifecycle(t *testing.T) {
 		// Wait briefly then cancel
 		time.Sleep(100 * time.Millisecond)
 		assert.True(t, ag.IsRunning())
-		
+
 		cancel()
 
 		// Should shutdown gracefully
@@ -82,7 +82,7 @@ func TestAgentLifecycle(t *testing.T) {
 
 		// Start first instance
 		go func() {
-			ag.Run(ctx1)
+			_ = ag.Run(ctx1)
 		}()
 
 		time.Sleep(50 * time.Millisecond)
@@ -125,7 +125,7 @@ func TestAgentStats(t *testing.T) {
 		defer cancel()
 
 		go func() {
-			ag.Run(ctx)
+			_ = ag.Run(ctx)
 		}()
 
 		time.Sleep(100 * time.Millisecond)

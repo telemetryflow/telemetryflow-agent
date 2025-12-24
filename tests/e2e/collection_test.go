@@ -36,7 +36,7 @@ func TestMetricCollection(t *testing.T) {
 		assert.NotNil(t, agentCmd.Process)
 
 		// Stop agent
-		agentCmd.Process.Kill()
-		agentCmd.Wait()
+		_ = agentCmd.Process.Kill()
+		_ = agentCmd.Wait()
 	})
 }

@@ -34,10 +34,10 @@ func TestSystemCollector(t *testing.T) {
 	t.Run("should collect metrics", func(t *testing.T) {
 		logger, _ := zap.NewDevelopment()
 		cfg := system.HostCollectorConfig{
-			Interval:    time.Second,
-			CollectCPU:  true,
-			CollectMem:  true,
-			Logger:      logger,
+			Interval:   time.Second,
+			CollectCPU: true,
+			CollectMem: true,
+			Logger:     logger,
 		}
 
 		c := system.NewHostCollector(cfg)

@@ -43,7 +43,8 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m
 
-.PHONY: all build build-all clean test test-unit test-integration test-e2e test-all test-coverage test-script test-short deps lint lint-fix run install help tidy version validate-config
+.PHONY: all build build-all clean test test-unit test-integration test-e2e test-all test-coverage test-script test-short deps lint lint-fix run install help tidy version validate-config \
+	fmt-check vet staticcheck verify deps-verify test-unit-ci test-integration-ci test-e2e-ci security govulncheck coverage-merge ci-lint ci-test ci-build
 
 # Default target
 all: build
@@ -66,19 +67,27 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Testing Commands:$(NC)"
 	@echo "  make test             - Run unit and integration tests"
-	@echo "  make test-unit        - Run unit tests only"
-	@echo "  make test-integration - Run integration tests only"
 	@echo "  make test-e2e         - Run E2E tests only"
+	@echo "  make test-integration - Run integration tests only"
+	@echo "  make test-unit        - Run unit tests only"
 	@echo "  make test-all         - Run all tests"
 	@echo "  make test-coverage    - Run tests with coverage report"
 	@echo "  make test-script      - Run test script"
 	@echo "  make test-short       - Run short tests (skip E2E)"
+	@echo "  make bench            - Run benchmarks"
 	@echo ""
 	@echo "$(YELLOW)Code Quality:$(NC)"
 	@echo "  make lint             - Run linter"
 	@echo "  make lint-fix         - Run linter with auto-fix"
 	@echo "  make fmt              - Format code"
 	@echo "  make vet              - Run go vet"
+	@echo ""
+	@echo "$(YELLOW)Code Quality:$(NC)"
+	@echo "  make lint             - Run linter"
+	@echo "  make lint-fix         - Run linter with auto-fix"
+	@echo "  make fmt              - Format code"
+	@echo "  make vet              - Run go vet"
+	@echo "  make check            - Run all checks (fmt, vet, lint, test)"
 	@echo ""
 	@echo "$(YELLOW)Dependencies:$(NC)"
 	@echo "  make deps             - Download dependencies"
@@ -175,6 +184,10 @@ test-short:
 	@echo "$(GREEN)Running short tests (skip E2E)...$(NC)"
 	@./scripts/test.sh short
 
+bench:
+	@echo "$(GREEN)Running benchmarks...$(NC)"
+	@$(GOTEST) -bench=. -benchmem ./...
+
 ## Dependencies
 deps:
 	@echo "$(GREEN)Downloading dependencies...$(NC)"
@@ -213,10 +226,15 @@ lint-fix:
 fmt:
 	@echo "$(GREEN)Formatting code...$(NC)"
 	@$(GOCMD) fmt ./...
+	@echo "$(GREEN)Code formatted$(NC)"
 
 vet:
 	@echo "$(GREEN)Running go vet...$(NC)"
 	@$(GOCMD) vet ./...
+	@echo "$(GREEN)Vet complete$(NC)"
+
+check: fmt vet lint test
+	@echo "$(GREEN)All checks passed$(NC)"
 
 ## Configuration
 validate-config:
@@ -244,6 +262,39 @@ uninstall:
 	@sudo rm -f /usr/local/bin/$(BINARY_NAME)
 	@echo "$(GREEN)Uninstalled successfully$(NC)"
 
+## CI pipeline
+ci: deps check
+	@echo "$(GREEN)CI pipeline completed$(NC)"
+
+release-check:
+	@echo "$(GREEN)Checking release readiness...$(NC)"
+	@echo "$(BLUE)1. Running tests...$(NC)"
+	@$(MAKE) test
+	@echo "$(BLUE)2. Running linter...$(NC)"
+	@$(MAKE) lint
+	@echo "$(BLUE)3. Building...$(NC)"
+	@$(MAKE) build
+	@echo "$(GREEN)Release checks passed$(NC)"
+
+## Documentation
+docs:
+	@echo "$(GREEN)Documentation locations:$(NC)"
+	@echo "  - Command: docs/COMMANDS.md"
+	@echo "  - Configuration: docs/CONFIGURATION.md"
+	@echo "  - GitHub Workflow: docs/GITHUB-WORKFLOWS.md"
+	@echo "  - Installation: docs/INSTALLATION.md"
+	@echo "  - Security: SECURTY.md"
+	@echo "  - Contributing: CONTRIBUTING.md"
+
+godoc:
+	@echo "$(GREEN)Starting godoc server...$(NC)"
+	@if command -v godoc > /dev/null; then \
+		echo "$(GREEN)Open http://localhost:6060$(NC)"; \
+		godoc -http=:6060; \
+	else \
+		echo "$(YELLOW)godoc not installed. Install with: go install golang.org/x/tools/cmd/godoc@latest$(NC)"; \
+	fi
+
 ## Docker
 docker-build:
 	@echo "$(GREEN)Building Docker image...$(NC)"
@@ -268,3 +319,119 @@ version:
 	@echo "  Git Branch:   $(GIT_BRANCH)"
 	@echo "  Build Time:   $(BUILD_TIME)"
 	@echo "  Go Version:   $(GO_VERSION)"
+
+# =============================================================================
+# CI-Specific Targets
+# =============================================================================
+# These targets are optimized for CI/CD pipelines with proper exit codes,
+# coverage output, and race detection.
+
+## CI: Check formatting (fails if code needs formatting)
+fmt-check:
+	@echo "$(GREEN)Checking code formatting...$(NC)"
+	@if [ -n "$$(gofmt -l .)" ]; then \
+		echo "$(RED)The following files need formatting:$(NC)"; \
+		gofmt -l .; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Code formatting OK$(NC)"
+
+## CI: Run staticcheck
+staticcheck:
+	@echo "$(GREEN)Running staticcheck...$(NC)"
+	@if command -v staticcheck >/dev/null 2>&1; then \
+		staticcheck ./...; \
+	else \
+		echo "$(YELLOW)Installing staticcheck...$(NC)"; \
+		go install honnef.co/go/tools/cmd/staticcheck@latest; \
+		staticcheck ./...; \
+	fi
+
+## CI: Verify dependencies
+verify:
+	@echo "$(GREEN)Verifying dependencies...$(NC)"
+	@$(GOMOD) verify
+	@echo "$(GREEN)Dependencies verified$(NC)"
+
+## CI: Download and verify dependencies
+deps-verify: deps verify
+	@echo "$(GREEN)Dependencies downloaded and verified$(NC)"
+
+## CI: Run unit tests with race detection and coverage
+test-unit-ci:
+	@echo "$(GREEN)Running unit tests (CI mode)...$(NC)"
+	@$(GOTEST) -v -race -timeout 5m -coverprofile=coverage-unit.out -covermode=atomic ./tests/unit/...
+
+## CI: Run integration tests with race detection and coverage
+test-integration-ci:
+	@echo "$(GREEN)Running integration tests (CI mode)...$(NC)"
+	@$(GOTEST) -v -race -timeout 10m -coverprofile=coverage-integration.out -covermode=atomic ./tests/integration/...
+
+## CI: Run E2E tests
+test-e2e-ci:
+	@echo "$(GREEN)Running E2E tests (CI mode)...$(NC)"
+	@$(GOTEST) -v -timeout 15m ./tests/e2e/...
+
+## CI: Run security scan with gosec
+security:
+	@echo "$(GREEN)Running security scan...$(NC)"
+	@if command -v gosec >/dev/null 2>&1; then \
+		gosec -no-fail -fmt sarif -out gosec-results.sarif ./...; \
+	else \
+		echo "$(YELLOW)gosec not installed, skipping...$(NC)"; \
+	fi
+
+## CI: Run govulncheck
+govulncheck:
+	@echo "$(GREEN)Running govulncheck...$(NC)"
+	@if command -v govulncheck >/dev/null 2>&1; then \
+		govulncheck ./... || true; \
+	else \
+		echo "$(YELLOW)Installing govulncheck...$(NC)"; \
+		go install golang.org/x/vuln/cmd/govulncheck@latest; \
+		govulncheck ./... || true; \
+	fi
+
+## CI: Merge coverage files
+coverage-merge:
+	@echo "$(GREEN)Merging coverage files...$(NC)"
+	@if command -v gocovmerge >/dev/null 2>&1; then \
+		if [ -f coverage-integration.out ]; then \
+			gocovmerge coverage-unit.out coverage-integration.out > coverage-merged.out; \
+		else \
+			cp coverage-unit.out coverage-merged.out; \
+		fi; \
+	else \
+		echo "$(YELLOW)Installing gocovmerge...$(NC)"; \
+		go install github.com/wadey/gocovmerge@latest; \
+		if [ -f coverage-integration.out ]; then \
+			gocovmerge coverage-unit.out coverage-integration.out > coverage-merged.out; \
+		else \
+			cp coverage-unit.out coverage-merged.out; \
+		fi; \
+	fi
+	@echo "$(GREEN)Coverage merged to coverage-merged.out$(NC)"
+
+## CI: Generate coverage report
+coverage-report: coverage-merge
+	@echo "$(GREEN)Generating coverage report...$(NC)"
+	@$(GOCMD) tool cover -func=coverage-merged.out | tee coverage-summary.txt
+	@$(GOCMD) tool cover -html=coverage-merged.out -o coverage.html
+	@echo "$(GREEN)Coverage report generated$(NC)"
+
+## CI: Complete lint pipeline
+ci-lint: deps-verify fmt-check vet staticcheck lint
+	@echo "$(GREEN)CI lint pipeline completed$(NC)"
+
+## CI: Complete test pipeline
+ci-test: test-unit-ci test-integration-ci
+	@echo "$(GREEN)CI test pipeline completed$(NC)"
+
+## CI: Complete build verification for a specific platform
+ci-build:
+	@echo "$(GREEN)Building for CI ($(GOOS)/$(GOARCH))...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	@OUTPUT="$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH)"; \
+	if [ "$(GOOS)" = "windows" ]; then OUTPUT="$${OUTPUT}.exe"; fi; \
+	CGO_ENABLED=0 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $${OUTPUT} ./cmd/tfo-agent; \
+	echo "$(GREEN)Built: $${OUTPUT}$(NC)"

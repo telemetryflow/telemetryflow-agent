@@ -12,6 +12,11 @@ import (
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 )
 
+// HeartbeatClient defines the interface for sending heartbeats
+type HeartbeatClient interface {
+	Heartbeat(ctx context.Context, agentID string, sysInfo *api.SystemInfoPayload) error
+}
+
 // Heartbeat manages periodic heartbeat to the TelemetryFlow backend
 type Heartbeat struct {
 	config HeartbeatConfig
@@ -43,8 +48,8 @@ type HeartbeatConfig struct {
 	// IncludeSystemInfo includes system metrics in heartbeat
 	IncludeSystemInfo bool
 
-	// Client is the API client
-	Client *api.Client
+	// Client is the API client (implements HeartbeatClient interface)
+	Client HeartbeatClient
 
 	// Logger is the logger instance
 	Logger *zap.Logger

@@ -89,11 +89,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
-        include:
-          - arch: amd64
-            goarch: amd64
-          - arch: arm64
-            goarch: arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -104,22 +99,20 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Download dependencies
+        run: make deps
+
       - name: Build binary
+        run: make ci-build
         env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
           VERSION: ${{ needs.prepare.outputs.version }}
-          COMMIT: ${{ needs.prepare.outputs.commit }}
-          BRANCH: ${{ needs.prepare.outputs.branch }}
-          BUILD_TIME: ${{ needs.prepare.outputs.build_time }}
+
+      - name: Prepare artifact
         run: |
           mkdir -p dist
-          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build \
-            -ldflags "-s -w \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.Version=${VERSION} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.GitCommit=${COMMIT} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.GitBranch=${BRANCH} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.BuildTime=${BUILD_TIME}" \
-            -o dist/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }} \
-            ./cmd/tfo-agent
+          cp build/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }} dist/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -145,22 +138,20 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Download dependencies
+        run: make deps
+
       - name: Build binary
+        run: make ci-build
         env:
+          GOOS: windows
+          GOARCH: amd64
           VERSION: ${{ needs.prepare.outputs.version }}
-          COMMIT: ${{ needs.prepare.outputs.commit }}
-          BRANCH: ${{ needs.prepare.outputs.branch }}
-          BUILD_TIME: ${{ needs.prepare.outputs.build_time }}
+
+      - name: Prepare artifact
         run: |
           mkdir -p dist
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
-            -ldflags "-s -w \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.Version=${VERSION} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.GitCommit=${COMMIT} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.GitBranch=${BRANCH} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.BuildTime=${BUILD_TIME}" \
-            -o dist/${{ env.BINARY_NAME }}-windows-amd64.exe \
-            ./cmd/tfo-agent
+          cp build/${{ env.BINARY_NAME }}-windows-amd64.exe dist/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -189,22 +180,20 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Download dependencies
+        run: make deps
+
       - name: Build binary
+        run: make ci-build
         env:
+          GOOS: darwin
+          GOARCH: ${{ matrix.arch }}
           VERSION: ${{ needs.prepare.outputs.version }}
-          COMMIT: ${{ needs.prepare.outputs.commit }}
-          BRANCH: ${{ needs.prepare.outputs.branch }}
-          BUILD_TIME: ${{ needs.prepare.outputs.build_time }}
+
+      - name: Prepare artifact
         run: |
           mkdir -p dist
-          CGO_ENABLED=0 GOOS=darwin GOARCH=${{ matrix.arch }} go build \
-            -ldflags "-s -w \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.Version=${VERSION} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.GitCommit=${COMMIT} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.GitBranch=${BRANCH} \
-              -X github.com/telemetryflow/telemetryflow-agent/internal/version.BuildTime=${BUILD_TIME}" \
-            -o dist/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }} \
-            ./cmd/tfo-agent
+          cp build/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }} dist/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -909,17 +898,81 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download RPM packages
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: rpm-*
+          path: artifacts/rpm
+          merge-multiple: true
+
+      - name: Download DEB packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: artifacts/deb
+          merge-multiple: true
+
+      - name: Download Windows packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: windows-*
+          path: artifacts/windows
+          merge-multiple: true
+
+      - name: Download macOS DMG packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dmg-*
+          path: artifacts/dmg
+          merge-multiple: true
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tarball-*
+          path: artifacts/tarball
+          merge-multiple: true
 
       - name: Prepare release assets
         run: |
           mkdir -p release
-          find artifacts -type f \( -name "*.rpm" -o -name "*.deb" -o -name "*.zip" -o -name "*.dmg" -o -name "*.tar.gz" \) \
-            -exec cp {} release/ \;
+
+          echo "=== Downloaded artifacts structure ==="
+          find artifacts -type f -ls
+
+          echo ""
+          echo "=== Collecting RPM packages ==="
+          find artifacts/rpm -name "*.rpm" -exec cp {} release/ \; 2>/dev/null || echo "No RPM packages found"
+
+          echo "=== Collecting DEB packages ==="
+          find artifacts/deb -name "*.deb" -exec cp {} release/ \; 2>/dev/null || echo "No DEB packages found"
+
+          echo "=== Collecting Windows packages ==="
+          find artifacts/windows -name "*.zip" -exec cp {} release/ \; 2>/dev/null || echo "No Windows packages found"
+
+          echo "=== Collecting macOS DMG packages ==="
+          find artifacts/dmg -name "*.dmg" -exec cp {} release/ \; 2>/dev/null || echo "No DMG packages found"
+
+          echo "=== Collecting tarballs ==="
+          find artifacts/tarball -name "*.tar.gz" -exec cp {} release/ \; 2>/dev/null || echo "No tarballs found"
+
+          echo ""
+          echo "=== Release directory contents ==="
           ls -la release/
+
+          echo ""
+          echo "=== Package summary ==="
+          echo "RPM packages: $(ls release/*.rpm 2>/dev/null | wc -l)"
+          echo "DEB packages: $(ls release/*.deb 2>/dev/null | wc -l)"
+          echo "Windows ZIP:  $(ls release/*.zip 2>/dev/null | wc -l)"
+          echo "macOS DMG:    $(ls release/*.dmg 2>/dev/null | wc -l)"
+          echo "Tarballs:     $(ls release/*.tar.gz 2>/dev/null | wc -l)"
+          echo "Total files:  $(ls release/ | wc -l)"
+
+          if [ -z "$(ls -A release/)" ]; then
+            echo "ERROR: No release assets found!"
+            exit 1
+          fi
 
       - name: Generate checksums
         run: |
@@ -927,13 +980,27 @@ jobs:
           sha256sum * > checksums-sha256.txt
           cat checksums-sha256.txt
 
+      - name: Create tag if not exists (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG_NAME="v${{ needs.prepare.outputs.version }}"
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+            git push origin "$TAG_NAME"
+            echo "Created tag: $TAG_NAME"
+          else
+            echo "Tag $TAG_NAME already exists"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: "${{ env.PRODUCT_NAME }} v${{ needs.prepare.outputs.version }}"
           tag_name: "v${{ needs.prepare.outputs.version }}"
           draft: false
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease == 'true' }}
           generate_release_notes: true
           files: |
             release/*
@@ -979,3 +1046,29 @@ jobs:
             ---
 
             📚 [Documentation](https://docs.telemetryflow.id) | 🐛 [Report Issues](https://github.com/telemetryflow/telemetryflow-agent/issues)
+
+      - name: Release summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Product** | ${{ env.PRODUCT_NAME }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ needs.prepare.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tag** | v${{ needs.prepare.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | ${{ needs.prepare.outputs.commit }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Packages Included" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package Type | Architectures |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------------|---------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **RPM** | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **DEB** | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Windows ZIP** | amd64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **macOS DMG** | amd64 (Intel), arm64 (Apple Silicon) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tarball** | linux-amd64, linux-arm64, darwin-amd64, darwin-arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📁 Release Assets" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -la release/ >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

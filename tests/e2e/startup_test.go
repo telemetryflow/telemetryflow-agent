@@ -36,8 +36,8 @@ func TestAgentStartup(t *testing.T) {
 		assert.NotNil(t, agentCmd.Process)
 
 		// Stop agent
-		agentCmd.Process.Kill()
-		agentCmd.Wait()
+		_ = agentCmd.Process.Kill()
+		_ = agentCmd.Wait()
 	})
 
 	t.Run("should fail with invalid config", func(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -47,14 +48,7 @@ func TestHeartbeat(t *testing.T) {
 		}
 
 		// Mock successful heartbeat
-		mockClient.On("SendHeartbeat", context.Background(), &mocks.HeartbeatRequest{
-			AgentID:   "test-agent",
-			Hostname:  "test-host",
-			Status:    "active",
-		}).Return(&mocks.HeartbeatResponse{
-			Status:     "ok",
-			ServerTime: time.Now().Unix(),
-		}, nil)
+		mockClient.On("Heartbeat", mock.Anything, "test-agent", (*api.SystemInfoPayload)(nil)).Return(nil)
 
 		h := exporter.NewHeartbeat(cfg)
 
@@ -109,9 +103,9 @@ func TestHeartbeat(t *testing.T) {
 		logger, _ := zap.NewDevelopment()
 
 		cfg := exporter.HeartbeatConfig{
-			AgentID:  "test-agent",
-			Client:   mockClient,
-			Logger:   logger,
+			AgentID: "test-agent",
+			Client:  mockClient,
+			Logger:  logger,
 		}
 
 		h := exporter.NewHeartbeat(cfg)

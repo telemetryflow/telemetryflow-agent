@@ -93,12 +93,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Go (for version info)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
       - name: Get build info
         id: info
         run: |
           echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "branch=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
           echo "build_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          # Get Go version from Makefile
+          echo "go_version=$(go version | cut -d ' ' -f 3)" >> $GITHUB_OUTPUT
 
       - name: Check if should push
         id: check

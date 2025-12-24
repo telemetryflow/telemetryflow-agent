@@ -201,7 +201,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
@@ -289,7 +289,7 @@ func (c *Client) RequestWithGzip(ctx context.Context, method, path string, body 
 			lastErr = err
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
