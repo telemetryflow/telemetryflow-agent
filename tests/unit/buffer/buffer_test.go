@@ -45,6 +45,7 @@ func TestBuffer(t *testing.T) {
 			Enabled:       true,
 			Path:          tmpDir,
 			MaxSizeMB:     10,
+			MaxAge:        1 * time.Hour,
 			FlushInterval: 100 * time.Millisecond,
 		}
 
@@ -77,6 +78,7 @@ func TestBuffer(t *testing.T) {
 			Enabled:       true,
 			Path:          tmpDir,
 			MaxSizeMB:     10,
+			MaxAge:        1 * time.Hour,
 			FlushInterval: 100 * time.Millisecond,
 		}
 
@@ -106,6 +108,7 @@ func TestBuffer(t *testing.T) {
 			Enabled:       true,
 			Path:          tmpDir,
 			MaxSizeMB:     10,
+			MaxAge:        1 * time.Hour,
 			FlushInterval: 100 * time.Millisecond,
 		}
 
@@ -137,9 +140,11 @@ func TestBuffer(t *testing.T) {
 	t.Run("should return stats", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		cfg := buffer.Config{
-			Enabled:   true,
-			Path:      tmpDir,
-			MaxSizeMB: 10,
+			Enabled:       true,
+			Path:          tmpDir,
+			MaxSizeMB:     10,
+			MaxAge:        1 * time.Hour,
+			FlushInterval: 100 * time.Millisecond,
 		}
 
 		b, err := buffer.New(cfg)

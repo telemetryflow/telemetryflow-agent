@@ -819,6 +819,19 @@ jobs:
           DMG_NAME="${{ env.BINARY_NAME }}-${VERSION}-darwin-${{ matrix.arch }}.dmg"
           VOLUME_NAME="${{ env.PRODUCT_NAME }} ${VERSION}"
 
+          # Prevent Spotlight indexing which can cause "Resource busy" errors
+          touch dmg-contents/.metadata_never_index
+
+          # Detach any existing mounted volumes with the same name
+          hdiutil detach "/Volumes/${VOLUME_NAME}" 2>/dev/null || true
+
+          # Remove any existing DMG file
+          rm -f "${DMG_NAME}"
+
+          # Sync filesystem and wait for file handles to be released
+          sync
+          sleep 2
+
           hdiutil create -volname "${VOLUME_NAME}" \
                          -srcfolder "dmg-contents" \
                          -ov -format UDZO \

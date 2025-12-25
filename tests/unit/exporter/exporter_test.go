@@ -69,10 +69,9 @@ func TestHeartbeat(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, h.IsRunning())
 
-		// Wait for context cancellation
-		cancel()
+		// Wait for Start to return - Stop() causes Start() to return nil via stopChan
 		err = <-errChan
-		assert.Error(t, err) // Should be context.Canceled
+		assert.NoError(t, err) // Stop() causes graceful shutdown, returns nil
 	})
 
 	t.Run("should send immediate heartbeat", func(t *testing.T) {
@@ -86,8 +85,8 @@ func TestHeartbeat(t *testing.T) {
 			Logger:   logger,
 		}
 
-		// Mock heartbeat call
-		mockClient.On("Heartbeat", context.Background(), "test-agent", (*api.SystemInfoPayload)(nil)).Return(nil)
+		// Mock heartbeat call - use mock.Anything for context since sendHeartbeat wraps it with timeout
+		mockClient.On("Heartbeat", mock.Anything, "test-agent", (*api.SystemInfoPayload)(nil)).Return(nil)
 
 		h := exporter.NewHeartbeat(cfg)
 
