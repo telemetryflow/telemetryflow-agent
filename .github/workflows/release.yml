@@ -268,7 +268,8 @@ jobs:
           URL:            ${{ env.HOMEPAGE }}
           Source0:        %{name}-%{version}.tar.gz
 
-          BuildArch:      ${{ matrix.rpm_arch }}
+          # Note: BuildArch is intentionally omitted - we package pre-built binaries
+          # The target architecture is specified via rpmbuild --target flag
 
           %description
           ${{ env.PRODUCT_NAME }} is an enterprise-grade telemetry collection agent
@@ -1046,29 +1047,3 @@ jobs:
             ---
 
             📚 [Documentation](https://docs.telemetryflow.id) | 🐛 [Report Issues](https://github.com/telemetryflow/telemetryflow-agent/issues)
-
-      - name: Release summary
-        run: |
-          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Product** | ${{ env.PRODUCT_NAME }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Version** | ${{ needs.prepare.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Tag** | v${{ needs.prepare.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commit** | ${{ needs.prepare.outputs.commit }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Packages Included" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Package Type | Architectures |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------------|---------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **RPM** | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| **DEB** | amd64, arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Windows ZIP** | amd64 |" >> $GITHUB_STEP_SUMMARY
-          echo "| **macOS DMG** | amd64 (Intel), arm64 (Apple Silicon) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Tarball** | linux-amd64, linux-arm64, darwin-amd64, darwin-arm64 |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📁 Release Assets" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          ls -la release/ >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY

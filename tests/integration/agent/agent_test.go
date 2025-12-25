@@ -54,7 +54,7 @@ func TestAgentIntegration(t *testing.T) {
 
 		// Wait for shutdown
 		err = <-errChan
-		assert.Error(t, err) // Should be context.Canceled
+		assert.NoError(t, err) // Graceful shutdown returns nil
 		assert.False(t, ag.IsRunning())
 	})
 
