@@ -73,7 +73,7 @@ func New(config Config) (*Buffer, error) {
 	}
 
 	// Create buffer directory
-	if err := os.MkdirAll(config.Path, 0755); err != nil {
+	if err := os.MkdirAll(config.Path, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create buffer directory: %w", err)
 	}
 
@@ -260,7 +260,7 @@ func (b *Buffer) flush() error {
 		return fmt.Errorf("failed to marshal buffer: %w", err)
 	}
 
-	if err := os.WriteFile(filename, data, 0644); err != nil {
+	if err := os.WriteFile(filename, data, 0600); err != nil {
 		return fmt.Errorf("failed to write buffer file: %w", err)
 	}
 

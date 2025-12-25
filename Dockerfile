@@ -83,8 +83,9 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
       io.telemetryflow.platform="CEOP" \
       io.telemetryflow.maintainer="DevOpsCorner Indonesia"
 
-# Install runtime dependencies
-RUN apk add --no-cache \
+# Update packages to get security patches (CVE fixes) and install runtime dependencies
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     ca-certificates \
     tzdata \
     curl \
