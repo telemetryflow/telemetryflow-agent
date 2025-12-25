@@ -240,12 +240,17 @@ func (a *Agent) Stats() AgentStats {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
+	var uptime time.Duration
+	if a.running {
+		uptime = time.Since(a.started)
+	}
+
 	return AgentStats{
 		ID:             a.id,
 		Hostname:       a.config.Agent.Hostname,
 		Running:        a.running,
 		Started:        a.started,
-		Uptime:         time.Since(a.started),
+		Uptime:         uptime,
 		CollectorCount: len(a.collectors),
 	}
 }
