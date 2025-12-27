@@ -130,7 +130,7 @@ func configCmd() *cobra.Command {
 				return fmt.Errorf("configuration validation failed: %w", err)
 			}
 			fmt.Printf("Configuration is valid\n")
-			fmt.Printf("  Endpoint: %s\n", cfg.API.Endpoint)
+			fmt.Printf("  Endpoint: %s\n", cfg.GetEffectiveEndpoint())
 			fmt.Printf("  Hostname: %s\n", cfg.Agent.Hostname)
 			fmt.Printf("  Heartbeat Interval: %s\n", cfg.Heartbeat.Interval)
 			return nil
@@ -190,7 +190,7 @@ func runAgent() error {
 		zap.String("vendor", version.Vendor),
 		zap.String("developer", version.Developer),
 		zap.String("hostname", cfg.Agent.Hostname),
-		zap.String("endpoint", cfg.API.Endpoint),
+		zap.String("endpoint", cfg.GetEffectiveEndpoint()),
 	)
 
 	// Create context with cancellation
@@ -275,10 +275,10 @@ func printConfig(cfg *config.Config) {
 	fmt.Printf("  ID:       %s\n", cfg.Agent.ID)
 	fmt.Printf("  Hostname: %s\n", cfg.Agent.Hostname)
 
-	fmt.Printf("\nAPI:\n")
-	fmt.Printf("  Endpoint:    %s\n", cfg.API.Endpoint)
-	fmt.Printf("  Workspace:   %s\n", cfg.API.WorkspaceID)
-	fmt.Printf("  TLS Enabled: %v\n", cfg.API.TLS.Enabled)
+	fmt.Printf("\nTelemetryFlow:\n")
+	fmt.Printf("  Endpoint:    %s\n", cfg.GetEffectiveEndpoint())
+	fmt.Printf("  Workspace:   %s\n", cfg.GetEffectiveWorkspaceID())
+	fmt.Printf("  TLS Enabled: %v\n", cfg.GetEffectiveTLSConfig().Enabled)
 
 	fmt.Printf("\nHeartbeat:\n")
 	fmt.Printf("  Interval: %s\n", cfg.Heartbeat.Interval)

@@ -59,7 +59,7 @@ graph LR
     end
 
     subgraph "SDKs"
-        SDK[TFO-GO-SDK<br/>v0.1.0]
+        SDK[TFO-Go-SDK<br/>v1.1.0]
     end
 
     subgraph "Agents"

@@ -399,6 +399,58 @@ func (c *Config) GetEffectiveAPIKeySecret() string {
 	return c.API.APIKeySecret
 }
 
+// GetEffectiveTimeout returns the timeout to use
+func (c *Config) GetEffectiveTimeout() time.Duration {
+	if c.TelemetryFlow.Timeout > 0 {
+		return c.TelemetryFlow.Timeout
+	}
+	if c.API.Timeout > 0 {
+		return c.API.Timeout
+	}
+	return 30 * time.Second
+}
+
+// GetEffectiveRetryAttempts returns the retry attempts to use
+func (c *Config) GetEffectiveRetryAttempts() int {
+	if c.TelemetryFlow.Retry.MaxAttempts > 0 {
+		return c.TelemetryFlow.Retry.MaxAttempts
+	}
+	if c.API.RetryAttempts > 0 {
+		return c.API.RetryAttempts
+	}
+	return 3
+}
+
+// GetEffectiveRetryDelay returns the retry delay to use
+func (c *Config) GetEffectiveRetryDelay() time.Duration {
+	if c.TelemetryFlow.Retry.InitialInterval > 0 {
+		return c.TelemetryFlow.Retry.InitialInterval
+	}
+	if c.API.RetryDelay > 0 {
+		return c.API.RetryDelay
+	}
+	return time.Second
+}
+
+// GetEffectiveTLSConfig returns the TLS config to use
+func (c *Config) GetEffectiveTLSConfig() TLSConfig {
+	// If TelemetryFlow endpoint is set, use its TLS config
+	if c.TelemetryFlow.Endpoint != "" {
+		return c.TelemetryFlow.TLS
+	}
+	return c.API.TLS
+}
+
+// GetEffectiveWorkspaceID returns the workspace ID (only from legacy API config)
+func (c *Config) GetEffectiveWorkspaceID() string {
+	return c.API.WorkspaceID
+}
+
+// GetEffectiveTenantID returns the tenant ID (only from legacy API config)
+func (c *Config) GetEffectiveTenantID() string {
+	return c.API.TenantID
+}
+
 // Errors
 var (
 	ErrMissingEndpoint          = configError("telemetryflow.endpoint or api.endpoint is required")

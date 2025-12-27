@@ -75,14 +75,14 @@ type OTLPExporterConfig struct {
 
 // OTLPExporterStats contains exporter statistics
 type OTLPExporterStats struct {
-	Running       bool
-	ExportCount   int64
-	ErrorCount    int64
-	LastExportAt  time.Time
-	LastError     error
-	LastErrorAt   time.Time
-	MetricsSent   int64
-	BytesSent     int64
+	Running      bool
+	ExportCount  int64
+	ErrorCount   int64
+	LastExportAt time.Time
+	LastError    error
+	LastErrorAt  time.Time
+	MetricsSent  int64
+	BytesSent    int64
 }
 
 // NewOTLPExporter creates a new OTLP exporter

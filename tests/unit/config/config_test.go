@@ -2,6 +2,8 @@
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+//
+//nolint:staticcheck // This file tests deprecated API config for backward compatibility
 package config_test
 
 import (
@@ -108,7 +110,7 @@ func TestConfigValidation(t *testing.T) {
 
 	t.Run("should pass validation with only TelemetryFlow endpoint", func(t *testing.T) {
 		cfg := config.DefaultConfig()
-		cfg.API.Endpoint = "" // Clear legacy endpoint
+		cfg.API.Endpoint = ""
 
 		err := cfg.Validate()
 		assert.NoError(t, err)
@@ -183,7 +185,6 @@ func TestConfigHelpers(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.TelemetryFlow.APIKeyID = "tfk_new_key"
 		cfg.API.APIKeyID = "old_key"
-
 		assert.Equal(t, "tfk_new_key", cfg.GetEffectiveAPIKeyID())
 	})
 
@@ -191,7 +192,6 @@ func TestConfigHelpers(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.TelemetryFlow.APIKeyID = ""
 		cfg.API.APIKeyID = "old_key"
-
 		assert.Equal(t, "old_key", cfg.GetEffectiveAPIKeyID())
 	})
 
@@ -199,7 +199,6 @@ func TestConfigHelpers(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.TelemetryFlow.APIKeySecret = "tfs_new_secret"
 		cfg.API.APIKeySecret = "old_secret"
-
 		assert.Equal(t, "tfs_new_secret", cfg.GetEffectiveAPIKeySecret())
 	})
 
@@ -207,7 +206,6 @@ func TestConfigHelpers(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.TelemetryFlow.APIKeySecret = ""
 		cfg.API.APIKeySecret = "old_secret"
-
 		assert.Equal(t, "old_secret", cfg.GetEffectiveAPIKeySecret())
 	})
 }

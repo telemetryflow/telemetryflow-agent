@@ -43,22 +43,23 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		logger.Info("Generated new agent ID", zap.String("id", agentID))
 	}
 
-	// Create API client
+	// Create API client using helper methods (prefer TelemetryFlow config over legacy API)
+	tlsConfig := cfg.GetEffectiveTLSConfig()
 	client := api.NewClient(api.ClientConfig{
-		BaseURL:       cfg.API.Endpoint,
-		APIKeyID:      cfg.API.APIKeyID,
-		APIKeySecret:  cfg.API.APIKeySecret,
-		WorkspaceID:   cfg.API.WorkspaceID,
-		TenantID:      cfg.API.TenantID,
-		Timeout:       cfg.API.Timeout,
-		RetryAttempts: cfg.API.RetryAttempts,
-		RetryDelay:    cfg.API.RetryDelay,
+		BaseURL:       cfg.GetEffectiveEndpoint(),
+		APIKeyID:      cfg.GetEffectiveAPIKeyID(),
+		APIKeySecret:  cfg.GetEffectiveAPIKeySecret(),
+		WorkspaceID:   cfg.GetEffectiveWorkspaceID(),
+		TenantID:      cfg.GetEffectiveTenantID(),
+		Timeout:       cfg.GetEffectiveTimeout(),
+		RetryAttempts: cfg.GetEffectiveRetryAttempts(),
+		RetryDelay:    cfg.GetEffectiveRetryDelay(),
 		TLSConfig: api.TLSConfig{
-			Enabled:    cfg.API.TLS.Enabled,
-			SkipVerify: cfg.API.TLS.SkipVerify,
-			CertFile:   cfg.API.TLS.CertFile,
-			KeyFile:    cfg.API.TLS.KeyFile,
-			CAFile:     cfg.API.TLS.CAFile,
+			Enabled:    tlsConfig.Enabled,
+			SkipVerify: tlsConfig.SkipVerify,
+			CertFile:   tlsConfig.CertFile,
+			KeyFile:    tlsConfig.KeyFile,
+			CAFile:     tlsConfig.CAFile,
 		},
 		Logger: logger,
 	})
