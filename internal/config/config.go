@@ -41,6 +41,12 @@ type TelemetryFlowConfig struct {
 
 	// Retry contains retry settings
 	Retry RetryConfig `mapstructure:"retry"`
+
+	// WorkspaceID is the workspace identifier
+	WorkspaceID string `mapstructure:"workspace_id"`
+
+	// TenantID is the tenant identifier
+	TenantID string `mapstructure:"tenant_id"`
 }
 
 // RetryConfig contains retry settings
@@ -359,8 +365,8 @@ func DefaultConfig() *Config {
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
-	// Check TelemetryFlow config first, fall back to legacy API config
-	if c.TelemetryFlow.Endpoint == "" && c.API.Endpoint == "" {
+	// Check TelemetryFlow endpoint
+	if c.TelemetryFlow.Endpoint == "" {
 		return ErrMissingEndpoint
 	}
 	if c.Heartbeat.Interval < time.Second {
@@ -375,37 +381,25 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// GetEffectiveEndpoint returns the endpoint to use (prefers TelemetryFlow over legacy API)
+// GetEffectiveEndpoint returns the TelemetryFlow endpoint
 func (c *Config) GetEffectiveEndpoint() string {
-	if c.TelemetryFlow.Endpoint != "" {
-		return c.TelemetryFlow.Endpoint
-	}
-	return c.API.Endpoint
+	return c.TelemetryFlow.Endpoint
 }
 
-// GetEffectiveAPIKeyID returns the API key ID to use
+// GetEffectiveAPIKeyID returns the TelemetryFlow API key ID
 func (c *Config) GetEffectiveAPIKeyID() string {
-	if c.TelemetryFlow.APIKeyID != "" {
-		return c.TelemetryFlow.APIKeyID
-	}
-	return c.API.APIKeyID
+	return c.TelemetryFlow.APIKeyID
 }
 
-// GetEffectiveAPIKeySecret returns the API key secret to use
+// GetEffectiveAPIKeySecret returns the TelemetryFlow API key secret
 func (c *Config) GetEffectiveAPIKeySecret() string {
-	if c.TelemetryFlow.APIKeySecret != "" {
-		return c.TelemetryFlow.APIKeySecret
-	}
-	return c.API.APIKeySecret
+	return c.TelemetryFlow.APIKeySecret
 }
 
 // GetEffectiveTimeout returns the timeout to use
 func (c *Config) GetEffectiveTimeout() time.Duration {
 	if c.TelemetryFlow.Timeout > 0 {
 		return c.TelemetryFlow.Timeout
-	}
-	if c.API.Timeout > 0 {
-		return c.API.Timeout
 	}
 	return 30 * time.Second
 }
@@ -415,9 +409,6 @@ func (c *Config) GetEffectiveRetryAttempts() int {
 	if c.TelemetryFlow.Retry.MaxAttempts > 0 {
 		return c.TelemetryFlow.Retry.MaxAttempts
 	}
-	if c.API.RetryAttempts > 0 {
-		return c.API.RetryAttempts
-	}
 	return 3
 }
 
@@ -426,34 +417,27 @@ func (c *Config) GetEffectiveRetryDelay() time.Duration {
 	if c.TelemetryFlow.Retry.InitialInterval > 0 {
 		return c.TelemetryFlow.Retry.InitialInterval
 	}
-	if c.API.RetryDelay > 0 {
-		return c.API.RetryDelay
-	}
 	return time.Second
 }
 
-// GetEffectiveTLSConfig returns the TLS config to use
+// GetEffectiveTLSConfig returns the TelemetryFlow TLS config
 func (c *Config) GetEffectiveTLSConfig() TLSConfig {
-	// If TelemetryFlow endpoint is set, use its TLS config
-	if c.TelemetryFlow.Endpoint != "" {
-		return c.TelemetryFlow.TLS
-	}
-	return c.API.TLS
+	return c.TelemetryFlow.TLS
 }
 
-// GetEffectiveWorkspaceID returns the workspace ID (only from legacy API config)
+// GetEffectiveWorkspaceID returns the workspace ID
 func (c *Config) GetEffectiveWorkspaceID() string {
-	return c.API.WorkspaceID
+	return c.TelemetryFlow.WorkspaceID
 }
 
-// GetEffectiveTenantID returns the tenant ID (only from legacy API config)
+// GetEffectiveTenantID returns the tenant ID
 func (c *Config) GetEffectiveTenantID() string {
-	return c.API.TenantID
+	return c.TelemetryFlow.TenantID
 }
 
 // Errors
 var (
-	ErrMissingEndpoint          = configError("telemetryflow.endpoint or api.endpoint is required")
+	ErrMissingEndpoint          = configError("telemetryflow.endpoint is required")
 	ErrInvalidHeartbeatInterval = configError("heartbeat.interval must be at least 1 second")
 	ErrInvalidProtocol          = configError("telemetryflow.protocol must be 'grpc' or 'http'")
 )

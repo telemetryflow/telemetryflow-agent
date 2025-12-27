@@ -19,11 +19,9 @@ func TestDefaultConfig(t *testing.T) {
 		cfg := config.DefaultConfig()
 
 		require.NotNil(t, cfg)
-		// Check new TelemetryFlow config
+		// Check TelemetryFlow config
 		assert.Equal(t, "localhost:4317", cfg.TelemetryFlow.Endpoint)
 		assert.Equal(t, "grpc", cfg.TelemetryFlow.Protocol)
-		// Check legacy API config (for backward compatibility)
-		assert.Equal(t, "http://localhost:3100", cfg.API.Endpoint)
 		assert.Equal(t, 60*time.Second, cfg.Heartbeat.Interval)
 		assert.True(t, cfg.Collector.System.Enabled)
 		assert.Equal(t, "info", cfg.Logging.Level)
@@ -96,30 +94,13 @@ func TestConfigValidation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("should fail validation with missing both endpoints", func(t *testing.T) {
+	t.Run("should fail validation with missing endpoint", func(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.TelemetryFlow.Endpoint = ""
-		cfg.API.Endpoint = ""
 
 		err := cfg.Validate()
 		assert.Error(t, err)
 		assert.Equal(t, config.ErrMissingEndpoint, err)
-	})
-
-	t.Run("should pass validation with only TelemetryFlow endpoint", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.API.Endpoint = ""
-
-		err := cfg.Validate()
-		assert.NoError(t, err)
-	})
-
-	t.Run("should pass validation with only legacy API endpoint", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.TelemetryFlow.Endpoint = "" // Clear new endpoint
-
-		err := cfg.Validate()
-		assert.NoError(t, err)
 	})
 
 	t.Run("should fail validation with invalid heartbeat interval", func(t *testing.T) {
@@ -166,45 +147,22 @@ func TestConfigValidation(t *testing.T) {
 }
 
 func TestConfigHelpers(t *testing.T) {
-	t.Run("should prefer TelemetryFlow endpoint over legacy", func(t *testing.T) {
+	t.Run("should return TelemetryFlow endpoint", func(t *testing.T) {
 		cfg := config.DefaultConfig()
 
 		assert.Equal(t, "localhost:4317", cfg.GetEffectiveEndpoint())
 	})
 
-	t.Run("should fall back to legacy endpoint if TelemetryFlow is empty", func(t *testing.T) {
+	t.Run("should return TelemetryFlow API key ID", func(t *testing.T) {
 		cfg := config.DefaultConfig()
-		cfg.TelemetryFlow.Endpoint = ""
-
-		assert.Equal(t, "http://localhost:3100", cfg.GetEffectiveEndpoint())
+		cfg.TelemetryFlow.APIKeyID = "tfk_test_key"
+		assert.Equal(t, "tfk_test_key", cfg.GetEffectiveAPIKeyID())
 	})
 
-	t.Run("should prefer TelemetryFlow API key ID", func(t *testing.T) {
+	t.Run("should return TelemetryFlow API key secret", func(t *testing.T) {
 		cfg := config.DefaultConfig()
-		cfg.TelemetryFlow.APIKeyID = "tfk_new_key"
-		cfg.API.APIKeyID = "old_key"
-		assert.Equal(t, "tfk_new_key", cfg.GetEffectiveAPIKeyID())
-	})
-
-	t.Run("should fall back to legacy API key ID", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.TelemetryFlow.APIKeyID = ""
-		cfg.API.APIKeyID = "old_key"
-		assert.Equal(t, "old_key", cfg.GetEffectiveAPIKeyID())
-	})
-
-	t.Run("should prefer TelemetryFlow API key secret", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.TelemetryFlow.APIKeySecret = "tfs_new_secret"
-		cfg.API.APIKeySecret = "old_secret"
-		assert.Equal(t, "tfs_new_secret", cfg.GetEffectiveAPIKeySecret())
-	})
-
-	t.Run("should fall back to legacy API key secret", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.TelemetryFlow.APIKeySecret = ""
-		cfg.API.APIKeySecret = "old_secret"
-		assert.Equal(t, "old_secret", cfg.GetEffectiveAPIKeySecret())
+		cfg.TelemetryFlow.APIKeySecret = "tfs_test_secret"
+		assert.Equal(t, "tfs_test_secret", cfg.GetEffectiveAPIKeySecret())
 	})
 }
 
@@ -234,28 +192,6 @@ func TestAgentConfig(t *testing.T) {
 
 		assert.Equal(t, "production", cfg.Agent.Tags["environment"])
 		assert.Equal(t, "us-east-1", cfg.Agent.Tags["datacenter"])
-	})
-}
-
-func TestAPIConfig(t *testing.T) {
-	t.Run("should have correct default timeout", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-
-		assert.Equal(t, 30*time.Second, cfg.API.Timeout)
-	})
-
-	t.Run("should have correct default retry settings", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-
-		assert.Equal(t, 3, cfg.API.RetryAttempts)
-		assert.Equal(t, time.Second, cfg.API.RetryDelay)
-	})
-
-	t.Run("should have TLS disabled by default", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-
-		assert.False(t, cfg.API.TLS.Enabled)
-		assert.False(t, cfg.API.TLS.SkipVerify)
 	})
 }
 
