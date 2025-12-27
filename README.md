@@ -9,13 +9,14 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL](https://img.shields.io/badge/OpenTelemetry-Agent-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
+[![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](CHANGELOG.md)
 
 </div>
 
 ---
 
-Enterprise-grade telemetry collection agent based on **OpenTelemetry Agent Community**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
+Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.39.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
 
 This agent works as the **client-side counterpart** to the TelemetryFlow Backend Agent Module (NestJS), providing:
 
@@ -24,11 +25,48 @@ This agent works as the **client-side counterpart** to the TelemetryFlow Backend
 - System metrics collection
 - OTLP telemetry export
 
+## TelemetryFlow Ecosystem
+
+TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same OpenTelemetry SDK version:
+
+```mermaid
+graph LR
+    subgraph "TelemetryFlow Ecosystem v1.1.0"
+        subgraph "Instrumentation"
+            SDK[TFO-Go-SDK<br/>OTEL SDK v1.39.0]
+        end
+
+        subgraph "Collection"
+            AGENT[TFO-Agent<br/>OTEL SDK v1.39.0]
+        end
+
+        subgraph "Processing"
+            COLLECTOR[TFO-Collector<br/>OTEL v0.142.0]
+        end
+    end
+
+    APP[Application] --> SDK
+    SDK -->|OTLP| AGENT
+    HOST[Host Metrics] --> AGENT
+    AGENT -->|OTLP gRPC/HTTP| COLLECTOR
+    COLLECTOR --> BACKEND[TelemetryFlow<br/>Platform]
+
+    style SDK fill:#81C784,stroke:#388E3C
+    style AGENT fill:#64B5F6,stroke:#1976D2
+    style COLLECTOR fill:#FFB74D,stroke:#F57C00
+```
+
+| Component | Version | OTEL Base | Description |
+|-----------|---------|-----------|-------------|
+| **TFO-Agent** | v1.1.0 | SDK v1.39.0 | Telemetry collection agent |
+| **TFO-Go-SDK** | v1.1.0 | SDK v1.39.0 | Go instrumentation SDK |
+| **TFO-Collector** | v1.1.0 | Collector v0.142.0 | Central telemetry collector |
+
 ## Features
 
 ### OpenTelemetry Core
 
-- **OpenTelemetry Native**: Built on OTEL Agent Community standards
+- **OpenTelemetry SDK v1.39.0**: Built on standard OTEL Go SDK (aligned with TFO-Go-SDK)
 - **OTLP Export**: OpenTelemetry Protocol for metrics, logs, and traces
 - **Multi-Signal Support**: Metrics, logs, and traces collection
 
@@ -98,11 +136,11 @@ docker-compose down
 ```bash
 # Build image
 docker build \
-  --build-arg VERSION=1.0.0 \
+  --build-arg VERSION=1.1.0 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/tfo-agent:1.0.0 .
+  -t telemetryflow/telemetryflow-agent:1.1.0 .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -112,7 +150,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/tfo-agent:1.0.0
+  telemetryflow/telemetryflow-agent:1.1.0
 ```
 
 ## Configuration
@@ -120,31 +158,68 @@ docker run -d --name tfo-agent \
 Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
 
 ```yaml
-api:
-  endpoint: "https://api.telemetryflow.id"
-  api_key_id: "your-api-key"
-  api_key_secret: "your-api-secret"
+# TelemetryFlow Platform Configuration (v1.1.0+)
+telemetryflow:
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+  protocol: grpc  # grpc or http
+  tls:
+    enabled: true
+    skip_verify: false
+  retry:
+    enabled: true
+    max_attempts: 3
+    initial_interval: 1s
+    max_interval: 30s
 
 agent:
+  name: "TelemetryFlow Agent"
   hostname: ""  # Auto-detected if empty
+  tags:
+    environment: production
 
 heartbeat:
-  interval: 30s
+  interval: 60s
   timeout: 10s
 
 collector:
   system:
     enabled: true
-    interval: 30s
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+
+exporter:
+  otlp:
+    enabled: true
+    batch_size: 100
+    flush_interval: 10s
+    compression: gzip
+
+buffer:
+  enabled: true
+  path: "/var/lib/tfo-agent/buffer"
+  max_size_mb: 100
 ```
 
 ### Environment Variables
 
 ```bash
-export TELEMETRYFLOW_API_ENDPOINT="https://api.telemetryflow.id"
-export TELEMETRYFLOW_API_KEY_ID="your-key"
-export TELEMETRYFLOW_API_KEY_SECRET="your-secret"
-export TELEMETRYFLOW_LOG_LEVEL="debug"
+# TelemetryFlow Platform (v1.1.0+)
+export TELEMETRYFLOW_ENDPOINT="localhost:4317"
+export TELEMETRYFLOW_API_KEY_ID="tfk_your_key_id"
+export TELEMETRYFLOW_API_KEY_SECRET="tfs_your_key_secret"
+export TELEMETRYFLOW_ENVIRONMENT="production"
+
+# Agent Configuration
+export TELEMETRYFLOW_AGENT_ID="your-agent-id"
+export TELEMETRYFLOW_AGENT_NAME="my-agent"
+
+# Logging
+export TELEMETRYFLOW_LOG_LEVEL="info"
 ```
 
 ## Usage
@@ -205,7 +280,7 @@ The `pkg/` directory contains reusable building blocks:
 ### Adding Custom Plugins
 
 ```go
-import "github.com/telemetryflow/telemetryflow/tfo-agent/pkg/plugin"
+import "github.com/telemetryflow/telemetryflow/telemetryflow-agent/pkg/plugin"
 
 // Register a custom collector
 plugin.Register("my-collector", func() plugin.Plugin {
@@ -306,6 +381,7 @@ sudo systemctl start tfo-agent
 | Document | Description |
 |----------|-------------|
 | [README](docs/README.md) | Documentation overview |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | System architecture with Mermaid diagrams |
 | [INSTALLATION](docs/INSTALLATION.md) | Installation guide for all platforms |
 | [CONFIGURATION](docs/CONFIGURATION.md) | Configuration options and examples |
 | [COMMANDS](docs/COMMANDS.md) | CLI commands reference |

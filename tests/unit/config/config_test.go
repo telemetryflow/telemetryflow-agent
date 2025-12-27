@@ -19,6 +19,10 @@ func TestDefaultConfig(t *testing.T) {
 		cfg := config.DefaultConfig()
 
 		require.NotNil(t, cfg)
+		// Check new TelemetryFlow config
+		assert.Equal(t, "localhost:4317", cfg.TelemetryFlow.Endpoint)
+		assert.Equal(t, "grpc", cfg.TelemetryFlow.Protocol)
+		// Check legacy API config (for backward compatibility)
 		assert.Equal(t, "http://localhost:3100", cfg.API.Endpoint)
 		assert.Equal(t, 60*time.Second, cfg.Heartbeat.Interval)
 		assert.True(t, cfg.Collector.System.Enabled)
@@ -57,8 +61,30 @@ func TestDefaultConfig(t *testing.T) {
 		cfg := config.DefaultConfig()
 
 		assert.True(t, cfg.Buffer.Enabled)
-		assert.Equal(t, 100, cfg.Buffer.MaxSizeMB)
+		assert.Equal(t, int64(100), cfg.Buffer.MaxSizeMB)
 		assert.Equal(t, "/var/lib/tfo-agent/buffer", cfg.Buffer.Path)
+		assert.Equal(t, 24*time.Hour, cfg.Buffer.MaxAge)
+		assert.Equal(t, 5*time.Second, cfg.Buffer.FlushInterval)
+	})
+
+	t.Run("should have valid TelemetryFlow defaults", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+
+		assert.Equal(t, "localhost:4317", cfg.TelemetryFlow.Endpoint)
+		assert.Equal(t, "grpc", cfg.TelemetryFlow.Protocol)
+		assert.Equal(t, 30*time.Second, cfg.TelemetryFlow.Timeout)
+		assert.True(t, cfg.TelemetryFlow.TLS.Enabled)
+		assert.False(t, cfg.TelemetryFlow.TLS.SkipVerify)
+		assert.True(t, cfg.TelemetryFlow.Retry.Enabled)
+		assert.Equal(t, 3, cfg.TelemetryFlow.Retry.MaxAttempts)
+	})
+
+	t.Run("should have valid agent defaults", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+
+		assert.Equal(t, "TelemetryFlow Agent", cfg.Agent.Name)
+		assert.Contains(t, cfg.Agent.Description, "TelemetryFlow Agent")
+		assert.Equal(t, "production", cfg.Agent.Tags["environment"])
 	})
 }
 
@@ -70,13 +96,30 @@ func TestConfigValidation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("should fail validation with missing endpoint", func(t *testing.T) {
+	t.Run("should fail validation with missing both endpoints", func(t *testing.T) {
 		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Endpoint = ""
 		cfg.API.Endpoint = ""
 
 		err := cfg.Validate()
 		assert.Error(t, err)
 		assert.Equal(t, config.ErrMissingEndpoint, err)
+	})
+
+	t.Run("should pass validation with only TelemetryFlow endpoint", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.API.Endpoint = "" // Clear legacy endpoint
+
+		err := cfg.Validate()
+		assert.NoError(t, err)
+	})
+
+	t.Run("should pass validation with only legacy API endpoint", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Endpoint = "" // Clear new endpoint
+
+		err := cfg.Validate()
+		assert.NoError(t, err)
 	})
 
 	t.Run("should fail validation with invalid heartbeat interval", func(t *testing.T) {
@@ -94,6 +137,78 @@ func TestConfigValidation(t *testing.T) {
 
 		err := cfg.Validate()
 		assert.NoError(t, err)
+	})
+
+	t.Run("should fail validation with invalid protocol", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Protocol = "invalid"
+
+		err := cfg.Validate()
+		assert.Error(t, err)
+		assert.Equal(t, config.ErrInvalidProtocol, err)
+	})
+
+	t.Run("should pass validation with grpc protocol", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Protocol = "grpc"
+
+		err := cfg.Validate()
+		assert.NoError(t, err)
+	})
+
+	t.Run("should pass validation with http protocol", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Protocol = "http"
+
+		err := cfg.Validate()
+		assert.NoError(t, err)
+	})
+}
+
+func TestConfigHelpers(t *testing.T) {
+	t.Run("should prefer TelemetryFlow endpoint over legacy", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+
+		assert.Equal(t, "localhost:4317", cfg.GetEffectiveEndpoint())
+	})
+
+	t.Run("should fall back to legacy endpoint if TelemetryFlow is empty", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Endpoint = ""
+
+		assert.Equal(t, "http://localhost:3100", cfg.GetEffectiveEndpoint())
+	})
+
+	t.Run("should prefer TelemetryFlow API key ID", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.APIKeyID = "tfk_new_key"
+		cfg.API.APIKeyID = "old_key"
+
+		assert.Equal(t, "tfk_new_key", cfg.GetEffectiveAPIKeyID())
+	})
+
+	t.Run("should fall back to legacy API key ID", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.APIKeyID = ""
+		cfg.API.APIKeyID = "old_key"
+
+		assert.Equal(t, "old_key", cfg.GetEffectiveAPIKeyID())
+	})
+
+	t.Run("should prefer TelemetryFlow API key secret", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.APIKeySecret = "tfs_new_secret"
+		cfg.API.APIKeySecret = "old_secret"
+
+		assert.Equal(t, "tfs_new_secret", cfg.GetEffectiveAPIKeySecret())
+	})
+
+	t.Run("should fall back to legacy API key secret", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.APIKeySecret = ""
+		cfg.API.APIKeySecret = "old_secret"
+
+		assert.Equal(t, "old_secret", cfg.GetEffectiveAPIKeySecret())
 	})
 }
 

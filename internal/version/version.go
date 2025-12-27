@@ -58,12 +58,15 @@ const (
 
 	// SupportURL is the support documentation URL
 	SupportURL = "https://docs.telemetryflow.id"
+
+	// OTELSDKVersion is the OpenTelemetry SDK version this agent is based on
+	OTELSDKVersion = "1.39.0"
 )
 
 // Build-time variables (set via ldflags)
 var (
 	// Version is the semantic version of the agent
-	Version = "1.0.0"
+	Version = "1.1.0"
 
 	// GitCommit is the git commit hash
 	GitCommit = "unknown"
@@ -80,45 +83,47 @@ var (
 
 // Info contains full version information
 type Info struct {
-	Product     string `json:"product"`
-	Description string `json:"description"`
-	Version     string `json:"version"`
-	GitCommit   string `json:"git_commit"`
-	GitBranch   string `json:"git_branch"`
-	BuildTime   string `json:"build_time"`
-	GoVersion   string `json:"go_version"`
-	OS          string `json:"os"`
-	Arch        string `json:"arch"`
-	Vendor      string `json:"vendor"`
-	VendorURL   string `json:"vendor_url"`
-	Developer   string `json:"developer"`
-	License     string `json:"license"`
-	SupportURL  string `json:"support_url"`
+	Product        string `json:"product"`
+	Description    string `json:"description"`
+	Version        string `json:"version"`
+	OTELSDKVersion string `json:"otel_sdk_version"`
+	GitCommit      string `json:"git_commit"`
+	GitBranch      string `json:"git_branch"`
+	BuildTime      string `json:"build_time"`
+	GoVersion      string `json:"go_version"`
+	OS             string `json:"os"`
+	Arch           string `json:"arch"`
+	Vendor         string `json:"vendor"`
+	VendorURL      string `json:"vendor_url"`
+	Developer      string `json:"developer"`
+	License        string `json:"license"`
+	SupportURL     string `json:"support_url"`
 }
 
 // Get returns the full version information
 func Get() Info {
 	return Info{
-		Product:     ProductName,
-		Description: ProductDescription,
-		Version:     Version,
-		GitCommit:   GitCommit,
-		GitBranch:   GitBranch,
-		BuildTime:   BuildTime,
-		GoVersion:   GoVersion,
-		OS:          runtime.GOOS,
-		Arch:        runtime.GOARCH,
-		Vendor:      Vendor,
-		VendorURL:   VendorURL,
-		Developer:   Developer,
-		License:     License,
-		SupportURL:  SupportURL,
+		Product:        ProductName,
+		Description:    ProductDescription,
+		Version:        Version,
+		OTELSDKVersion: OTELSDKVersion,
+		GitCommit:      GitCommit,
+		GitBranch:      GitBranch,
+		BuildTime:      BuildTime,
+		GoVersion:      GoVersion,
+		OS:             runtime.GOOS,
+		Arch:           runtime.GOARCH,
+		Vendor:         Vendor,
+		VendorURL:      VendorURL,
+		Developer:      Developer,
+		License:        License,
+		SupportURL:     SupportURL,
 	}
 }
 
 // String returns a formatted version string
 func String() string {
-	return fmt.Sprintf(`%s v%s
+	return fmt.Sprintf(`%s v%s (OTEL SDK %s)
 
   Build Information
   ─────────────────────────────────────────────
@@ -137,7 +142,7 @@ func String() string {
   Support:     %s
 
   %s`,
-		ProductName, Version,
+		ProductName, Version, OTELSDKVersion,
 		GitCommit, GitBranch, BuildTime, GoVersion,
 		runtime.GOOS, runtime.GOARCH,
 		Vendor, VendorURL, Developer, License, SupportURL,
@@ -177,7 +182,7 @@ func Banner() string {
                            \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    %s v%s
+    %s v%s (Based on OTEL SDK %s)
     %s
   ══════════════════════════════════════════════════════════════════════════════
     Platform     %s/%s
@@ -193,7 +198,7 @@ func Banner() string {
     %s
   ══════════════════════════════════════════════════════════════════════════════
 
-`, ProductName, Version, Motto,
+`, ProductName, Version, OTELSDKVersion, Motto,
 		runtime.GOOS, runtime.GOARCH, GoVersion, GitCommit, BuildTime,
 		Vendor, VendorURL, Developer, License, SupportURL,
 		Copyright)
@@ -227,16 +232,17 @@ func Full() string {
 // BuildInfo returns a map of build information
 func BuildInfo() map[string]string {
 	return map[string]string{
-		"version":      Version,
-		"product_name": ProductName,
-		"git_commit":   GitCommit,
-		"git_branch":   GitBranch,
-		"build_time":   BuildTime,
-		"go_version":   GoVersion,
-		"os":           runtime.GOOS,
-		"arch":         runtime.GOARCH,
-		"vendor":       Vendor,
-		"developer":    Developer,
-		"license":      License,
+		"version":          Version,
+		"product_name":     ProductName,
+		"otel_sdk_version": OTELSDKVersion,
+		"git_commit":       GitCommit,
+		"git_branch":       GitBranch,
+		"build_time":       BuildTime,
+		"go_version":       GoVersion,
+		"os":               runtime.GOOS,
+		"arch":             runtime.GOARCH,
+		"vendor":           Vendor,
+		"developer":        Developer,
+		"license":          License,
 	}
 }

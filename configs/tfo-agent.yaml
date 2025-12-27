@@ -1,65 +1,93 @@
+# =============================================================================
 # TelemetryFlow Agent Configuration
-# =================================
-# This is the default configuration file for the TelemetryFlow agent.
-# Copy this file and modify as needed for your environment.
+# =============================================================================
+# Community Enterprise Observability Platform (CEOP)
+# Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+#
+# This configuration file controls the TelemetryFlow Agent behavior.
+# Copy to: /etc/tfo-agent/tfo-agent.yaml or ~/.tfo-agent/
+#
+# =============================================================================
+# Environment Variables
+# =============================================================================
+#   TELEMETRYFLOW_API_KEY_ID      - API Key ID for authentication (tfk_xxx)
+#   TELEMETRYFLOW_API_KEY_SECRET  - API Key Secret for authentication (tfs_xxx)
+#   TELEMETRYFLOW_ENDPOINT        - TelemetryFlow backend endpoint (host:port)
+#   TELEMETRYFLOW_AGENT_ID        - Unique agent identifier (optional)
+#   TELEMETRYFLOW_AGENT_NAME      - Human-readable agent name (optional)
+#   TELEMETRYFLOW_ENVIRONMENT     - Deployment environment (optional)
+#
+# Example .env file:
+#   TELEMETRYFLOW_API_KEY_ID=tfk_your_key_id
+#   TELEMETRYFLOW_API_KEY_SECRET=tfs_your_key_secret
+#   TELEMETRYFLOW_ENDPOINT=collector.telemetryflow.id:4317
+#
+# =============================================================================
 
-# Agent identification
-agent:
-  # Agent ID (leave empty to auto-generate)
-  id: ""
-
-  # Hostname (leave empty to auto-detect)
-  hostname: ""
-
-  # Optional description
-  description: ""
-
-  # Custom tags for the agent
-  tags: {}
-    # environment: production
-    # region: us-west-2
-    # team: platform
-
-# TelemetryFlow Backend API settings
-api:
-  # Backend endpoint URL
-  endpoint: "http://localhost:3100"
-
-  # API Key authentication
-  api_key_id: ""
-  api_key_secret: ""
-
-  # Workspace and Tenant IDs (for multi-tenant setups)
-  workspace_id: ""
-  tenant_id: ""
-
-  # Request timeout
-  timeout: 30s
-
-  # Retry settings
-  retry_attempts: 3
-  retry_delay: 1s
-
-  # TLS settings
+# =============================================================================
+# TelemetryFlow Backend Connection
+# =============================================================================
+# Authentication and connection settings for TelemetryFlow backend
+telemetryflow:
+  # API Key ID (format: tfk_xxx) - used for agent identification
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  # API Key Secret (format: tfs_xxx) - used for authentication
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  # TelemetryFlow backend endpoint for sending telemetry
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+  # Protocol: grpc or http
+  protocol: grpc
+  # TLS settings for backend connection
   tls:
-    enabled: false
-    skip_verify: false
+    enabled: true
+    insecure_skip_verify: false
     # cert_file: /path/to/client.crt
     # key_file: /path/to/client.key
     # ca_file: /path/to/ca.crt
+  # Request timeout
+  timeout: 30s
+  # Retry settings
+  retry:
+    enabled: true
+    max_attempts: 3
+    initial_interval: 1s
+    max_interval: 30s
 
-# Heartbeat settings
+# =============================================================================
+# Agent Identification
+# =============================================================================
+agent:
+  # Unique agent identifier (auto-generated if empty)
+  id: "${TELEMETRYFLOW_AGENT_ID}"
+  # Agent hostname (auto-detected if empty)
+  hostname: ""
+  # Human-readable agent name
+  name: "${TELEMETRYFLOW_AGENT_NAME:-TelemetryFlow Agent}"
+  # Human-readable description
+  description: "TelemetryFlow Agent - Community Enterprise Observability Platform"
+  # Agent version (auto-populated at build time)
+  version: ""
+  # Custom tags for labeling and filtering
+  tags:
+    environment: "${TELEMETRYFLOW_ENVIRONMENT:-production}"
+    datacenter: "default"
+    # team: platform
+    # region: us-west-2
+
+# =============================================================================
+# Heartbeat Settings
+# =============================================================================
 heartbeat:
   # Heartbeat interval (how often to send heartbeats)
   interval: 60s
-
   # Heartbeat request timeout
   timeout: 10s
-
   # Include system info in heartbeat
   include_system_info: true
 
-# Collector settings
+# =============================================================================
+# Collectors - Data Collection Configuration
+# =============================================================================
 collectors:
   # System metrics collector
   system:
@@ -72,7 +100,7 @@ collectors:
     # Specific disk paths to monitor (empty = all)
     disk_paths: []
 
-  # Log collector (future feature)
+  # Log collector
   logs:
     enabled: false
     paths: []
@@ -81,7 +109,7 @@ collectors:
     include_patterns: []
     exclude_patterns: []
 
-  # Process monitoring (future feature)
+  # Process monitoring
   process:
     enabled: false
     interval: 30s
@@ -90,7 +118,9 @@ collectors:
     # - postgres
     # - redis
 
-# Exporter settings
+# =============================================================================
+# Exporter Settings - OTLP Export Configuration
+# =============================================================================
 exporter:
   otlp:
     enabled: true
@@ -100,21 +130,24 @@ exporter:
     flush_interval: 10s
     # Compression (none, gzip)
     compression: gzip
-    # OTLP endpoints (relative to api.endpoint)
-    metrics_endpoint: "/api/v2/otlp/metrics"
-    logs_endpoint: "/api/v2/otlp/logs"
 
-# Disk buffer for offline/retry scenarios
+# =============================================================================
+# Buffer - Offline/Retry Storage
+# =============================================================================
 buffer:
   enabled: true
   # Maximum buffer size in MB
   max_size_mb: 100
   # Buffer directory path
   path: "/var/lib/tfo-agent/buffer"
+  # Maximum age of buffered entries
+  max_age: 24h
   # Flush interval for buffered data
-  flush_interval: 30s
+  flush_interval: 5s
 
-# Logging settings
+# =============================================================================
+# Logging Settings
+# =============================================================================
 logging:
   # Log level: debug, info, warn, error
   level: info

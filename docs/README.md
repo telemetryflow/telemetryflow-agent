@@ -1,6 +1,7 @@
 # TelemetryFlow Agent Documentation
 
-- **Version:** 1.0.0
+- **Version:** 1.1.0
+- **OTEL SDK Version:** 1.39.0
 - **Last Updated:** December 2025
 - **Status:** Production Ready
 
@@ -8,17 +9,61 @@
 
 ## Overview
 
-TelemetryFlow Agent (`tfo-agent`) is a custom-built enterprise-grade telemetry collection agent written in Go. Unlike the standard OpenTelemetry Collector, `tfo-agent` provides a purpose-built CLI with Cobra commands, custom configuration format, and TelemetryFlow-specific features.
+TelemetryFlow Agent (`tfo-agent`) is a custom-built enterprise-grade telemetry collection agent written in Go. Built on the standard OpenTelemetry Go SDK v1.39.0, `tfo-agent` provides a purpose-built CLI with Cobra commands, custom configuration format, and TelemetryFlow-specific features while maintaining full compatibility with the OTEL ecosystem.
 
 ### Key Differentiators
 
 | Feature | tfo-agent (Custom) | OTEL Collector |
 |---------|-------------------|----------------|
+| SDK Base | OpenTelemetry SDK v1.39.0 | OTEL Collector |
 | CLI Framework | Cobra with subcommands | Standard OTEL |
 | Config Format | Custom YAML with `enabled` flags | Standard OTEL YAML |
 | Banner/Branding | Custom ASCII art banner | None |
 | Build System | Single Go binary | OCB-generated |
 | Commands | `start`, `version`, `config` | `--config` only |
+
+### TelemetryFlow Ecosystem Alignment
+
+TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same OpenTelemetry SDK version across all components:
+
+```mermaid
+graph LR
+    subgraph "TelemetryFlow Ecosystem v1.1.0"
+        subgraph "Instrumentation"
+            SDK[TFO-Go-SDK<br/>OTEL SDK v1.39.0]
+        end
+
+        subgraph "Collection"
+            AGENT[TFO-Agent<br/>OTEL SDK v1.39.0]
+        end
+
+        subgraph "Processing"
+            COLLECTOR[TFO-Collector<br/>OTEL v0.142.0]
+        end
+    end
+
+    APP[Application] --> SDK
+    SDK -->|OTLP| AGENT
+    HOST[Host Metrics] --> AGENT
+    AGENT -->|OTLP gRPC/HTTP| COLLECTOR
+    COLLECTOR --> BACKEND[TelemetryFlow<br/>Platform]
+
+    style SDK fill:#81C784,stroke:#388E3C
+    style AGENT fill:#64B5F6,stroke:#1976D2
+    style COLLECTOR fill:#FFB74D,stroke:#F57C00
+```
+
+| Component | Version | OTEL Base | Description |
+|-----------|---------|-----------|-------------|
+| **TFO-Agent** | v1.1.0 | SDK v1.39.0 | Telemetry collection agent |
+| **TFO-Go-SDK** | v1.1.0 | SDK v1.39.0 | Go instrumentation SDK |
+| **TFO-Collector** | v1.1.0 | Collector v0.142.0 | Central telemetry collector |
+
+This alignment ensures:
+- **Consistent telemetry format** across all components
+- **Seamless integration** between agent and SDK instrumentation
+- **Unified authentication** using TelemetryFlow credentials (tfk_xxx / tfs_xxx)
+- **Compatible OTLP protocols** (gRPC and HTTP)
 
 ---
 
@@ -290,7 +335,7 @@ docker run -d \
   -p 4317:4317 \
   -p 4318:4318 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml \
-  telemetryflow/tfo-agent:latest \
+  telemetryflow/telemetryflow-agent:latest \
   start --config /etc/tfo-agent/tfo-agent.yaml
 ```
 
@@ -309,7 +354,7 @@ spec:
     spec:
       containers:
       - name: tfo-agent
-        image: telemetryflow/tfo-agent:latest
+        image: telemetryflow/telemetryflow-agent:latest
         args: ["start", "--config", "/etc/tfo-agent/config.yaml"]
 ```
 

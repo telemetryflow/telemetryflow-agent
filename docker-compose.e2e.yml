@@ -30,7 +30,7 @@ services:
 
   # OTEL Collector to receive telemetry from agent
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.114.0
+    image: otel/opentelemetry-collector-contrib:0.142.0
     command: ["--config=/etc/otel/config.yaml"]
     ports:
       - "4317:4317"   # OTLP gRPC

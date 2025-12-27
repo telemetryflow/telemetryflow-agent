@@ -394,7 +394,7 @@ sudo systemctl start tfo-agent
 
 ```bash
 # Run in container
-docker run -d telemetryflow/tfo-agent:latest \
+docker run -d telemetryflow/telemetryflow-agent:latest \
   start --config /etc/tfo-agent/config.yaml
 ```
 
@@ -403,7 +403,7 @@ docker run -d telemetryflow/tfo-agent:latest \
 ```yaml
 containers:
 - name: tfo-agent
-  image: telemetryflow/tfo-agent:latest
+  image: telemetryflow/telemetryflow-agent:latest
   args:
     - "start"
     - "--config"

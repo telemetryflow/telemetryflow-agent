@@ -1,13 +1,16 @@
 # TelemetryFlow Agent Configuration Reference
 
-- **Version:** 1.0.0
+- **Version:** 1.1.0
+- **OTEL SDK Version:** 1.39.0
 - **Last Updated:** December 2025
 
 ---
 
 ## Overview
 
-TelemetryFlow Agent uses a custom YAML configuration format with `enabled` flags for easy feature toggling. This differs from the standard OpenTelemetry Collector configuration format.
+TelemetryFlow Agent uses a custom YAML configuration format with `enabled` flags for easy feature toggling. Built on the standard OpenTelemetry Go SDK v1.39.0, the agent maintains TelemetryFlow identity and branding while leveraging OTEL SDK capabilities for telemetry collection and export.
+
+Starting with v1.1.0, the agent introduces a new `telemetryflow` configuration section that aligns with TFO-Collector for unified platform configuration.
 
 ---
 
@@ -22,15 +25,92 @@ The agent searches for configuration in the following order:
 
 ---
 
+## TelemetryFlow Platform Configuration (v1.1.0+)
+
+The new `telemetryflow` section provides unified configuration for connecting to the TelemetryFlow platform:
+
+```yaml
+# TelemetryFlow Platform Connection
+telemetryflow:
+  # API credentials (supports environment variable substitution)
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+
+  # OTLP endpoint (default: localhost:4317)
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+
+  # Protocol: grpc or http
+  protocol: grpc
+
+  # Connection timeout
+  timeout: 30s
+
+  # TLS configuration
+  tls:
+    enabled: true
+    skip_verify: false
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+
+  # Retry configuration
+  retry:
+    enabled: true
+    max_attempts: 3
+    initial_interval: 1s
+    max_interval: 30s
+```
+
+### Authentication Headers
+
+When connecting to TFO-Collector, the agent automatically sends these headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-TelemetryFlow-Key-ID` | API key ID (tfk_xxx) |
+| `X-TelemetryFlow-Key-Secret` | API key secret (tfs_xxx) |
+| `X-TelemetryFlow-Agent-ID` | Unique agent identifier |
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TELEMETRYFLOW_API_KEY_ID` | API key ID | - |
+| `TELEMETRYFLOW_API_KEY_SECRET` | API key secret | - |
+| `TELEMETRYFLOW_ENDPOINT` | OTLP endpoint | `localhost:4317` |
+| `TELEMETRYFLOW_ENVIRONMENT` | Deployment environment | `production` |
+| `TELEMETRYFLOW_AGENT_ID` | Agent identifier | Auto-generated UUID |
+| `TELEMETRYFLOW_AGENT_NAME` | Agent display name | `TelemetryFlow Agent` |
+
+---
+
 ## Complete Configuration Reference
 
 ```yaml
 # =============================================================================
 # TelemetryFlow Agent Configuration
 # =============================================================================
-# Version: 1.0.0
+# Version: 1.1.0
 # Format: Custom YAML (not standard OTEL format)
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# TelemetryFlow Platform (v1.1.0+)
+# -----------------------------------------------------------------------------
+telemetryflow:
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+  protocol: grpc
+  timeout: 30s
+  tls:
+    enabled: true
+    skip_verify: false
+  retry:
+    enabled: true
+    max_attempts: 3
+    initial_interval: 1s
+    max_interval: 30s
 
 # -----------------------------------------------------------------------------
 # Agent Identification

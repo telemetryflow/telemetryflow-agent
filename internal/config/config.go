@@ -7,13 +7,55 @@ import (
 
 // Config represents the complete agent configuration
 type Config struct {
-	Agent     AgentConfig     `mapstructure:"agent"`
-	API       APIConfig       `mapstructure:"api"`
-	Heartbeat HeartbeatConfig `mapstructure:"heartbeat"`
-	Collector CollectorConfig `mapstructure:"collectors"`
-	Exporter  ExporterConfig  `mapstructure:"exporter"`
-	Buffer    BufferConfig    `mapstructure:"buffer"`
-	Logging   LoggingConfig   `mapstructure:"logging"`
+	TelemetryFlow TelemetryFlowConfig `mapstructure:"telemetryflow"`
+	Agent         AgentConfig         `mapstructure:"agent"`
+	Heartbeat     HeartbeatConfig     `mapstructure:"heartbeat"`
+	Collector     CollectorConfig     `mapstructure:"collectors"`
+	Exporter      ExporterConfig      `mapstructure:"exporter"`
+	Buffer        BufferConfig        `mapstructure:"buffer"`
+	Logging       LoggingConfig       `mapstructure:"logging"`
+
+	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
+	API APIConfig `mapstructure:"api"`
+}
+
+// TelemetryFlowConfig contains TelemetryFlow backend connection settings
+type TelemetryFlowConfig struct {
+	// APIKeyID is the API key identifier (format: tfk_xxx)
+	APIKeyID string `mapstructure:"api_key_id"`
+
+	// APIKeySecret is the API key secret (format: tfs_xxx)
+	APIKeySecret string `mapstructure:"api_key_secret"`
+
+	// Endpoint is the TelemetryFlow backend endpoint (host:port)
+	Endpoint string `mapstructure:"endpoint"`
+
+	// Protocol is the transport protocol (grpc or http)
+	Protocol string `mapstructure:"protocol"`
+
+	// TLS contains TLS/SSL settings
+	TLS TLSConfig `mapstructure:"tls"`
+
+	// Timeout is the request timeout
+	Timeout time.Duration `mapstructure:"timeout"`
+
+	// Retry contains retry settings
+	Retry RetryConfig `mapstructure:"retry"`
+}
+
+// RetryConfig contains retry settings
+type RetryConfig struct {
+	// Enabled enables retry logic
+	Enabled bool `mapstructure:"enabled"`
+
+	// MaxAttempts is the maximum number of retry attempts
+	MaxAttempts int `mapstructure:"max_attempts"`
+
+	// InitialInterval is the initial delay between retries
+	InitialInterval time.Duration `mapstructure:"initial_interval"`
+
+	// MaxInterval is the maximum delay between retries
+	MaxInterval time.Duration `mapstructure:"max_interval"`
 }
 
 // AgentConfig contains agent identification settings
@@ -24,11 +66,17 @@ type AgentConfig struct {
 	// Hostname is the agent hostname (auto-detected if empty)
 	Hostname string `mapstructure:"hostname"`
 
-	// Tags are custom key-value labels for the agent
-	Tags map[string]string `mapstructure:"tags"`
+	// Name is the human-readable agent name
+	Name string `mapstructure:"name"`
 
 	// Description is a human-readable description
 	Description string `mapstructure:"description"`
+
+	// Version is the agent version (auto-populated at build time)
+	Version string `mapstructure:"version"`
+
+	// Tags are custom key-value labels for the agent
+	Tags map[string]string `mapstructure:"tags"`
 }
 
 // APIConfig contains backend API connection settings
@@ -187,10 +235,13 @@ type BufferConfig struct {
 	Enabled bool `mapstructure:"enabled"`
 
 	// MaxSizeMB is the maximum buffer size in megabytes
-	MaxSizeMB int `mapstructure:"max_size_mb"`
+	MaxSizeMB int64 `mapstructure:"max_size_mb"`
 
 	// Path is the buffer directory path
 	Path string `mapstructure:"path"`
+
+	// MaxAge is the maximum age of buffered entries
+	MaxAge time.Duration `mapstructure:"max_age"`
 
 	// FlushInterval is the buffer flush interval
 	FlushInterval time.Duration `mapstructure:"flush_interval"`
@@ -220,11 +271,31 @@ type LoggingConfig struct {
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Agent: AgentConfig{
-			ID:       "",
-			Hostname: "",
-			Tags:     make(map[string]string),
+		TelemetryFlow: TelemetryFlowConfig{
+			Endpoint: "localhost:4317",
+			Protocol: "grpc",
+			Timeout:  30 * time.Second,
+			TLS: TLSConfig{
+				Enabled:    true,
+				SkipVerify: false,
+			},
+			Retry: RetryConfig{
+				Enabled:         true,
+				MaxAttempts:     3,
+				InitialInterval: time.Second,
+				MaxInterval:     30 * time.Second,
+			},
 		},
+		Agent: AgentConfig{
+			ID:          "",
+			Hostname:    "",
+			Name:        "TelemetryFlow Agent",
+			Description: "TelemetryFlow Agent - Community Enterprise Observability Platform",
+			Tags: map[string]string{
+				"environment": "production",
+			},
+		},
+		// Deprecated: Use TelemetryFlow instead
 		API: APIConfig{
 			Endpoint:      "http://localhost:3100",
 			Timeout:       30 * time.Second,
@@ -272,7 +343,8 @@ func DefaultConfig() *Config {
 			Enabled:       true,
 			MaxSizeMB:     100,
 			Path:          "/var/lib/tfo-agent/buffer",
-			FlushInterval: 30 * time.Second,
+			MaxAge:        24 * time.Hour,
+			FlushInterval: 5 * time.Second,
 		},
 		Logging: LoggingConfig{
 			Level:      "info",
@@ -287,19 +359,51 @@ func DefaultConfig() *Config {
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
-	if c.API.Endpoint == "" {
+	// Check TelemetryFlow config first, fall back to legacy API config
+	if c.TelemetryFlow.Endpoint == "" && c.API.Endpoint == "" {
 		return ErrMissingEndpoint
 	}
 	if c.Heartbeat.Interval < time.Second {
 		return ErrInvalidHeartbeatInterval
 	}
+	// Validate protocol if TelemetryFlow is configured
+	if c.TelemetryFlow.Endpoint != "" && c.TelemetryFlow.Protocol != "" {
+		if c.TelemetryFlow.Protocol != "grpc" && c.TelemetryFlow.Protocol != "http" {
+			return ErrInvalidProtocol
+		}
+	}
 	return nil
+}
+
+// GetEffectiveEndpoint returns the endpoint to use (prefers TelemetryFlow over legacy API)
+func (c *Config) GetEffectiveEndpoint() string {
+	if c.TelemetryFlow.Endpoint != "" {
+		return c.TelemetryFlow.Endpoint
+	}
+	return c.API.Endpoint
+}
+
+// GetEffectiveAPIKeyID returns the API key ID to use
+func (c *Config) GetEffectiveAPIKeyID() string {
+	if c.TelemetryFlow.APIKeyID != "" {
+		return c.TelemetryFlow.APIKeyID
+	}
+	return c.API.APIKeyID
+}
+
+// GetEffectiveAPIKeySecret returns the API key secret to use
+func (c *Config) GetEffectiveAPIKeySecret() string {
+	if c.TelemetryFlow.APIKeySecret != "" {
+		return c.TelemetryFlow.APIKeySecret
+	}
+	return c.API.APIKeySecret
 }
 
 // Errors
 var (
-	ErrMissingEndpoint          = configError("api.endpoint is required")
+	ErrMissingEndpoint          = configError("telemetryflow.endpoint or api.endpoint is required")
 	ErrInvalidHeartbeatInterval = configError("heartbeat.interval must be at least 1 second")
+	ErrInvalidProtocol          = configError("telemetryflow.protocol must be 'grpc' or 'http'")
 )
 
 type configError string

@@ -292,18 +292,18 @@ godoc:
 ## Docker
 docker-build:
 	@echo "$(GREEN)Building Docker image...$(NC)"
-	@docker build -t telemetryflow/tfo-agent:$(VERSION) \
+	@docker build -t telemetryflow/telemetryflow-agent:$(VERSION) \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		--build-arg BUILD_TIME=$(BUILD_TIME) \
 		.
-	@docker tag telemetryflow/tfo-agent:$(VERSION) telemetryflow/tfo-agent:latest
-	@echo "$(GREEN)Docker image built: telemetryflow/tfo-agent:$(VERSION)$(NC)"
+	@docker tag telemetryflow/telemetryflow-agent:$(VERSION) telemetryflow/telemetryflow-agent:latest
+	@echo "$(GREEN)Docker image built: telemetryflow/telemetryflow-agent:$(VERSION)$(NC)"
 
 docker-push: docker-build
 	@echo "$(GREEN)Pushing Docker image...$(NC)"
-	@docker push telemetryflow/tfo-agent:$(VERSION)
-	@docker push telemetryflow/tfo-agent:latest
+	@docker push telemetryflow/telemetryflow-agent:$(VERSION)
+	@docker push telemetryflow/telemetryflow-agent:latest
 
 ## Version info
 version:

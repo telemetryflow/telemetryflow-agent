@@ -1,6 +1,7 @@
 # TelemetryFlow Agent Installation Guide
 
-- **Version:** 1.0.0
+- **Version:** 1.1.0
+- **OTEL SDK Version:** 1.39.0
 - **Last Updated:** December 2025
 
 ---
@@ -31,14 +32,14 @@ make build
 
 **Expected Output:**
 ```
-TelemetryFlow Agent v1.0.0
+TelemetryFlow Agent v1.1.0 (OTEL SDK 1.39.0)
 
   Build Information
   ─────────────────────────────────────────────
   Commit:      abc1234
   Branch:      main
-  Built:       2025-12-17T10:00:00Z
-  Go Version:  go1.22.0
+  Built:       2025-12-27T10:00:00Z
+  Go Version:  go1.24.0
   Platform:    darwin/arm64
 
   Product Information
@@ -80,13 +81,16 @@ docker-compose down
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VERSION` | Build version | `1.0.0` |
-| `IMAGE_NAME` | Docker image name | `telemetryflow/tfo-agent` |
+| `VERSION` | Build version | `1.1.0` |
+| `OTEL_SDK_VERSION` | OpenTelemetry SDK version | `1.39.0` |
+| `IMAGE_NAME` | Docker image name | `telemetryflow/telemetryflow-agent` |
 | `OTLP_GRPC_PORT` | OTLP gRPC port | `4317` |
 | `OTLP_HTTP_PORT` | OTLP HTTP port | `4318` |
 | `METRICS_PORT` | Prometheus metrics port | `8888` |
 | `HEALTH_PORT` | Health check port | `13133` |
-| `COLLECTOR_ENDPOINT` | Collector endpoint | `http://tfo-collector:4317` |
+| `TELEMETRYFLOW_ENDPOINT` | TelemetryFlow collector endpoint | `localhost:4317` |
+| `TELEMETRYFLOW_API_KEY_ID` | API key ID | - |
+| `TELEMETRYFLOW_API_KEY_SECRET` | API key secret | - |
 | `LOG_LEVEL` | Log level | `info` |
 | `MEMORY_LIMIT` | Container memory limit | `512M` |
 
@@ -95,11 +99,11 @@ docker-compose down
 ```bash
 # Build image with version info
 docker build \
-  --build-arg VERSION=1.0.0 \
+  --build-arg VERSION=1.1.0 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/tfo-agent:1.0.0 .
+  -t telemetryflow/telemetryflow-agent:1.1.0 .
 
 # Run with configuration
 docker run -d \
@@ -111,7 +115,7 @@ docker run -d \
   -p 13133:13133 \
   -v $(pwd)/configs/tfo-agent.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/tfo-agent:1.0.0
+  telemetryflow/telemetryflow-agent:1.1.0
 
 # Check logs
 docker logs tfo-agent
@@ -124,13 +128,13 @@ curl http://localhost:13133/
 
 ```bash
 # Download the latest release
-VERSION=1.0.0
+VERSION=1.1.0
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
 [[ "$ARCH" == "aarch64" ]] && ARCH="arm64"
 
-wget https://github.com/telemetryflow-agent/releases/download/v${VERSION}/tfo-agent-${PLATFORM}-${ARCH}.tar.gz
+wget https://github.com/telemetryflow/telemetryflow-agent/releases/download/v${VERSION}/tfo-agent-${PLATFORM}-${ARCH}.tar.gz
 
 # Extract
 tar -xzf tfo-agent-${PLATFORM}-${ARCH}.tar.gz
@@ -161,31 +165,39 @@ sudo mkdir -p /var/log/tfo-agent
 # From source
 sudo cp configs/tfo-agent.yaml /etc/tfo-agent/
 
-# Or create minimal config
+# Or create minimal config (v1.1.0+)
 cat > /etc/tfo-agent/tfo-agent.yaml <<'EOF'
+# TelemetryFlow Platform Configuration
+telemetryflow:
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+  protocol: grpc
+  tls:
+    enabled: true
+
 agent:
   id: ""
   hostname: ""
-  description: "TelemetryFlow Agent"
+  name: "TelemetryFlow Agent"
   tags:
     environment: "production"
 
-collectors:
-  metrics:
+collector:
+  system:
     enabled: true
-    interval: 60s
-  logs:
-    enabled: true
-    paths:
-      - /var/log/*.log
-  traces:
-    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
 
 exporter:
   otlp:
     enabled: true
-    endpoint: "http://tfo-collector:4317"
-    compression: "gzip"
+    batch_size: 100
+    flush_interval: 10s
+    compression: gzip
 
 buffer:
   enabled: true
@@ -282,7 +294,7 @@ helm repo add telemetryflow https://charts.telemetryflow.id
 helm repo update
 
 # Install tfo-agent as DaemonSet
-helm install tfo-agent telemetryflow/tfo-agent \
+helm install tfo-agent telemetryflow/telemetryflow-agent \
   --namespace observability \
   --create-namespace \
   --set config.endpoint="http://tfo-collector:4317"
@@ -361,7 +373,7 @@ metadata:
   namespace: observability
   labels:
     app: tfo-agent
-    version: "1.0.0"
+    version: "1.1.0"
 spec:
   selector:
     matchLabels:
@@ -377,7 +389,7 @@ spec:
 
       containers:
       - name: tfo-agent
-        image: telemetryflow/tfo-agent:1.0.0
+        image: telemetryflow/telemetryflow-agent:1.1.0
         args:
           - "start"
           - "--config"
@@ -542,7 +554,7 @@ tfo-agent version
 
 ```bash
 # Pull new image
-docker pull telemetryflow/tfo-agent:1.1.0
+docker pull telemetryflow/telemetryflow-agent:1.1.0
 
 # Stop and remove old container
 docker stop tfo-agent
@@ -552,7 +564,7 @@ docker rm tfo-agent
 docker run -d \
   --name tfo-agent \
   ... # same options as before
-  telemetryflow/tfo-agent:1.1.0 \
+  telemetryflow/telemetryflow-agent:1.1.0 \
   start --config /etc/tfo-agent/config.yaml
 ```
 
@@ -561,7 +573,7 @@ docker run -d \
 ```bash
 # Update image in DaemonSet
 kubectl set image daemonset/tfo-agent \
-  tfo-agent=telemetryflow/tfo-agent:1.1.0 \
+  tfo-agent=telemetryflow/telemetryflow-agent:1.1.0 \
   -n observability
 
 # Watch rollout
@@ -598,7 +610,7 @@ sudo userdel telemetryflow
 ```bash
 docker stop tfo-agent
 docker rm tfo-agent
-docker rmi telemetryflow/tfo-agent:latest
+docker rmi telemetryflow/telemetryflow-agent:latest
 ```
 
 ### Kubernetes
