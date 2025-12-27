@@ -100,7 +100,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.7.2
           args: --timeout=5m
           skip-cache: false
 
@@ -344,35 +344,47 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: coverage-unit
+          path: coverage/
 
       - name: Download integration coverage
         uses: actions/download-artifact@v4
         with:
           name: coverage-integration
+          path: coverage/
         continue-on-error: true
 
-      - name: Merge and generate coverage report
+      - name: Prepare coverage files
+        run: |
+          cp coverage/coverage-unit.out coverage-unit.out
+          if [ -f coverage/coverage-integration.out ]; then
+            cp coverage/coverage-integration.out coverage-integration.out
+          fi
+
+      - name: Generate coverage report
         run: make coverage-report
+
+      - name: Move coverage files
+        run: |
+          mv coverage-merged.out coverage/coverage-merged.out
+          mv coverage-summary.txt coverage/coverage-summary.txt
+          mv coverage.html coverage/coverage.html
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: |
-            coverage-merged.out
-            coverage-summary.txt
-            coverage.html
+          path: coverage/
           retention-days: 30
 
       - name: Coverage summary
         run: |
           echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat coverage-summary.txt >> $GITHUB_STEP_SUMMARY
+          cat coverage/coverage-summary.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   # ===========================================================================
-  # Summary
+  # CI Summary
   # ===========================================================================
   summary:
     name: CI Summary

@@ -1,4 +1,4 @@
-# GolangCI-Lint Configuration v2
+# GolangCI-Lint Configuration (v2)
 # TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 
 version: "2"
@@ -15,6 +15,7 @@ linters:
     - errcheck
     - ineffassign
     - unused
+
   settings:
     staticcheck:
       checks:
