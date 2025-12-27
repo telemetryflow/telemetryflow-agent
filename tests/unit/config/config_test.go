@@ -2,8 +2,6 @@
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
-//
-//nolint:staticcheck // This file tests deprecated API config for backward compatibility
 package config_test
 
 import (
