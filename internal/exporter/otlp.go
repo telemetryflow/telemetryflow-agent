@@ -238,7 +238,7 @@ func (e *OTLPExporter) createGRPCExporter(ctx context.Context) (sdkmetric.Export
 	// Configure TLS
 	if e.config.TLSEnabled {
 		tlsConfig := &tls.Config{
-			InsecureSkipVerify: e.config.TLSSkipVerify,
+			InsecureSkipVerify: e.config.TLSSkipVerify, //nolint:gosec // G402: Configurable for dev/testing with self-signed certs
 		}
 		opts = append(opts, otlpmetricgrpc.WithDialOption(
 			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
@@ -276,7 +276,7 @@ func (e *OTLPExporter) createHTTPExporter(ctx context.Context) (sdkmetric.Export
 	// Configure TLS
 	if e.config.TLSEnabled {
 		tlsConfig := &tls.Config{
-			InsecureSkipVerify: e.config.TLSSkipVerify,
+			InsecureSkipVerify: e.config.TLSSkipVerify, //nolint:gosec // G402: Configurable for dev/testing with self-signed certs
 		}
 		opts = append(opts, otlpmetrichttp.WithTLSClientConfig(tlsConfig))
 	} else {

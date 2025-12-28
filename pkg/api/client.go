@@ -101,7 +101,7 @@ func NewClient(cfg ClientConfig) *Client {
 
 	if cfg.TLSConfig.Enabled {
 		tlsConfig := &tls.Config{
-			InsecureSkipVerify: cfg.TLSConfig.SkipVerify,
+			InsecureSkipVerify: cfg.TLSConfig.SkipVerify, //nolint:gosec // G402: Configurable for dev/testing with self-signed certs
 		}
 		transport.TLSClientConfig = tlsConfig
 	}
