@@ -165,7 +165,7 @@ sudo mkdir -p /var/log/tfo-agent
 # From source
 sudo cp configs/tfo-agent.yaml /etc/tfo-agent/
 
-# Or create minimal config (v1.1.0+)
+# Or create minimal config (v1.1.1+)
 cat > /etc/tfo-agent/tfo-agent.yaml <<'EOF'
 # TelemetryFlow Platform Configuration
 telemetryflow:
