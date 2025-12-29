@@ -315,7 +315,7 @@ We would like to thank the following security researchers for their contribution
 ---
 
 - **Last Updated**: December 23, 2025
-- **Version**: 1.0.1
+- **Version**: 1.1.1
 - **Project**: TelemetryFlow Agent
 
 **Built with ❤️ by DevOpsCorner Indonesia**

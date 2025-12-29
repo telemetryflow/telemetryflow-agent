@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
-[![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.1-green.svg)](CHANGELOG.md)
 
 </div>
 
@@ -385,6 +385,8 @@ sudo systemctl start tfo-agent
 | [INSTALLATION](docs/INSTALLATION.md) | Installation guide for all platforms |
 | [CONFIGURATION](docs/CONFIGURATION.md) | Configuration options and examples |
 | [COMMANDS](docs/COMMANDS.md) | CLI commands reference |
+| [DEVELOPMENT](docs/DEVELOPMENT.md) | Development guide and coding standards |
+| [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) | Troubleshooting guide and common issues |
 | [GITHUB-WORKFLOWS](docs/GITHUB-WORKFLOWS.md) | CI/CD workflows documentation |
 | [CHANGELOG](CHANGELOG.md) | Version history and changes |
 

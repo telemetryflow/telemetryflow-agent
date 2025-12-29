@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Documentation
 
-- **Version:** 1.1.0
+- **Version:** 1.1.1
 - **OTEL SDK Version:** 1.39.0
 - **Last Updated:** December 2025
 - **Status:** Production Ready
@@ -55,9 +55,9 @@ graph LR
 
 | Component | Version | OTEL Base | Description |
 |-----------|---------|-----------|-------------|
-| **TFO-Agent** | v1.1.0 | SDK v1.39.0 | Telemetry collection agent |
-| **TFO-Go-SDK** | v1.1.0 | SDK v1.39.0 | Go instrumentation SDK |
-| **TFO-Collector** | v1.1.0 | Collector v0.142.0 | Central telemetry collector |
+| **TFO-Agent** | v1.1.1 | SDK v1.39.0 | Telemetry collection agent |
+| **TFO-Go-SDK** | v1.1.1 | SDK v1.39.0 | Go instrumentation SDK |
+| **TFO-Collector** | v1.1.1 | Collector v0.142.0 | Central telemetry collector |
 
 This alignment ensures:
 - **Consistent telemetry format** across all components
@@ -75,9 +75,10 @@ This alignment ensures:
 | [INSTALLATION.md](INSTALLATION.md) | Installation and deployment guide |
 | [CONFIGURATION.md](CONFIGURATION.md) | Configuration reference |
 | [COMMANDS.md](COMMANDS.md) | CLI commands reference |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Internal architecture |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Development guide |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting guide |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Internal architecture with Mermaid diagrams |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Development guide, coding standards, and testing |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting guide and common issues |
+| [GITHUB-WORKFLOWS.md](GITHUB-WORKFLOWS.md) | CI/CD workflows documentation |
 
 ---
 

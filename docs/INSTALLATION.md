@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Installation Guide
 
-- **Version:** 1.1.0
+- **Version:** 1.1.1
 - **OTEL SDK Version:** 1.39.0
 - **Last Updated:** December 2025
 
@@ -32,7 +32,7 @@ make build
 
 **Expected Output:**
 ```
-TelemetryFlow Agent v1.1.0 (OTEL SDK 1.39.0)
+TelemetryFlow Agent v1.1.1 (OTEL SDK 1.39.0)
 
   Build Information
   ─────────────────────────────────────────────
@@ -81,7 +81,7 @@ docker-compose down
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VERSION` | Build version | `1.1.0` |
+| `VERSION` | Build version | `1.1.1` |
 | `OTEL_SDK_VERSION` | OpenTelemetry SDK version | `1.39.0` |
 | `IMAGE_NAME` | Docker image name | `telemetryflow/telemetryflow-agent` |
 | `OTLP_GRPC_PORT` | OTLP gRPC port | `4317` |
@@ -99,11 +99,11 @@ docker-compose down
 ```bash
 # Build image with version info
 docker build \
-  --build-arg VERSION=1.1.0 \
+  --build-arg VERSION=1.1.1 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.1.0 .
+  -t telemetryflow/telemetryflow-agent:1.1.1 .
 
 # Run with configuration
 docker run -d \
@@ -115,7 +115,7 @@ docker run -d \
   -p 13133:13133 \
   -v $(pwd)/configs/tfo-agent.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.1.0
+  telemetryflow/telemetryflow-agent:1.1.1
 
 # Check logs
 docker logs tfo-agent
@@ -128,7 +128,7 @@ curl http://localhost:13133/
 
 ```bash
 # Download the latest release
-VERSION=1.1.0
+VERSION=1.1.1
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
@@ -373,7 +373,7 @@ metadata:
   namespace: observability
   labels:
     app: tfo-agent
-    version: "1.1.0"
+    version: "1.1.1"
 spec:
   selector:
     matchLabels:
@@ -389,7 +389,7 @@ spec:
 
       containers:
       - name: tfo-agent
-        image: telemetryflow/telemetryflow-agent:1.1.0
+        image: telemetryflow/telemetryflow-agent:1.1.1
         args:
           - "start"
           - "--config"
@@ -554,7 +554,7 @@ tfo-agent version
 
 ```bash
 # Pull new image
-docker pull telemetryflow/telemetryflow-agent:1.1.0
+docker pull telemetryflow/telemetryflow-agent:1.1.1
 
 # Stop and remove old container
 docker stop tfo-agent
@@ -564,7 +564,7 @@ docker rm tfo-agent
 docker run -d \
   --name tfo-agent \
   ... # same options as before
-  telemetryflow/telemetryflow-agent:1.1.0 \
+  telemetryflow/telemetryflow-agent:1.1.1 \
   start --config /etc/tfo-agent/config.yaml
 ```
 
@@ -573,7 +573,7 @@ docker run -d \
 ```bash
 # Update image in DaemonSet
 kubectl set image daemonset/tfo-agent \
-  tfo-agent=telemetryflow/telemetryflow-agent:1.1.0 \
+  tfo-agent=telemetryflow/telemetryflow-agent:1.1.1 \
   -n observability
 
 # Watch rollout
