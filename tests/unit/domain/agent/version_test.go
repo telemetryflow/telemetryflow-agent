@@ -1,8 +1,8 @@
-// Package version_test provides unit tests for the version package.
+// Package agent_test provides unit tests for the version package.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
-package version_test
+package agent_test
 
 import (
 	"runtime"

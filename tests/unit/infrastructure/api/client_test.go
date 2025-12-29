@@ -1,8 +1,8 @@
-// Package api provides HTTP client tests for TelemetryFlow backend communication.
+// Package api_test provides unit tests for the TelemetryFlow API client infrastructure.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
-package api
+package api_test
 
 import (
 	"context"
@@ -14,45 +14,34 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 )
 
 func TestNewClient(t *testing.T) {
-	t.Run("should create client with default values", func(t *testing.T) {
-		client := NewClient(ClientConfig{
+	t.Run("should create client with config", func(t *testing.T) {
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: "http://localhost:8080",
 		})
-
 		require.NotNil(t, client)
-		assert.Equal(t, "http://localhost:8080", client.baseURL)
 	})
 
 	t.Run("should use provided timeout", func(t *testing.T) {
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: "http://localhost:8080",
 			Timeout: 60 * time.Second,
 		})
-
 		require.NotNil(t, client)
-		assert.Equal(t, 60*time.Second, client.httpClient.Timeout)
-	})
-
-	t.Run("should use default timeout when not provided", func(t *testing.T) {
-		client := NewClient(ClientConfig{
-			BaseURL: "http://localhost:8080",
-		})
-
-		assert.Equal(t, 30*time.Second, client.httpClient.Timeout)
 	})
 
 	t.Run("should configure TLS when enabled", func(t *testing.T) {
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: "https://localhost:8080",
-			TLSConfig: TLSConfig{
+			TLSConfig: api.TLSConfig{
 				Enabled:    true,
 				SkipVerify: true,
 			},
 		})
-
 		require.NotNil(t, client)
 	})
 }
@@ -67,7 +56,7 @@ func TestClientRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: server.URL,
 		})
 
@@ -92,7 +81,7 @@ func TestClientRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: server.URL,
 		})
 
@@ -111,7 +100,7 @@ func TestClientRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL:      server.URL,
 			APIKeyID:     "tfk_test",
 			APIKeySecret: "tfs_secret",
@@ -130,7 +119,7 @@ func TestClientRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL:       server.URL,
 			RetryAttempts: 0,
 		})
@@ -147,7 +136,7 @@ func TestClientRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: server.URL,
 		})
 
@@ -161,7 +150,7 @@ func TestClientRequest(t *testing.T) {
 
 func TestResponse(t *testing.T) {
 	t.Run("should unmarshal JSON response", func(t *testing.T) {
-		resp := &Response{
+		resp := &api.Response{
 			StatusCode: 200,
 			Body:       []byte(`{"name": "test", "value": 123}`),
 		}
@@ -178,7 +167,7 @@ func TestResponse(t *testing.T) {
 	})
 
 	t.Run("should return error on invalid JSON", func(t *testing.T) {
-		resp := &Response{
+		resp := &api.Response{
 			StatusCode: 200,
 			Body:       []byte(`invalid json`),
 		}
@@ -191,13 +180,13 @@ func TestResponse(t *testing.T) {
 	t.Run("should correctly identify success status codes", func(t *testing.T) {
 		successCodes := []int{200, 201, 202, 204, 299}
 		for _, code := range successCodes {
-			resp := &Response{StatusCode: code}
+			resp := &api.Response{StatusCode: code}
 			assert.True(t, resp.IsSuccess(), "status %d should be success", code)
 		}
 
 		failureCodes := []int{400, 401, 403, 404, 500, 502, 503}
 		for _, code := range failureCodes {
-			resp := &Response{StatusCode: code}
+			resp := &api.Response{StatusCode: code}
 			assert.False(t, resp.IsSuccess(), "status %d should not be success", code)
 		}
 	})
@@ -214,7 +203,7 @@ func TestClientHeartbeat(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: server.URL,
 		})
 
@@ -224,7 +213,7 @@ func TestClientHeartbeat(t *testing.T) {
 
 	t.Run("should send heartbeat with system info", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var req HeartbeatRequest
+			var req api.HeartbeatRequest
 			err := json.NewDecoder(r.Body).Decode(&req)
 			require.NoError(t, err)
 			assert.NotNil(t, req.SystemInfo)
@@ -235,11 +224,11 @@ func TestClientHeartbeat(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: server.URL,
 		})
 
-		sysInfo := &SystemInfoPayload{
+		sysInfo := &api.SystemInfoPayload{
 			Hostname: "test-host",
 			OS:       "linux",
 		}
@@ -255,7 +244,7 @@ func TestClientRegisterAgent(t *testing.T) {
 			assert.Equal(t, http.MethodPost, r.Method)
 			assert.Equal(t, "/agents", r.URL.Path)
 
-			var req RegisterAgentRequest
+			var req api.RegisterAgentRequest
 			err := json.NewDecoder(r.Body).Decode(&req)
 			require.NoError(t, err)
 			assert.Equal(t, "test-host", req.Hostname)
@@ -265,11 +254,11 @@ func TestClientRegisterAgent(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client := NewClient(ClientConfig{
+		client := api.NewClient(api.ClientConfig{
 			BaseURL: server.URL,
 		})
 
-		resp, err := client.RegisterAgent(context.Background(), &RegisterAgentRequest{
+		resp, err := client.RegisterAgent(context.Background(), &api.RegisterAgentRequest{
 			Hostname:     "test-host",
 			AgentVersion: "1.0.0",
 		})

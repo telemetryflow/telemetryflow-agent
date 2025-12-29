@@ -1,3 +1,7 @@
+// Package exporter_test provides unit tests for the TelemetryFlow exporter infrastructure.
+//
+// TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
 package exporter_test
 
 import (

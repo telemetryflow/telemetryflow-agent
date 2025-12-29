@@ -1,4 +1,4 @@
-// Package agent_test provides unit tests for the agent package.
+// Package agent_test provides unit tests for the agent domain.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.

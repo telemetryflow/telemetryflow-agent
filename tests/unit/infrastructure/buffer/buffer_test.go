@@ -1,3 +1,7 @@
+// Package buffer_test provides unit tests for the TelemetryFlow buffer infrastructure.
+//
+// TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
 package buffer_test
 
 import (
