@@ -142,4 +142,207 @@ func TestAgentStats(t *testing.T) {
 
 		assert.Zero(t, ag.Uptime())
 	})
+
+	t.Run("should return collector count in stats", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = true
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		stats := ag.Stats()
+		assert.Equal(t, 1, stats.CollectorCount)
+	})
+
+	t.Run("should return zero collectors when disabled", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = false
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		stats := ag.Stats()
+		assert.Equal(t, 0, stats.CollectorCount)
+	})
+}
+
+func TestAgentWithCollectors(t *testing.T) {
+	t.Run("should create agent with system collector enabled", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = true
+		cfg.Collector.System.CPU = true
+		cfg.Collector.System.Memory = true
+		cfg.Collector.System.Disk = true
+		cfg.Collector.System.Network = true
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+		assert.NotNil(t, ag)
+
+		stats := ag.Stats()
+		assert.Equal(t, 1, stats.CollectorCount)
+	})
+
+	t.Run("should run agent with system collector", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = true
+		cfg.Collector.System.Interval = 100 * time.Millisecond
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		errChan := make(chan error, 1)
+		go func() {
+			errChan <- ag.Run(ctx)
+		}()
+
+		// Let it run briefly
+		time.Sleep(200 * time.Millisecond)
+		assert.True(t, ag.IsRunning())
+
+		cancel()
+
+		err = <-errChan
+		assert.NoError(t, err)
+	})
+}
+
+func TestAgentShutdown(t *testing.T) {
+	t.Run("should shutdown gracefully with no collectors", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = false
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		errChan := make(chan error, 1)
+		go func() {
+			errChan <- ag.Run(ctx)
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+
+		err = <-errChan
+		assert.NoError(t, err)
+		assert.False(t, ag.IsRunning())
+	})
+
+	t.Run("should shutdown gracefully with collectors", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = true
+		cfg.Collector.System.Interval = 100 * time.Millisecond
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		errChan := make(chan error, 1)
+		go func() {
+			errChan <- ag.Run(ctx)
+		}()
+
+		time.Sleep(150 * time.Millisecond)
+		assert.True(t, ag.IsRunning())
+
+		cancel()
+
+		err = <-errChan
+		assert.NoError(t, err)
+		assert.False(t, ag.IsRunning())
+	})
+}
+
+func TestAgentConfiguration(t *testing.T) {
+	t.Run("should use custom hostname", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Agent.Hostname = "custom-hostname"
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		stats := ag.Stats()
+		assert.Equal(t, "custom-hostname", stats.Hostname)
+	})
+
+	t.Run("should use TelemetryFlow endpoint config", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.Endpoint = "custom-endpoint:4317"
+		cfg.TelemetryFlow.APIKeyID = "tfk_test"
+		cfg.TelemetryFlow.APIKeySecret = "tfs_test"
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+		assert.NotNil(t, ag)
+	})
+
+	t.Run("should configure TLS settings", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.TLS.Enabled = true
+		cfg.TelemetryFlow.TLS.SkipVerify = true
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+		assert.NotNil(t, ag)
+	})
+
+	t.Run("should configure heartbeat settings", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Heartbeat.Interval = 30 * time.Second
+		cfg.Heartbeat.Timeout = 5 * time.Second
+		cfg.Heartbeat.IncludeSystemInfo = true
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+		assert.NotNil(t, ag)
+	})
+
+	t.Run("should configure collector disk paths", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Collector.System.Enabled = true
+		cfg.Collector.System.DiskPaths = []string{"/", "/home"}
+		logger, _ := zap.NewDevelopment()
+
+		ag, err := agent.New(cfg, logger)
+		require.NoError(t, err)
+
+		stats := ag.Stats()
+		assert.Equal(t, 1, stats.CollectorCount)
+	})
+}
+
+func TestAgentStatsStruct(t *testing.T) {
+	t.Run("should have all fields", func(t *testing.T) {
+		stats := agent.AgentStats{
+			ID:             "test-id",
+			Hostname:       "test-host",
+			Running:        true,
+			Started:        time.Now(),
+			Uptime:         5 * time.Minute,
+			CollectorCount: 2,
+		}
+
+		assert.Equal(t, "test-id", stats.ID)
+		assert.Equal(t, "test-host", stats.Hostname)
+		assert.True(t, stats.Running)
+		assert.False(t, stats.Started.IsZero())
+		assert.Equal(t, 5*time.Minute, stats.Uptime)
+		assert.Equal(t, 2, stats.CollectorCount)
+	})
 }
