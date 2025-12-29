@@ -242,7 +242,7 @@ tfo-agent version
 
 ```
 tfo-agent/
-├── cmd/tfo-agent/           # CLI entry point
+├── cmd/tfo-agent/         # CLI entry point
 ├── internal/
 │   ├── agent/             # Core agent lifecycle
 │   ├── buffer/            # Disk-backed retry buffer
