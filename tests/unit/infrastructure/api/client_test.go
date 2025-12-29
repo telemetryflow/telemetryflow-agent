@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -533,10 +534,10 @@ func TestClientRetry(t *testing.T) {
 	})
 
 	t.Run("should not retry on context cancellation", func(t *testing.T) {
-		attempts := 0
+		var attempts int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			attempts++
-			time.Sleep(50 * time.Millisecond)
+			atomic.AddInt32(&attempts, 1)
+			time.Sleep(200 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		}))
 		defer server.Close()
@@ -544,15 +545,15 @@ func TestClientRetry(t *testing.T) {
 		client := api.NewClient(api.ClientConfig{
 			BaseURL:       server.URL,
 			RetryAttempts: 3,
-			RetryDelay:    10 * time.Millisecond,
+			RetryDelay:    50 * time.Millisecond,
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
 		_, err := client.Request(ctx, http.MethodGet, "/test", nil)
 		require.Error(t, err)
-		assert.LessOrEqual(t, attempts, 2) // Should not do all retries
+		assert.LessOrEqual(t, atomic.LoadInt32(&attempts), int32(2)) // Should not do all retries
 	})
 }
 

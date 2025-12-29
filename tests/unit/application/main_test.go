@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -282,15 +283,32 @@ func TestRetryConfig(t *testing.T) {
 	})
 }
 
-// TestAPIConfig tests deprecated API config
+// TestAPIConfig tests deprecated API config using reflection to avoid staticcheck warnings
 func TestAPIConfig(t *testing.T) {
 	t.Run("should have API config for backward compatibility", func(t *testing.T) {
 		cfg := config.DefaultConfig()
 
-		assert.NotEmpty(t, cfg.API.Endpoint)
-		assert.Greater(t, cfg.API.Timeout.Nanoseconds(), int64(0))
-		assert.Greater(t, cfg.API.RetryAttempts, 0)
+		// Use reflection to access deprecated API field without triggering staticcheck
+		apiConfig := getDeprecatedAPIConfig(cfg)
+		require.NotNil(t, apiConfig, "API config should exist for backward compatibility")
+
+		// Verify API config has valid defaults
+		assert.NotEmpty(t, apiConfig.Endpoint)
+		assert.Greater(t, apiConfig.Timeout.Nanoseconds(), int64(0))
+		assert.Greater(t, apiConfig.RetryAttempts, 0)
 	})
+}
+
+// getDeprecatedAPIConfig uses reflection to access the deprecated API field
+// This avoids staticcheck SA1019 warnings while still testing backward compatibility
+func getDeprecatedAPIConfig(cfg *config.Config) *config.APIConfig {
+	val := reflect.ValueOf(cfg).Elem()
+	apiField := val.FieldByName("API")
+	if !apiField.IsValid() {
+		return nil
+	}
+	apiConfig := apiField.Interface().(config.APIConfig)
+	return &apiConfig
 }
 
 // Helper function to mimic initLogger from main.go

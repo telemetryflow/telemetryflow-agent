@@ -812,7 +812,7 @@ func TestOTLPExporterContextCancellation(t *testing.T) {
 			Protocol:      "grpc",
 			TLSEnabled:    false,
 			FlushInterval: 1 * time.Second,
-			Timeout:       5 * time.Second,
+			Timeout:       1 * time.Second,
 			Logger:        logger,
 		}
 
@@ -822,10 +822,10 @@ func TestOTLPExporterContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		// Start with canceled context may or may not error depending on timing
+		// Start with canceled context - may error
 		_ = exp.Start(ctx)
 
-		// Cleanup
+		// Cleanup - always stop regardless of start result
 		_ = exp.Stop(context.Background())
 	})
 
@@ -841,23 +841,33 @@ func TestOTLPExporterContextCancellation(t *testing.T) {
 			Endpoint:      "localhost:4317",
 			Protocol:      "grpc",
 			TLSEnabled:    false,
-			FlushInterval: 1 * time.Second,
-			Timeout:       5 * time.Second,
+			FlushInterval: 100 * time.Millisecond,
+			Timeout:       1 * time.Second,
 			Logger:        logger,
 		}
 
 		exp := exporter.NewOTLPExporter(cfg)
-		ctx := context.Background()
 
-		// Start
-		err := exp.Start(ctx)
+		// Use timeout context for start
+		startCtx, startCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer startCancel()
+
+		// Start - may fail due to no server, but that's expected
+		err := exp.Start(startCtx)
 		require.NoError(t, err)
 
-		// Stop with very short timeout - may error if no server is running
-		stopCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-		defer cancel()
+		// Stop with very short timeout - expect it may error due to flush timeout
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer stopCancel()
 
-		// Stop may or may not error depending on server availability
-		_ = exp.Stop(stopCtx)
+		// Stop may error due to timeout during flush - this is expected behavior
+		err = exp.Stop(stopCtx)
+		// Don't assert on error - timeout during shutdown is acceptable
+		if err != nil {
+			assert.Contains(t, err.Error(), "deadline exceeded")
+		}
+
+		// Verify exporter is no longer running regardless of shutdown error
+		assert.False(t, exp.IsRunning())
 	})
 }

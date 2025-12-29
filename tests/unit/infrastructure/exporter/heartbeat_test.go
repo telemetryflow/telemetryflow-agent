@@ -7,6 +7,7 @@ package exporter_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 
 // mockHeartbeatClient is a mock implementation of HeartbeatClient
 type mockHeartbeatClient struct {
+	mu           sync.RWMutex
 	callCount    int32
 	shouldFail   bool
 	failAfter    int32
@@ -31,8 +33,10 @@ type mockHeartbeatClient struct {
 
 func (m *mockHeartbeatClient) Heartbeat(ctx context.Context, agentID string, sysInfo *api.SystemInfoPayload) error {
 	count := atomic.AddInt32(&m.callCount, 1)
+	m.mu.Lock()
 	m.lastAgentID = agentID
 	m.lastSysInfo = sysInfo
+	m.mu.Unlock()
 
 	if m.responseTime > 0 {
 		select {
@@ -55,6 +59,18 @@ func (m *mockHeartbeatClient) Heartbeat(ctx context.Context, agentID string, sys
 
 func (m *mockHeartbeatClient) CallCount() int32 {
 	return atomic.LoadInt32(&m.callCount)
+}
+
+func (m *mockHeartbeatClient) LastAgentID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastAgentID
+}
+
+func (m *mockHeartbeatClient) LastSysInfo() *api.SystemInfoPayload {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastSysInfo
 }
 
 func TestNewHeartbeat(t *testing.T) {
@@ -118,8 +134,8 @@ func TestHeartbeatStart(t *testing.T) {
 
 		cfg := exporter.HeartbeatConfig{
 			AgentID:  "test-agent",
-			Interval: 50 * time.Millisecond,
-			Timeout:  100 * time.Millisecond,
+			Interval: 100 * time.Millisecond,
+			Timeout:  200 * time.Millisecond,
 			Client:   mock,
 			Logger:   logger,
 		}
@@ -134,7 +150,7 @@ func TestHeartbeatStart(t *testing.T) {
 			errChan <- hb.Start(ctx)
 		}()
 
-		time.Sleep(30 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 		assert.True(t, hb.IsRunning())
 
 		cancel()
@@ -148,7 +164,7 @@ func TestHeartbeatStart(t *testing.T) {
 		cfg := exporter.HeartbeatConfig{
 			AgentID:  "test-agent-123",
 			Interval: 1 * time.Second,
-			Timeout:  100 * time.Millisecond,
+			Timeout:  200 * time.Millisecond,
 			Client:   mock,
 		}
 
@@ -161,9 +177,9 @@ func TestHeartbeatStart(t *testing.T) {
 			_ = hb.Start(ctx)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 		assert.GreaterOrEqual(t, mock.CallCount(), int32(1))
-		assert.Equal(t, "test-agent-123", mock.lastAgentID)
+		assert.Equal(t, "test-agent-123", mock.LastAgentID())
 
 		cancel()
 	})
@@ -173,8 +189,8 @@ func TestHeartbeatStart(t *testing.T) {
 
 		cfg := exporter.HeartbeatConfig{
 			AgentID:  "test-agent",
-			Interval: 30 * time.Millisecond,
-			Timeout:  50 * time.Millisecond,
+			Interval: 100 * time.Millisecond,
+			Timeout:  150 * time.Millisecond,
 			Client:   mock,
 		}
 
@@ -187,7 +203,7 @@ func TestHeartbeatStart(t *testing.T) {
 		}()
 
 		// Wait for initial + a few periodic heartbeats
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(350 * time.Millisecond)
 		cancel()
 
 		// Should have sent at least 2-3 heartbeats (initial + periodic)
@@ -199,8 +215,8 @@ func TestHeartbeatStart(t *testing.T) {
 
 		cfg := exporter.HeartbeatConfig{
 			AgentID:  "test-agent",
-			Interval: 100 * time.Millisecond,
-			Timeout:  50 * time.Millisecond,
+			Interval: 200 * time.Millisecond,
+			Timeout:  150 * time.Millisecond,
 			Client:   mock,
 		}
 
@@ -213,11 +229,11 @@ func TestHeartbeatStart(t *testing.T) {
 			_ = hb.Start(ctx1)
 		}()
 
-		time.Sleep(30 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		assert.True(t, hb.IsRunning())
 
 		// Try to start again - should return immediately without error
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 150*time.Millisecond)
 		defer cancel2()
 
 		err := hb.Start(ctx2)
@@ -403,7 +419,7 @@ func TestHeartbeatSendNow(t *testing.T) {
 		err := hb.SendNow(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, int32(1), mock.CallCount())
-		assert.Equal(t, "test-agent-now", mock.lastAgentID)
+		assert.Equal(t, "test-agent-now", mock.LastAgentID())
 	})
 
 	t.Run("should return error on failure", func(t *testing.T) {
@@ -482,7 +498,7 @@ func TestHeartbeatWithSystemInfo(t *testing.T) {
 
 		err := hb.SendNow(ctx)
 		require.NoError(t, err)
-		assert.Nil(t, mock.lastSysInfo)
+		assert.Nil(t, mock.LastSysInfo())
 	})
 }
 

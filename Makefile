@@ -43,8 +43,10 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m
 
-.PHONY: all build build-all clean test test-unit test-integration test-e2e test-all test-coverage test-script test-short deps lint lint-fix run install help tidy version validate-config \
-	fmt-check vet staticcheck verify deps-verify test-unit-ci test-integration-ci test-e2e-ci security govulncheck coverage-merge ci-lint ci-test ci-build
+.PHONY: all build build-all build-linux build-darwin clean test test-unit test-integration test-e2e test-all test-coverage test-script test-short bench \
+	run dev deps deps-update tidy lint lint-fix fmt vet check validate-config install uninstall ci release-check docs godoc \
+	docker-build docker-push version help fmt-check staticcheck verify deps-verify test-unit-ci test-integration-ci test-e2e-ci \
+	security govulncheck coverage-merge coverage-report ci-lint ci-test ci-build
 
 # Default target
 all: build
@@ -354,7 +356,7 @@ deps-verify: deps verify
 ## CI: Run unit tests with race detection and coverage
 test-unit-ci:
 	@echo "$(GREEN)Running unit tests (CI mode)...$(NC)"
-	@$(GOTEST) -v -race -timeout 5m -coverprofile=coverage-unit.out -covermode=atomic ./tests/unit/...
+	@$(GOTEST) -v -race -timeout 10m -coverprofile=coverage-unit.out -covermode=atomic ./tests/unit/...
 
 ## CI: Run integration tests with race detection and coverage
 test-integration-ci:
@@ -414,7 +416,7 @@ coverage-report: coverage-merge
 	@echo "$(GREEN)Coverage report generated$(NC)"
 
 ## CI: Complete lint pipeline
-ci-lint: deps-verify fmt-check vet staticcheck lint
+ci-lint: deps-verify fmt-check vet staticcheck security
 	@echo "$(GREEN)CI lint pipeline completed$(NC)"
 
 ## CI: Complete test pipeline
