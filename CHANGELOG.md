@@ -28,9 +28,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Enterprise 3rd Party Integrations**: Added comprehensive integration support for enterprise environments
+  - **Cloud Providers**: GCP (Cloud Monitoring, Logging, Trace), Azure (Monitor, Log Analytics, App Insights), Alibaba Cloud (CMS, SLS, ARMS)
+  - **Infrastructure**: Proxmox VE, VMware vSphere, Nutanix (Prism Central/Element), Azure Arc
+  - **Network & IoT**: Cisco (DNA Center, Meraki Dashboard), SNMP v1/v2c/v3, MQTT
+  - **Kernel/System**: eBPF for Linux kernel-level observability (syscalls, network, file I/O, scheduler)
+  - **Observability**: Blackbox (synthetic monitoring), Telegraf, Grafana Alloy, Percona PMM
+- **Integration Manager**: New centralized manager for all integration exporters with parallel export, health checks, and statistics
+- **Integration Documentation**: Added comprehensive documentation with Mermaid diagrams
+  - `docs/integrations/README.md` - Integration overview and architecture
+  - `docs/integrations/cloud-providers.md` - GCP, Azure, Alibaba configuration
+  - `docs/integrations/infrastructure.md` - Proxmox, VMware, Nutanix, Azure Arc
+  - `docs/integrations/network.md` - Cisco, SNMP, MQTT configuration
+  - `docs/integrations/kernel.md` - eBPF observability guide
+  - `docs/integrations/observability.md` - Backend integrations
+- **Dual Endpoint Ingestion Support**: Updated docker-compose and E2E configs for TFO-Collector dual ingestion
+  - v1 endpoints: Standard OTEL community format (`/v1/traces`, `/v1/metrics`, `/v1/logs`)
+  - v2 endpoints: TelemetryFlow enhanced format (`/v2/traces`, `/v2/metrics`, `/v2/logs`)
+  - gRPC endpoint: Same port (4317) for both v1 and v2
+- **TFO-Collector as Default**: Docker-compose.e2e.yml now uses `telemetryflow/telemetryflow-collector` as default image
+  - Commented alternatives for TFO-Collector-OCB and OTEL Collector Contrib
+  - Separate volume mounts for each collector type
+- **Enhanced Port Configuration**: Added additional ports for observability
+  - zPages (55679) for debugging
+  - pprof (1777) for profiling
+  - Prometheus exporter (8889)
 - **Documentation**: Added missing documentation files
   - `docs/DEVELOPMENT.md` - Comprehensive development guide with coding standards, testing practices, and debugging tips
   - `docs/TROUBLESHOOTING.md` - Complete troubleshooting guide covering common issues, diagnostics, and solutions
+  - README.md updated with OTEL Collector Ports table and dual endpoint documentation
 
 ### Fixed
 
@@ -173,7 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | OTEL SDK | Description |
 |---------|------|----------|-------------|
-| 1.1.1 | 2024-12-29 | v1.39.0 | Race condition fixes, documentation, test improvements |
+| 1.1.1 | 2024-12-29 | v1.39.0 | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF) |
 | 1.1.0 | 2024-12-27 | v1.39.0 | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector |
 | 1.0.1 | 2024-12-17 | - | Docker workflow, SBOM, multi-platform support |
 | 1.0.0 | 2024-12-17 | - | Initial release |

@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 )
@@ -187,25 +188,7 @@ func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
 		if err != nil {
 			h.logger.Debug("Failed to collect system info", zap.Error(err))
 		} else {
-			sysInfo = &api.SystemInfoPayload{
-				Hostname:        info.Hostname,
-				OS:              info.OS,
-				OSVersion:       info.OSVersion,
-				KernelVersion:   info.KernelVersion,
-				Architecture:    info.Architecture,
-				Uptime:          info.Uptime,
-				CPUCores:        info.CPUCores,
-				CPUModel:        info.CPUModel,
-				CPUUsage:        info.CPUUsage,
-				MemoryTotal:     info.MemoryTotal,
-				MemoryUsed:      info.MemoryUsed,
-				MemoryAvailable: info.MemoryAvailable,
-				MemoryUsage:     info.MemoryUsage,
-				DiskTotal:       info.DiskTotal,
-				DiskUsed:        info.DiskUsed,
-				DiskAvailable:   info.DiskAvailable,
-				DiskUsage:       info.DiskUsage,
-			}
+			sysInfo = mapSystemInfoToPayload(info)
 		}
 	}
 
@@ -225,4 +208,224 @@ func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
 // SendNow sends an immediate heartbeat
 func (h *Heartbeat) SendNow(ctx context.Context) error {
 	return h.sendHeartbeat(ctx)
+}
+
+// mapSystemInfoToPayload converts collector.SystemInfo to api.SystemInfoPayload
+func mapSystemInfoToPayload(info *collector.SystemInfo) *api.SystemInfoPayload {
+	if info == nil {
+		return nil
+	}
+
+	payload := &api.SystemInfoPayload{
+		// Host Information
+		Hostname:       info.Hostname,
+		OS:             info.OS,
+		OSVersion:      info.OSVersion,
+		Platform:       info.Platform,
+		PlatformFamily: info.PlatformFamily,
+		KernelVersion:  info.KernelVersion,
+		Architecture:   info.Architecture,
+		Uptime:         info.Uptime,
+		BootTime:       info.BootTime,
+		Timezone:       info.Timezone,
+		HostID:         info.HostID,
+
+		// CPU Information
+		CPUCores:          info.CPUCores,
+		CPULogicalCores:   info.CPULogicalCores,
+		CPUPhysicalCores:  info.CPUPhysicalCores,
+		CPUModel:          info.CPUModel,
+		CPUVendor:         info.CPUVendor,
+		CPUFamily:         info.CPUFamily,
+		CPUMhz:            info.CPUMhz,
+		CPUCacheSize:      info.CPUCacheSize,
+		CPUUsage:          info.CPUUsage,
+		CPUUserPercent:    info.CPUUserPercent,
+		CPUSystemPercent:  info.CPUSystemPercent,
+		CPUIdlePercent:    info.CPUIdlePercent,
+		CPUIOWaitPercent:  info.CPUIOWaitPercent,
+		CPUStealPercent:   info.CPUStealPercent,
+		CPUGuestPercent:   info.CPUGuestPercent,
+		CPUIrqPercent:     info.CPUIrqPercent,
+		CPUSoftIrqPercent: info.CPUSoftIrqPercent,
+		CPUNicePercent:    info.CPUNicePercent,
+		LoadAvg1:          info.LoadAvg1,
+		LoadAvg5:          info.LoadAvg5,
+		LoadAvg15:         info.LoadAvg15,
+
+		// Memory Information
+		MemoryTotal:       info.MemoryTotal,
+		MemoryUsed:        info.MemoryUsed,
+		MemoryAvailable:   info.MemoryAvailable,
+		MemoryFree:        info.MemoryFree,
+		MemoryUsage:       info.MemoryUsage,
+		MemoryCached:      info.MemoryCached,
+		MemoryBuffers:     info.MemoryBuffers,
+		MemoryActive:      info.MemoryActive,
+		MemoryInactive:    info.MemoryInactive,
+		MemoryWired:       info.MemoryWired,
+		MemoryShared:      info.MemoryShared,
+		MemorySlab:        info.MemorySlab,
+		MemoryPageTables:  info.MemoryPageTables,
+		MemoryCommitted:   info.MemoryCommitted,
+		MemoryCommitLimit: info.MemoryCommitLimit,
+		MemoryDirty:       info.MemoryDirty,
+		MemoryWriteback:   info.MemoryWriteback,
+		SwapTotal:         info.SwapTotal,
+		SwapUsed:          info.SwapUsed,
+		SwapFree:          info.SwapFree,
+		SwapUsage:         info.SwapUsage,
+		SwapIn:            info.SwapIn,
+		SwapOut:           info.SwapOut,
+		PageFaultsMajor:   info.PageFaultsMajor,
+		PageFaultsMinor:   info.PageFaultsMinor,
+
+		// Disk Information
+		DiskTotal:        info.DiskTotal,
+		DiskUsed:         info.DiskUsed,
+		DiskAvailable:    info.DiskAvailable,
+		DiskUsage:        info.DiskUsage,
+		DiskInodes:       info.DiskInodes,
+		DiskInodesFree:   info.DiskInodesFree,
+		DiskInodesUsed:   info.DiskInodesUsed,
+		DiskInodesUsage:  info.DiskInodesUsage,
+		DiskReadBytes:    info.DiskReadBytes,
+		DiskWriteBytes:   info.DiskWriteBytes,
+		DiskReadOps:      info.DiskReadOps,
+		DiskWriteOps:     info.DiskWriteOps,
+		DiskReadTime:     info.DiskReadTime,
+		DiskWriteTime:    info.DiskWriteTime,
+		DiskIOTime:       info.DiskIOTime,
+		DiskWeightedIO:   info.DiskWeightedIO,
+		DiskIOInProgress: info.DiskIOInProgress,
+		DiskIOPS:         info.DiskIOPS,
+		DiskLatencyRead:  info.DiskLatencyRead,
+		DiskLatencyWrite: info.DiskLatencyWrite,
+
+		// Network Information
+		NetworkBytesSent:     info.NetworkBytesSent,
+		NetworkBytesRecv:     info.NetworkBytesRecv,
+		NetworkPacketsSent:   info.NetworkPacketsSent,
+		NetworkPacketsRecv:   info.NetworkPacketsRecv,
+		NetworkErrorsIn:      info.NetworkErrorsIn,
+		NetworkErrorsOut:     info.NetworkErrorsOut,
+		NetworkDropsIn:       info.NetworkDropsIn,
+		NetworkDropsOut:      info.NetworkDropsOut,
+		NetworkFifoIn:        info.NetworkFifoIn,
+		NetworkFifoOut:       info.NetworkFifoOut,
+		NetworkBytesSentRate: info.NetworkBytesSentRate,
+		NetworkBytesRecvRate: info.NetworkBytesRecvRate,
+
+		// TCP Connection States
+		TCPConnectionsEstablished: info.TCPConnectionsEstablished,
+		TCPConnectionsTimeWait:    info.TCPConnectionsTimeWait,
+		TCPConnectionsCloseWait:   info.TCPConnectionsCloseWait,
+		TCPConnectionsListen:      info.TCPConnectionsListen,
+		TCPConnectionsSynSent:     info.TCPConnectionsSynSent,
+		TCPConnectionsSynRecv:     info.TCPConnectionsSynRecv,
+		TCPConnectionsFinWait1:    info.TCPConnectionsFinWait1,
+		TCPConnectionsFinWait2:    info.TCPConnectionsFinWait2,
+		TCPConnectionsLastAck:     info.TCPConnectionsLastAck,
+		TCPConnectionsClosing:     info.TCPConnectionsClosing,
+		TCPRetransmits:            info.TCPRetransmits,
+
+		// Process Information
+		ProcessCount:    info.ProcessCount,
+		ProcessRunning:  info.ProcessRunning,
+		ProcessSleeping: info.ProcessSleeping,
+		ProcessStopped:  info.ProcessStopped,
+		ProcessZombie:   info.ProcessZombie,
+		ProcessBlocked:  info.ProcessBlocked,
+		ThreadCount:     info.ThreadCount,
+		ContextSwitches: info.ContextSwitches,
+		Interrupts:      info.Interrupts,
+		SoftInterrupts:  info.SoftInterrupts,
+		SystemCalls:     info.SystemCalls,
+
+		// System Resources
+		OpenFileDescriptors:  info.OpenFileDescriptors,
+		MaxFileDescriptors:   info.MaxFileDescriptors,
+		FileDescriptorsUsage: info.FileDescriptorsUsage,
+		EntropyAvailable:     info.EntropyAvailable,
+
+		// Container/Virtualization Detection
+		IsContainer:        info.IsContainer,
+		ContainerID:        info.ContainerID,
+		ContainerRuntime:   info.ContainerRuntime,
+		ContainerName:      info.ContainerName,
+		ContainerImage:     info.ContainerImage,
+		IsVirtualized:      info.IsVirtualized,
+		VirtualizationType: info.VirtualizationType,
+		CloudProvider:      info.CloudProvider,
+		CloudInstanceID:    info.CloudInstanceID,
+		CloudInstanceType:  info.CloudInstanceType,
+		CloudRegion:        info.CloudRegion,
+		CloudZone:          info.CloudZone,
+
+		// Agent Metadata
+		AgentVersion:       info.AgentVersion,
+		AgentStartTime:     info.AgentStartTime,
+		AgentUptime:        info.AgentUptime,
+		CollectionTime:     info.CollectionTime,
+		CollectionDuration: info.CollectionDuration,
+	}
+
+	// Map CPU per-core info
+	if len(info.CPUPerCore) > 0 {
+		payload.CPUPerCore = make([]api.CPUCoreInfoPayload, len(info.CPUPerCore))
+		for i, core := range info.CPUPerCore {
+			payload.CPUPerCore[i] = api.CPUCoreInfoPayload{
+				CoreID:        core.CoreID,
+				Usage:         core.Usage,
+				UserPercent:   core.UserPercent,
+				SystemPercent: core.SystemPercent,
+				IdlePercent:   core.IdlePercent,
+			}
+		}
+	}
+
+	// Map disk partitions
+	if len(info.DiskPartitions) > 0 {
+		payload.DiskPartitions = make([]api.DiskPartitionInfoPayload, len(info.DiskPartitions))
+		for i, part := range info.DiskPartitions {
+			payload.DiskPartitions[i] = api.DiskPartitionInfoPayload{
+				Device:      part.Device,
+				Mountpoint:  part.Mountpoint,
+				Fstype:      part.Fstype,
+				Total:       part.Total,
+				Used:        part.Used,
+				Free:        part.Free,
+				Usage:       part.Usage,
+				Inodes:      part.Inodes,
+				InodesFree:  part.InodesFree,
+				InodesUsage: part.InodesUsage,
+			}
+		}
+	}
+
+	// Map network interfaces
+	if len(info.NetworkInterfaces) > 0 {
+		payload.NetworkInterfaces = make([]api.NetworkInterfaceInfoPayload, len(info.NetworkInterfaces))
+		for i, iface := range info.NetworkInterfaces {
+			payload.NetworkInterfaces[i] = api.NetworkInterfaceInfoPayload{
+				Name:        iface.Name,
+				MacAddress:  iface.MacAddress,
+				IPAddresses: iface.IPAddresses,
+				MTU:         iface.MTU,
+				Speed:       iface.Speed,
+				IsUp:        iface.IsUp,
+				IsLoopback:  iface.IsLoopback,
+				BytesSent:   iface.BytesSent,
+				BytesRecv:   iface.BytesRecv,
+				PacketsSent: iface.PacketsSent,
+				PacketsRecv: iface.PacketsRecv,
+				ErrorsIn:    iface.ErrorsIn,
+				ErrorsOut:   iface.ErrorsOut,
+				DropsIn:     iface.DropsIn,
+				DropsOut:    iface.DropsOut,
+			}
+		}
+	}
+
+	return payload
 }

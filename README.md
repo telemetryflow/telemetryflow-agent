@@ -154,6 +154,40 @@ docker run -d --name tfo-agent \
   telemetryflow/telemetryflow-agent:1.1.1
 ```
 
+### OTEL Collector Ports
+
+| Port  | Protocol | Description           |
+| ----- | -------- | --------------------- |
+| 4317  | gRPC     | OTLP gRPC (v1 & v2)   |
+| 4318  | HTTP     | OTLP HTTP (v1 & v2)   |
+| 8888  | HTTP     | OTEL Collector metrics|
+| 8889  | HTTP     | Prometheus exporter   |
+| 13133 | HTTP     | Health check          |
+| 55679 | HTTP     | zPages (debugging)    |
+| 1777  | HTTP     | pprof (profiling)     |
+
+### OTLP Endpoints (Dual Ingestion)
+
+The TFO-Collector supports both TelemetryFlow (v2) and OTEL Community (v1) endpoints:
+
+**TelemetryFlow Platform (Recommended):**
+
+```text
+POST http://localhost:4318/v2/traces
+POST http://localhost:4318/v2/metrics
+POST http://localhost:4318/v2/logs
+```
+
+**OTEL Community (Backwards Compatible):**
+
+```text
+POST http://localhost:4318/v1/traces
+POST http://localhost:4318/v1/metrics
+POST http://localhost:4318/v1/logs
+```
+
+**gRPC:** `localhost:4317` (both v1 and v2)
+
 ## Configuration
 
 Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
@@ -377,6 +411,21 @@ sudo systemctl enable tfo-agent
 sudo systemctl start tfo-agent
 ```
 
+## 3rd Party Integrations
+
+TelemetryFlow Agent supports a wide range of integrations for enterprise environments:
+
+| Category | Integrations |
+|----------|--------------|
+| **Cloud Providers** | GCP, Azure, Alibaba Cloud |
+| **Infrastructure** | Proxmox, VMware, Nutanix, Azure Arc |
+| **Network & IoT** | Cisco (DNA Center/Meraki), SNMP, MQTT |
+| **Kernel/System** | eBPF (Linux) |
+| **Observability** | Prometheus, Datadog, Splunk, Elasticsearch, InfluxDB |
+| **Streaming** | Kafka, Loki, Jaeger, Zipkin |
+
+See [Integration Documentation](docs/integrations/README.md) for detailed configuration.
+
 ## Documentation
 
 | Document | Description |
@@ -389,6 +438,7 @@ sudo systemctl start tfo-agent
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Development guide and coding standards |
 | [TROUBLESHOOTING](docs/TROUBLESHOOTING.md) | Troubleshooting guide and common issues |
 | [GITHUB-WORKFLOWS](docs/GITHUB-WORKFLOWS.md) | CI/CD workflows documentation |
+| [INTEGRATIONS](docs/integrations/README.md) | 3rd party integration guides |
 | [CHANGELOG](CHANGELOG.md) | Version history and changes |
 
 ## License

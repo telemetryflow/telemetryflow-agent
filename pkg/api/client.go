@@ -336,25 +336,228 @@ type HeartbeatRequest struct {
 	SystemInfo *SystemInfoPayload `json:"systemInfo,omitempty"`
 }
 
-// SystemInfoPayload is the system info sent with heartbeat
+// SystemInfoPayload is the comprehensive system info sent with heartbeat
 type SystemInfoPayload struct {
-	Hostname        string  `json:"hostname,omitempty"`
-	OS              string  `json:"os,omitempty"`
-	OSVersion       string  `json:"osVersion,omitempty"`
-	KernelVersion   string  `json:"kernelVersion,omitempty"`
-	Architecture    string  `json:"architecture,omitempty"`
-	Uptime          uint64  `json:"uptime,omitempty"`
-	CPUCores        int     `json:"cpuCores,omitempty"`
-	CPUModel        string  `json:"cpuModel,omitempty"`
-	CPUUsage        float64 `json:"cpuUsage,omitempty"`
-	MemoryTotal     uint64  `json:"memoryTotal,omitempty"`
-	MemoryUsed      uint64  `json:"memoryUsed,omitempty"`
-	MemoryAvailable uint64  `json:"memoryAvailable,omitempty"`
-	MemoryUsage     float64 `json:"memoryUsage,omitempty"`
-	DiskTotal       uint64  `json:"diskTotal,omitempty"`
-	DiskUsed        uint64  `json:"diskUsed,omitempty"`
-	DiskAvailable   uint64  `json:"diskAvailable,omitempty"`
-	DiskUsage       float64 `json:"diskUsage,omitempty"`
+	// ==========================================================================
+	// Host Information
+	// ==========================================================================
+	Hostname       string `json:"hostname,omitempty"`
+	OS             string `json:"os,omitempty"`
+	OSVersion      string `json:"osVersion,omitempty"`
+	Platform       string `json:"platform,omitempty"`
+	PlatformFamily string `json:"platformFamily,omitempty"`
+	KernelVersion  string `json:"kernelVersion,omitempty"`
+	Architecture   string `json:"architecture,omitempty"`
+	Uptime         uint64 `json:"uptime,omitempty"`
+	BootTime       uint64 `json:"bootTime,omitempty"`
+	Timezone       string `json:"timezone,omitempty"`
+	HostID         string `json:"hostId,omitempty"`
+
+	// ==========================================================================
+	// CPU Information
+	// ==========================================================================
+	CPUCores          int     `json:"cpuCores,omitempty"`
+	CPULogicalCores   int     `json:"cpuLogicalCores,omitempty"`
+	CPUPhysicalCores  int     `json:"cpuPhysicalCores,omitempty"`
+	CPUModel          string  `json:"cpuModel,omitempty"`
+	CPUVendor         string  `json:"cpuVendor,omitempty"`
+	CPUFamily         string  `json:"cpuFamily,omitempty"`
+	CPUMhz            float64 `json:"cpuMhz,omitempty"`
+	CPUCacheSize      int32   `json:"cpuCacheSize,omitempty"`
+	CPUUsage          float64 `json:"cpuUsage,omitempty"`
+	CPUUserPercent    float64 `json:"cpuUserPercent,omitempty"`
+	CPUSystemPercent  float64 `json:"cpuSystemPercent,omitempty"`
+	CPUIdlePercent    float64 `json:"cpuIdlePercent,omitempty"`
+	CPUIOWaitPercent  float64 `json:"cpuIowaitPercent,omitempty"`
+	CPUStealPercent   float64 `json:"cpuStealPercent,omitempty"`
+	CPUGuestPercent   float64 `json:"cpuGuestPercent,omitempty"`
+	CPUIrqPercent     float64 `json:"cpuIrqPercent,omitempty"`
+	CPUSoftIrqPercent float64 `json:"cpuSoftirqPercent,omitempty"`
+	CPUNicePercent    float64 `json:"cpuNicePercent,omitempty"`
+	LoadAvg1          float64 `json:"loadAvg1,omitempty"`
+	LoadAvg5          float64 `json:"loadAvg5,omitempty"`
+	LoadAvg15         float64 `json:"loadAvg15,omitempty"`
+
+	// CPU Per-Core (optional detailed breakdown)
+	CPUPerCore []CPUCoreInfoPayload `json:"cpuPerCore,omitempty"`
+
+	// ==========================================================================
+	// Memory Information
+	// ==========================================================================
+	MemoryTotal       uint64  `json:"memoryTotal,omitempty"`
+	MemoryUsed        uint64  `json:"memoryUsed,omitempty"`
+	MemoryAvailable   uint64  `json:"memoryAvailable,omitempty"`
+	MemoryFree        uint64  `json:"memoryFree,omitempty"`
+	MemoryUsage       float64 `json:"memoryUsage,omitempty"`
+	MemoryCached      uint64  `json:"memoryCached,omitempty"`
+	MemoryBuffers     uint64  `json:"memoryBuffers,omitempty"`
+	MemoryActive      uint64  `json:"memoryActive,omitempty"`
+	MemoryInactive    uint64  `json:"memoryInactive,omitempty"`
+	MemoryWired       uint64  `json:"memoryWired,omitempty"`
+	MemoryShared      uint64  `json:"memoryShared,omitempty"`
+	MemorySlab        uint64  `json:"memorySlab,omitempty"`
+	MemoryPageTables  uint64  `json:"memoryPageTables,omitempty"`
+	MemoryCommitted   uint64  `json:"memoryCommitted,omitempty"`
+	MemoryCommitLimit uint64  `json:"memoryCommitLimit,omitempty"`
+	MemoryDirty       uint64  `json:"memoryDirty,omitempty"`
+	MemoryWriteback   uint64  `json:"memoryWriteback,omitempty"`
+	SwapTotal         uint64  `json:"swapTotal,omitempty"`
+	SwapUsed          uint64  `json:"swapUsed,omitempty"`
+	SwapFree          uint64  `json:"swapFree,omitempty"`
+	SwapUsage         float64 `json:"swapUsage,omitempty"`
+	SwapIn            uint64  `json:"swapIn,omitempty"`
+	SwapOut           uint64  `json:"swapOut,omitempty"`
+	PageFaultsMajor   uint64  `json:"pageFaultsMajor,omitempty"`
+	PageFaultsMinor   uint64  `json:"pageFaultsMinor,omitempty"`
+
+	// ==========================================================================
+	// Disk Information
+	// ==========================================================================
+	DiskTotal        uint64  `json:"diskTotal,omitempty"`
+	DiskUsed         uint64  `json:"diskUsed,omitempty"`
+	DiskAvailable    uint64  `json:"diskAvailable,omitempty"`
+	DiskUsage        float64 `json:"diskUsage,omitempty"`
+	DiskInodes       uint64  `json:"diskInodes,omitempty"`
+	DiskInodesFree   uint64  `json:"diskInodesFree,omitempty"`
+	DiskInodesUsed   uint64  `json:"diskInodesUsed,omitempty"`
+	DiskInodesUsage  float64 `json:"diskInodesUsage,omitempty"`
+	DiskReadBytes    uint64  `json:"diskReadBytes,omitempty"`
+	DiskWriteBytes   uint64  `json:"diskWriteBytes,omitempty"`
+	DiskReadOps      uint64  `json:"diskReadOps,omitempty"`
+	DiskWriteOps     uint64  `json:"diskWriteOps,omitempty"`
+	DiskReadTime     uint64  `json:"diskReadTime,omitempty"`
+	DiskWriteTime    uint64  `json:"diskWriteTime,omitempty"`
+	DiskIOTime       uint64  `json:"diskIoTime,omitempty"`
+	DiskWeightedIO   uint64  `json:"diskWeightedIo,omitempty"`
+	DiskIOInProgress uint64  `json:"diskIoInProgress,omitempty"`
+	DiskIOPS         float64 `json:"diskIops,omitempty"`
+	DiskLatencyRead  float64 `json:"diskLatencyRead,omitempty"`
+	DiskLatencyWrite float64 `json:"diskLatencyWrite,omitempty"`
+
+	// Per-partition metrics
+	DiskPartitions []DiskPartitionInfoPayload `json:"diskPartitions,omitempty"`
+
+	// ==========================================================================
+	// Network Information
+	// ==========================================================================
+	NetworkBytesSent     uint64  `json:"networkBytesSent,omitempty"`
+	NetworkBytesRecv     uint64  `json:"networkBytesRecv,omitempty"`
+	NetworkPacketsSent   uint64  `json:"networkPacketsSent,omitempty"`
+	NetworkPacketsRecv   uint64  `json:"networkPacketsRecv,omitempty"`
+	NetworkErrorsIn      uint64  `json:"networkErrorsIn,omitempty"`
+	NetworkErrorsOut     uint64  `json:"networkErrorsOut,omitempty"`
+	NetworkDropsIn       uint64  `json:"networkDropsIn,omitempty"`
+	NetworkDropsOut      uint64  `json:"networkDropsOut,omitempty"`
+	NetworkFifoIn        uint64  `json:"networkFifoIn,omitempty"`
+	NetworkFifoOut       uint64  `json:"networkFifoOut,omitempty"`
+	NetworkBytesSentRate float64 `json:"networkBytesSentRate,omitempty"`
+	NetworkBytesRecvRate float64 `json:"networkBytesRecvRate,omitempty"`
+
+	// TCP Connection States
+	TCPConnectionsEstablished uint32 `json:"tcpConnectionsEstablished,omitempty"`
+	TCPConnectionsTimeWait    uint32 `json:"tcpConnectionsTimeWait,omitempty"`
+	TCPConnectionsCloseWait   uint32 `json:"tcpConnectionsCloseWait,omitempty"`
+	TCPConnectionsListen      uint32 `json:"tcpConnectionsListen,omitempty"`
+	TCPConnectionsSynSent     uint32 `json:"tcpConnectionsSynSent,omitempty"`
+	TCPConnectionsSynRecv     uint32 `json:"tcpConnectionsSynRecv,omitempty"`
+	TCPConnectionsFinWait1    uint32 `json:"tcpConnectionsFinWait1,omitempty"`
+	TCPConnectionsFinWait2    uint32 `json:"tcpConnectionsFinWait2,omitempty"`
+	TCPConnectionsLastAck     uint32 `json:"tcpConnectionsLastAck,omitempty"`
+	TCPConnectionsClosing     uint32 `json:"tcpConnectionsClosing,omitempty"`
+	TCPRetransmits            uint64 `json:"tcpRetransmits,omitempty"`
+
+	// Per-interface metrics
+	NetworkInterfaces []NetworkInterfaceInfoPayload `json:"networkInterfaces,omitempty"`
+
+	// ==========================================================================
+	// Process Information
+	// ==========================================================================
+	ProcessCount    uint64 `json:"processCount,omitempty"`
+	ProcessRunning  uint64 `json:"processRunning,omitempty"`
+	ProcessSleeping uint64 `json:"processSleeping,omitempty"`
+	ProcessStopped  uint64 `json:"processStopped,omitempty"`
+	ProcessZombie   uint64 `json:"processZombie,omitempty"`
+	ProcessBlocked  uint64 `json:"processBlocked,omitempty"`
+	ThreadCount     uint64 `json:"threadCount,omitempty"`
+	ContextSwitches uint64 `json:"contextSwitches,omitempty"`
+	Interrupts      uint64 `json:"interrupts,omitempty"`
+	SoftInterrupts  uint64 `json:"softInterrupts,omitempty"`
+	SystemCalls     uint64 `json:"systemCalls,omitempty"`
+
+	// ==========================================================================
+	// System Resources
+	// ==========================================================================
+	OpenFileDescriptors  uint64  `json:"openFileDescriptors,omitempty"`
+	MaxFileDescriptors   uint64  `json:"maxFileDescriptors,omitempty"`
+	FileDescriptorsUsage float64 `json:"fileDescriptorsUsage,omitempty"`
+	EntropyAvailable     uint64  `json:"entropyAvailable,omitempty"`
+
+	// ==========================================================================
+	// Container/Virtualization Detection
+	// ==========================================================================
+	IsContainer        bool   `json:"isContainer,omitempty"`
+	ContainerID        string `json:"containerId,omitempty"`
+	ContainerRuntime   string `json:"containerRuntime,omitempty"`
+	ContainerName      string `json:"containerName,omitempty"`
+	ContainerImage     string `json:"containerImage,omitempty"`
+	IsVirtualized      bool   `json:"isVirtualized,omitempty"`
+	VirtualizationType string `json:"virtualizationType,omitempty"`
+	CloudProvider      string `json:"cloudProvider,omitempty"`
+	CloudInstanceID    string `json:"cloudInstanceId,omitempty"`
+	CloudInstanceType  string `json:"cloudInstanceType,omitempty"`
+	CloudRegion        string `json:"cloudRegion,omitempty"`
+	CloudZone          string `json:"cloudZone,omitempty"`
+
+	// ==========================================================================
+	// Agent Metadata
+	// ==========================================================================
+	AgentVersion       string `json:"agentVersion,omitempty"`
+	AgentStartTime     uint64 `json:"agentStartTime,omitempty"`
+	AgentUptime        uint64 `json:"agentUptime,omitempty"`
+	CollectionTime     int64  `json:"collectionTime,omitempty"`
+	CollectionDuration int64  `json:"collectionDuration,omitempty"`
+}
+
+// CPUCoreInfoPayload contains per-core CPU information for API payload
+type CPUCoreInfoPayload struct {
+	CoreID        int     `json:"coreId"`
+	Usage         float64 `json:"usage"`
+	UserPercent   float64 `json:"userPercent,omitempty"`
+	SystemPercent float64 `json:"systemPercent,omitempty"`
+	IdlePercent   float64 `json:"idlePercent,omitempty"`
+}
+
+// DiskPartitionInfoPayload contains per-partition disk information for API payload
+type DiskPartitionInfoPayload struct {
+	Device      string  `json:"device"`
+	Mountpoint  string  `json:"mountpoint"`
+	Fstype      string  `json:"fstype"`
+	Total       uint64  `json:"total"`
+	Used        uint64  `json:"used"`
+	Free        uint64  `json:"free"`
+	Usage       float64 `json:"usage"`
+	Inodes      uint64  `json:"inodes,omitempty"`
+	InodesFree  uint64  `json:"inodesFree,omitempty"`
+	InodesUsage float64 `json:"inodesUsage,omitempty"`
+}
+
+// NetworkInterfaceInfoPayload contains per-interface network information for API payload
+type NetworkInterfaceInfoPayload struct {
+	Name        string   `json:"name"`
+	MacAddress  string   `json:"macAddress,omitempty"`
+	IPAddresses []string `json:"ipAddresses,omitempty"`
+	MTU         int      `json:"mtu,omitempty"`
+	Speed       uint64   `json:"speed,omitempty"`
+	IsUp        bool     `json:"isUp"`
+	IsLoopback  bool     `json:"isLoopback"`
+	BytesSent   uint64   `json:"bytesSent"`
+	BytesRecv   uint64   `json:"bytesRecv"`
+	PacketsSent uint64   `json:"packetsSent"`
+	PacketsRecv uint64   `json:"packetsRecv"`
+	ErrorsIn    uint64   `json:"errorsIn"`
+	ErrorsOut   uint64   `json:"errorsOut"`
+	DropsIn     uint64   `json:"dropsIn"`
+	DropsOut    uint64   `json:"dropsOut"`
 }
 
 // HeartbeatResponse represents the heartbeat response from backend

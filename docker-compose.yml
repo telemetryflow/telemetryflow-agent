@@ -6,6 +6,12 @@
 # Community Enterprise Observability Platform (CEOP)
 # Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
 #
+# Features:
+#   - OTLP export for metrics, traces, and logs
+#   - Dual endpoint support (v1: OTEL standard, v2: TFO Platform)
+#   - gRPC and HTTP protocol support
+#   - Disk-backed buffer for offline resilience
+#
 # Usage:
 #   # Start with default .env
 #   docker-compose up -d
@@ -38,9 +44,29 @@ services:
 
     # Environment variables
     environment:
+      # TelemetryFlow Backend Configuration
       - TELEMETRYFLOW_API_ENDPOINT=${TELEMETRYFLOW_API_ENDPOINT:-http://localhost:3100}
       - TELEMETRYFLOW_API_KEY_ID=${TELEMETRYFLOW_API_KEY_ID:-}
       - TELEMETRYFLOW_API_KEY_SECRET=${TELEMETRYFLOW_API_KEY_SECRET:-}
+
+      # OTLP Collector Connection
+      # TFO Collector endpoint (supports both v1 and v2 endpoints)
+      - TELEMETRYFLOW_ENDPOINT=${TELEMETRYFLOW_ENDPOINT:-tfo-collector:4317}
+      - TELEMETRYFLOW_PROTOCOL=${TELEMETRYFLOW_PROTOCOL:-grpc}
+
+      # Dual Endpoint Version (v1: OTEL standard, v2: TFO Platform)
+      - TELEMETRYFLOW_ENDPOINT_VERSION=${TELEMETRYFLOW_ENDPOINT_VERSION:-v2}
+
+      # Signal Type Enablement
+      - TELEMETRYFLOW_METRICS_ENABLED=${TELEMETRYFLOW_METRICS_ENABLED:-true}
+      - TELEMETRYFLOW_TRACES_ENABLED=${TELEMETRYFLOW_TRACES_ENABLED:-false}
+      - TELEMETRYFLOW_LOGS_ENABLED=${TELEMETRYFLOW_LOGS_ENABLED:-false}
+
+      # Logging
+      - TELEMETRYFLOW_LOG_LEVEL=${TELEMETRYFLOW_LOG_LEVEL:-info}
+      - TELEMETRYFLOW_LOG_FORMAT=${TELEMETRYFLOW_LOG_FORMAT:-json}
+
+      # Legacy (for backward compatibility)
       - COLLECTOR_ENDPOINT=${COLLECTOR_ENDPOINT:-http://tfo-collector:4317}
       - LOG_LEVEL=${LOG_LEVEL:-info}
 
