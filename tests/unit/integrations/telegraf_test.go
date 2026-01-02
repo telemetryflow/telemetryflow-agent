@@ -1,5 +1,5 @@
-// package integrations provides unit tests for TelemetryFlow Agent integrations.
-package integrations
+// package integrations_test provides unit tests for TelemetryFlow Agent integrations.
+package integrations_test
 
 import (
 	"context"
@@ -161,7 +161,7 @@ func TestTelegrafExporterInit(t *testing.T) {
 		require.NoError(t, err)
 		conn, err := net.ListenUDP("udp", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		config := integrations.TelegrafConfig{
 			Enabled:  true,
@@ -976,7 +976,7 @@ func TestTelegrafExporterHealth(t *testing.T) {
 		require.NoError(t, err)
 		conn, err := net.ListenUDP("udp", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		config := integrations.TelegrafConfig{
 			Enabled:  true,
@@ -1048,7 +1048,7 @@ func TestTelegrafExporterClose(t *testing.T) {
 		require.NoError(t, err)
 		conn, err := net.ListenUDP("udp", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		config := integrations.TelegrafConfig{
 			Enabled:  true,
@@ -1087,7 +1087,7 @@ func TestTelegrafExporterUDPExport(t *testing.T) {
 		require.NoError(t, err)
 		listener, err := net.ListenUDP("udp", addr)
 		require.NoError(t, err)
-		defer listener.Close()
+		defer func() { _ = listener.Close() }()
 
 		// Channel to receive data
 		received := make(chan []byte, 1)
@@ -1137,7 +1137,7 @@ func TestTelegrafExporterUDPExport(t *testing.T) {
 		require.NoError(t, err)
 		listener, err := net.ListenUDP("udp", addr)
 		require.NoError(t, err)
-		defer listener.Close()
+		defer func() { _ = listener.Close() }()
 
 		received := make(chan []byte, 1)
 		go func() {

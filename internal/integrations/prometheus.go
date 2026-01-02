@@ -184,7 +184,7 @@ func (p *PrometheusExporter) ExportMetrics(ctx context.Context, metrics []Metric
 		p.RecordError(err)
 		return &ExportResult{Success: false, Error: err, Duration: time.Since(startTime)}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
@@ -243,7 +243,7 @@ func (p *PrometheusExporter) Health(ctx context.Context) (*HealthStatus, error) 
 			Latency:   time.Since(startTime),
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return &HealthStatus{
 		Healthy:   true,

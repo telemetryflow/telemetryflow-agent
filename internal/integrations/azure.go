@@ -422,7 +422,7 @@ func (a *AzureExporter) ExportLogs(ctx context.Context, logs []LogEntry) (*Expor
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		err := fmt.Errorf("Log Analytics error: status=%d body=%s", resp.StatusCode, string(respBody))
+		err := fmt.Errorf("log analytics error: status=%d body=%s", resp.StatusCode, string(respBody))
 		a.RecordError(err)
 		return &ExportResult{Success: false, Error: err, BytesSent: int64(len(body))}, err
 	}
@@ -493,7 +493,7 @@ func (a *AzureExporter) sendRequest(ctx context.Context, method, url string, bod
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		err := fmt.Errorf("Azure API error: status=%d body=%s", resp.StatusCode, string(respBody))
+		err := fmt.Errorf("azure API error: status=%d body=%s", resp.StatusCode, string(respBody))
 		return &ExportResult{Success: false, Error: err, BytesSent: int64(len(body))}, err
 	}
 
@@ -508,6 +508,11 @@ func (a *AzureExporter) setAuthHeaders(req *http.Request) {
 	if a.accessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+a.accessToken)
 	}
+}
+
+// SetAccessToken sets the access token for Azure API authentication
+func (a *AzureExporter) SetAccessToken(token string) {
+	a.accessToken = token
 }
 
 // setLogAnalyticsAuth sets authorization for Log Analytics Data Collector API

@@ -291,7 +291,7 @@ func (t *TelegrafExporter) Health(ctx context.Context) (*HealthStatus, error) {
 				Latency:   time.Since(startTime),
 			}, nil
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		return &HealthStatus{
 			Healthy:   resp.StatusCode < 500,

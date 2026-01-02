@@ -19,6 +19,7 @@ type CiscoConfig struct {
 	Enabled           bool              `mapstructure:"enabled"`
 	DNACenterURL      string            `mapstructure:"dnac_url"`
 	MerakiAPIKey      string            `mapstructure:"meraki_api_key"`
+	MerakiBaseURL     string            `mapstructure:"meraki_base_url"` // defaults to https://api.meraki.com/api/v1
 	Username          string            `mapstructure:"username"`
 	Password          string            `mapstructure:"password"`
 	APIType           string            `mapstructure:"api_type"` // dnac, meraki, ise, aci
@@ -107,6 +108,14 @@ type merakiDeviceStatus struct {
 	LastReportedAt string `json:"lastReportedAt"`
 }
 
+// Ensure types are used (for future implementation)
+var (
+	_ = dnacHealth{}
+	_ = healthScore{}
+	_ = merakiNetwork{}
+	_ = merakiDevice{}
+)
+
 // NewCiscoExporter creates a new Cisco exporter
 func NewCiscoExporter(config CiscoConfig, logger *zap.Logger) *CiscoExporter {
 	return &CiscoExporter{
@@ -144,6 +153,9 @@ func (c *CiscoExporter) Init(ctx context.Context) error {
 	}
 	if c.config.ScrapeInterval == 0 {
 		c.config.ScrapeInterval = 60 * time.Second
+	}
+	if c.config.MerakiBaseURL == "" {
+		c.config.MerakiBaseURL = "https://api.meraki.com/api/v1"
 	}
 	if !c.config.CollectDevices && !c.config.CollectNetworks && !c.config.CollectHealth {
 		c.config.CollectDevices = true
@@ -542,7 +554,7 @@ func (c *CiscoExporter) dnacRequest(ctx context.Context, method, path string, bo
 
 // merakiRequest makes a request to Meraki Dashboard API
 func (c *CiscoExporter) merakiRequest(ctx context.Context, method, path string, body []byte) ([]byte, error) {
-	endpoint := "https://api.meraki.com/api/v1" + path
+	endpoint := c.config.MerakiBaseURL + path
 
 	var reqBody io.Reader
 	if body != nil {
@@ -569,7 +581,7 @@ func (c *CiscoExporter) merakiRequest(ctx context.Context, method, path string, 
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Meraki API error: status=%d body=%s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("meraki API error: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	return io.ReadAll(resp.Body)

@@ -389,6 +389,9 @@ func parseOIDValue(value interface{}, oidConfig SNMPOIDConfig) (float64, bool) {
 	return result, true
 }
 
+// Ensure parseOIDValue is used (for future SNMP implementations)
+var _ = parseOIDValue
+
 // Health checks the health of SNMP targets
 func (s *SNMPExporter) Health(ctx context.Context) (*HealthStatus, error) {
 	if !s.config.Enabled {

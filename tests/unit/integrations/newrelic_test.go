@@ -1,5 +1,5 @@
-// package integrations provides unit tests for TelemetryFlow Agent integrations.
-package integrations
+// package integrations_test provides unit tests for TelemetryFlow Agent integrations.
+package integrations_test
 
 import (
 	"compress/gzip"

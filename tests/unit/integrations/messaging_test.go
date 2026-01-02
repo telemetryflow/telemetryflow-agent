@@ -1,5 +1,5 @@
-// package integrations provides unit tests for TelemetryFlow Agent messaging integrations.
-package integrations
+// package integrations_test provides unit tests for TelemetryFlow Agent messaging integrations.
+package integrations_test
 
 import (
 	"context"

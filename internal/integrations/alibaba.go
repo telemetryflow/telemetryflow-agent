@@ -498,7 +498,7 @@ func (a *AlibabaExporter) sendRequest(ctx context.Context, method, endpoint stri
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		err := fmt.Errorf("Alibaba Cloud API error: status=%d body=%s", resp.StatusCode, string(respBody))
+		err := fmt.Errorf("alibaba cloud API error: status=%d body=%s", resp.StatusCode, string(respBody))
 		return &ExportResult{Success: false, Error: err, BytesSent: int64(len(body))}, err
 	}
 
@@ -609,7 +609,7 @@ func (a *AlibabaExporter) calculateSignature(stringToSign, secret string) string
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
 
-// percentEncode encodes string for Alibaba Cloud signature
-func percentEncode(s string) string {
+// PercentEncode encodes string for Alibaba Cloud signature
+func PercentEncode(s string) string {
 	return url.QueryEscape(s)
 }

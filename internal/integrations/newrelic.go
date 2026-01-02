@@ -411,7 +411,7 @@ func (n *NewRelicExporter) Health(ctx context.Context) (*HealthStatus, error) {
 			Latency:   time.Since(startTime),
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return &HealthStatus{
 		Healthy:   true,
@@ -474,7 +474,7 @@ func (n *NewRelicExporter) sendRequest(ctx context.Context, url string, body []b
 	if err != nil {
 		return &ExportResult{Success: false, Error: err}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

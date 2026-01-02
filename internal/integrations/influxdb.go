@@ -281,7 +281,7 @@ func (i *InfluxDBExporter) Health(ctx context.Context) (*HealthStatus, error) {
 			Latency:   time.Since(startTime),
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	healthy := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent
 
@@ -391,7 +391,7 @@ func (i *InfluxDBExporter) sendRequest(ctx context.Context, body []byte) (*Expor
 	if err != nil {
 		return &ExportResult{Success: false, Error: err}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

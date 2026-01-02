@@ -91,6 +91,14 @@ type ebpfSchedulerMetric struct {
 	Comm        string
 }
 
+// Ensure types are used (for future eBPF implementation)
+var (
+	_ = ebpfSyscallMetric{}
+	_ = ebpfNetworkMetric{}
+	_ = ebpfFileIOMetric{}
+	_ = ebpfSchedulerMetric{}
+)
+
 // NewEBPFExporter creates a new eBPF exporter
 func NewEBPFExporter(config EBPFConfig, logger *zap.Logger) *EBPFExporter {
 	return &EBPFExporter{

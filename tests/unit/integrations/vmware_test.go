@@ -1,5 +1,5 @@
-// package integrations provides unit tests for TelemetryFlow Agent integrations.
-package integrations
+// package integrations_test provides unit tests for TelemetryFlow Agent integrations.
+package integrations_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,13 +146,338 @@ func TestVMwareExporterHealth(t *testing.T) {
 	logger := zap.NewNop()
 	ctx := context.Background()
 
-	config := integrations.VMwareConfig{Enabled: false}
-	exporter := integrations.NewVMwareExporter(config, logger)
+	t.Run("disabled", func(t *testing.T) {
+		config := integrations.VMwareConfig{Enabled: false}
+		exporter := integrations.NewVMwareExporter(config, logger)
 
-	status, err := exporter.Health(ctx)
-	require.NoError(t, err)
-	assert.False(t, status.Healthy)
-	assert.Equal(t, "integration disabled", status.Message)
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Equal(t, "integration disabled", status.Message)
+	})
+
+	t.Run("successful health check - HTTP 200", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch {
+			case r.URL.Path == "/api/session" && r.Method == "POST":
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("health-test-session-id")
+			case r.URL.Path == "/api/session" && r.Method == "DELETE":
+				w.WriteHeader(http.StatusOK)
+			case r.URL.Path == "/api/vcenter/vm":
+				// Health check lists VMs
+				_ = json.NewEncoder(w).Encode([]map[string]interface{}{
+					{"vm": "vm-001", "name": "test-vm", "power_state": "POWERED_ON"},
+				})
+			default:
+				w.WriteHeader(http.StatusOK)
+			}
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+			Datacenter: "DC1",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.True(t, status.Healthy)
+		assert.Equal(t, "VMware vSphere connected", status.Message)
+		assert.NotZero(t, status.Latency)
+		assert.NotNil(t, status.Details)
+		assert.Equal(t, server.URL, status.Details["vcenter_url"])
+		assert.Equal(t, "DC1", status.Details["datacenter"])
+	})
+
+	t.Run("failed health check - HTTP 500", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			// Return 500 for health check
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Internal Server Error"})
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+		assert.NotNil(t, status.LastError)
+	})
+
+	t.Run("failed health check - HTTP 503 Service Unavailable", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Service Unavailable"})
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+	})
+
+	t.Run("authentication failure - HTTP 401", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "invalid",
+			Password:   "wrongpassword",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		// Init should fail with auth error
+		assert.Error(t, err)
+	})
+
+	t.Run("session expired during health check", func(t *testing.T) {
+		sessionCallCount := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				sessionCallCount++
+				if sessionCallCount == 1 {
+					w.WriteHeader(http.StatusCreated)
+					_ = json.NewEncoder(w).Encode("expired-session-id")
+					return
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			// Health check returns 401 (session expired)
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "session expired"})
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+	})
+
+	t.Run("connection timeout", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			// Simulate timeout
+			time.Sleep(100 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		shortCtx, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+		defer cancel()
+
+		status, err := exporter.Health(shortCtx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+	})
+
+	t.Run("network error - server closed", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		serverURL := server.URL
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: serverURL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		// Close server to simulate network error
+		server.Close()
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+		assert.NotNil(t, status.LastError)
+	})
+
+	t.Run("health check with latency measurement", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			// Add delay for latency measurement
+			time.Sleep(5 * time.Millisecond)
+			_ = json.NewEncoder(w).Encode([]map[string]interface{}{})
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.True(t, status.Healthy)
+		assert.GreaterOrEqual(t, status.Latency.Milliseconds(), int64(5))
+		assert.NotZero(t, status.LastCheck)
+	})
+
+	t.Run("health check with HTTP 403 Forbidden", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden - insufficient privileges"})
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+	})
+
+	t.Run("health check with empty VM list response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/session" && r.Method == "POST" {
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode("test-session-id")
+				return
+			}
+			if r.URL.Path == "/api/vcenter/vm" {
+				// Empty list is valid
+				_ = json.NewEncoder(w).Encode([]map[string]interface{}{})
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		config := integrations.VMwareConfig{
+			Enabled:    true,
+			VCenterURL: server.URL,
+			Username:   "admin@vsphere.local",
+			Password:   "password",
+		}
+
+		exporter := integrations.NewVMwareExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.True(t, status.Healthy)
+		assert.Equal(t, "VMware vSphere connected", status.Message)
+	})
 }
 
 func TestVMwareExporterClose(t *testing.T) {
@@ -534,4 +860,233 @@ func TestVMwareExporterCollectMetricsNotInitialized(t *testing.T) {
 	metrics, err := exporter.CollectMetrics(ctx)
 	assert.Error(t, err)
 	assert.Nil(t, metrics)
+}
+
+// TestVMwareExporterExportMetrics tests the ExportMetrics function
+// VMware is a data source, not a metrics destination, so ExportMetrics should return an error
+func TestVMwareExporterExportMetrics(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		config  integrations.VMwareConfig
+		metrics []integrations.Metric
+	}{
+		{
+			name: "export metrics returns error - vmware is a data source",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			metrics: []integrations.Metric{
+				{
+					Name:  "test_metric",
+					Value: 42.0,
+					Type:  integrations.MetricTypeGauge,
+					Tags:  map[string]string{"test": "true"},
+				},
+			},
+		},
+		{
+			name: "export metrics with empty slice returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			metrics: []integrations.Metric{},
+		},
+		{
+			name: "export metrics with nil slice returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			metrics: nil,
+		},
+		{
+			name: "export metrics with multiple metrics returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			metrics: []integrations.Metric{
+				{Name: "metric1", Value: 1.0, Type: integrations.MetricTypeGauge},
+				{Name: "metric2", Value: 2.0, Type: integrations.MetricTypeCounter},
+				{Name: "metric3", Value: 3.0, Type: integrations.MetricTypeHistogram},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := integrations.NewVMwareExporter(tt.config, logger)
+
+			result, err := exporter.ExportMetrics(ctx, tt.metrics)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "vmware is a data source, not a metrics destination")
+		})
+	}
+}
+
+// TestVMwareExporterExportTraces tests the ExportTraces function
+// VMware does not support traces, so ExportTraces should return an error
+func TestVMwareExporterExportTraces(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		config integrations.VMwareConfig
+		traces []integrations.Trace
+	}{
+		{
+			name: "export traces returns error - vmware does not support traces",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			traces: []integrations.Trace{
+				{
+					TraceID:       "trace-123",
+					SpanID:        "span-456",
+					OperationName: "test-trace",
+				},
+			},
+		},
+		{
+			name: "export traces with empty slice returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			traces: []integrations.Trace{},
+		},
+		{
+			name: "export traces with nil slice returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			traces: nil,
+		},
+		{
+			name: "export traces with multiple traces returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			traces: []integrations.Trace{
+				{TraceID: "trace-1", SpanID: "span-1", OperationName: "trace1"},
+				{TraceID: "trace-2", SpanID: "span-2", OperationName: "trace2"},
+				{TraceID: "trace-3", SpanID: "span-3", OperationName: "trace3"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := integrations.NewVMwareExporter(tt.config, logger)
+
+			result, err := exporter.ExportTraces(ctx, tt.traces)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "vmware does not support traces")
+		})
+	}
+}
+
+// TestVMwareExporterExportLogs tests the ExportLogs function
+// VMware does not support log ingestion, so ExportLogs should return an error
+func TestVMwareExporterExportLogs(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		config integrations.VMwareConfig
+		logs   []integrations.LogEntry
+	}{
+		{
+			name: "export logs returns error - vmware does not support log ingestion",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			logs: []integrations.LogEntry{
+				{
+					Message:    "test log message",
+					Level:      integrations.LogLevelInfo,
+					Attributes: map[string]string{"service": "test"},
+				},
+			},
+		},
+		{
+			name: "export logs with empty slice returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			logs: []integrations.LogEntry{},
+		},
+		{
+			name: "export logs with nil slice returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			logs: nil,
+		},
+		{
+			name: "export logs with multiple logs returns error",
+			config: integrations.VMwareConfig{
+				Enabled:    true,
+				VCenterURL: "https://vcenter.local",
+				Username:   "admin",
+				Password:   "password",
+			},
+			logs: []integrations.LogEntry{
+				{Message: "log1", Level: "info"},
+				{Message: "log2", Level: "warn"},
+				{Message: "log3", Level: "error"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := integrations.NewVMwareExporter(tt.config, logger)
+
+			result, err := exporter.ExportLogs(ctx, tt.logs)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "vmware does not support log ingestion")
+		})
+	}
 }

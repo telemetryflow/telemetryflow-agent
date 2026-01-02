@@ -666,7 +666,7 @@ func (n *NutanixExporter) apiRequest(ctx context.Context, method, path string, b
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Nutanix API error: status=%d body=%s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("nutanix API error: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	return io.ReadAll(resp.Body)

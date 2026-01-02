@@ -247,7 +247,7 @@ func (l *LokiExporter) Health(ctx context.Context) (*HealthStatus, error) {
 			Latency:   time.Since(startTime),
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return &HealthStatus{
 		Healthy:   resp.StatusCode == http.StatusOK,
@@ -292,7 +292,7 @@ func (l *LokiExporter) sendRequest(ctx context.Context, body []byte) (*ExportRes
 	if err != nil {
 		return &ExportResult{Success: false, Error: err}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

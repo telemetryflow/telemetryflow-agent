@@ -111,10 +111,11 @@ func TestOTLPExporter(t *testing.T) {
 		logger, _ := zap.NewDevelopment()
 
 		cfg := exporter.OTLPExporterConfig{
-			AgentID:  "test-agent-006",
-			Endpoint: "localhost:4317",
-			Protocol: "invalid-protocol",
-			Logger:   logger,
+			AgentID:        "test-agent-006",
+			Endpoint:       "localhost:4317",
+			Protocol:       "invalid-protocol",
+			Logger:         logger,
+			MetricsEnabled: true, // Enable metrics to trigger protocol validation
 		}
 
 		exp := exporter.NewOTLPExporter(cfg)
@@ -514,18 +515,19 @@ func TestOTLPExporterLifecycle(t *testing.T) {
 		logger, _ := zap.NewDevelopment()
 
 		cfg := exporter.OTLPExporterConfig{
-			AgentID:       "lifecycle-003",
-			AgentName:     "Lifecycle Test Agent",
-			Hostname:      "lifecycle-host",
-			Environment:   "test",
-			Version:       "1.0.0",
-			Endpoint:      "localhost:4317",
-			Protocol:      "grpc",
-			TLSEnabled:    false,
-			BatchSize:     100,
-			FlushInterval: 1 * time.Second,
-			Timeout:       5 * time.Second,
-			Logger:        logger,
+			AgentID:        "lifecycle-003",
+			AgentName:      "Lifecycle Test Agent",
+			Hostname:       "lifecycle-host",
+			Environment:    "test",
+			Version:        "1.0.0",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			TLSEnabled:     false,
+			BatchSize:      100,
+			FlushInterval:  1 * time.Second,
+			Timeout:        5 * time.Second,
+			Logger:         logger,
+			MetricsEnabled: true, // Enable metrics to have a meter available
 		}
 
 		exp := exporter.NewOTLPExporter(cfg)
@@ -536,7 +538,7 @@ func TestOTLPExporterLifecycle(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, exp.IsRunning())
 
-		// Verify meter is available after start
+		// Verify meter is available after start (when metrics enabled)
 		meter := exp.Meter()
 		assert.NotNil(t, meter)
 
@@ -765,17 +767,18 @@ func TestOTLPExporterMeter(t *testing.T) {
 		logger, _ := zap.NewDevelopment()
 
 		cfg := exporter.OTLPExporterConfig{
-			AgentID:       "meter-001",
-			AgentName:     "Meter Test Agent",
-			Hostname:      "meter-test-host",
-			Environment:   "test",
-			Version:       "1.0.0",
-			Endpoint:      "localhost:4317",
-			Protocol:      "grpc",
-			TLSEnabled:    false,
-			FlushInterval: 1 * time.Second,
-			Timeout:       5 * time.Second,
-			Logger:        logger,
+			AgentID:        "meter-001",
+			AgentName:      "Meter Test Agent",
+			Hostname:       "meter-test-host",
+			Environment:    "test",
+			Version:        "1.0.0",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			TLSEnabled:     false,
+			FlushInterval:  1 * time.Second,
+			Timeout:        5 * time.Second,
+			Logger:         logger,
+			MetricsEnabled: true, // Enable metrics to have a meter available
 		}
 
 		exp := exporter.NewOTLPExporter(cfg)
@@ -789,11 +792,520 @@ func TestOTLPExporterMeter(t *testing.T) {
 		err := exp.Start(ctx)
 		require.NoError(t, err)
 
-		// Meter after start should not be nil
+		// Meter after start should not be nil (when metrics enabled)
 		meterAfter := exp.Meter()
 		assert.NotNil(t, meterAfter)
 
 		// Stop - may error if no server is running (connection refused on flush)
+		_ = exp.Stop(ctx)
+	})
+}
+
+// =============================================================================
+// Dual Endpoint Version Tests (v1/v2)
+// =============================================================================
+
+func TestOTLPExporterDualEndpointVersion(t *testing.T) {
+	t.Run("should create exporter with v2 endpoint version (default)", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:             "dual-v2-001",
+			AgentName:           "Dual Endpoint V2 Agent",
+			Hostname:            "dual-v2-host",
+			Environment:         "test",
+			Version:             "1.0.0",
+			Endpoint:            "localhost:4318",
+			Protocol:            "http",
+			EndpointVersion:     "v2",
+			MetricsEndpointPath: "/v2/metrics",
+			TracesEndpointPath:  "/v2/traces",
+			LogsEndpointPath:    "/v2/logs",
+			MetricsEnabled:      true,
+			TracesEnabled:       false,
+			LogsEnabled:         false,
+			TLSEnabled:          false,
+			BatchSize:           100,
+			FlushInterval:       1 * time.Second,
+			Timeout:             5 * time.Second,
+			Logger:              logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		require.NotNil(t, exp)
+		assert.False(t, exp.IsRunning())
+	})
+
+	t.Run("should create exporter with v1 endpoint version (OTEL standard)", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:             "dual-v1-001",
+			AgentName:           "Dual Endpoint V1 Agent",
+			Hostname:            "dual-v1-host",
+			Environment:         "test",
+			Version:             "1.0.0",
+			Endpoint:            "localhost:4318",
+			Protocol:            "http",
+			EndpointVersion:     "v1",
+			MetricsEndpointPath: "/v1/metrics",
+			TracesEndpointPath:  "/v1/traces",
+			LogsEndpointPath:    "/v1/logs",
+			MetricsEnabled:      true,
+			TracesEnabled:       true,
+			LogsEnabled:         true,
+			TLSEnabled:          false,
+			BatchSize:           100,
+			FlushInterval:       1 * time.Second,
+			Timeout:             5 * time.Second,
+			Logger:              logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		require.NotNil(t, exp)
+	})
+
+	t.Run("should start with metrics only enabled", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:         "metrics-only-001",
+			AgentName:       "Metrics Only Agent",
+			Hostname:        "metrics-only-host",
+			Environment:     "test",
+			Version:         "1.0.0",
+			Endpoint:        "localhost:4317",
+			Protocol:        "grpc",
+			EndpointVersion: "v2",
+			MetricsEnabled:  true,
+			TracesEnabled:   false,
+			LogsEnabled:     false,
+			TLSEnabled:      false,
+			BatchSize:       100,
+			FlushInterval:   1 * time.Second,
+			Timeout:         5 * time.Second,
+			Logger:          logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+		assert.True(t, exp.IsRunning())
+
+		// Meter should be available
+		assert.NotNil(t, exp.Meter())
+
+		// Tracer and LoggerProvider should be nil (not enabled)
+		assert.Nil(t, exp.Tracer())
+		assert.Nil(t, exp.LoggerProvider())
+
+		_ = exp.Stop(ctx)
+	})
+
+	t.Run("should start with all signals enabled", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:         "all-signals-001",
+			AgentName:       "All Signals Agent",
+			Hostname:        "all-signals-host",
+			Environment:     "test",
+			Version:         "1.0.0",
+			Endpoint:        "localhost:4317",
+			Protocol:        "grpc",
+			EndpointVersion: "v2",
+			MetricsEnabled:  true,
+			TracesEnabled:   true,
+			LogsEnabled:     true,
+			TLSEnabled:      false,
+			BatchSize:       100,
+			FlushInterval:   1 * time.Second,
+			Timeout:         5 * time.Second,
+			Logger:          logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+		assert.True(t, exp.IsRunning())
+
+		// All providers should be available
+		assert.NotNil(t, exp.Meter())
+		assert.NotNil(t, exp.Tracer())
+		assert.NotNil(t, exp.LoggerProvider())
+
+		_ = exp.Stop(ctx)
+	})
+
+	t.Run("should include endpoint version in stats", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:         "stats-version-001",
+			AgentName:       "Stats Version Agent",
+			Hostname:        "stats-version-host",
+			Environment:     "test",
+			Version:         "1.0.0",
+			Endpoint:        "localhost:4317",
+			Protocol:        "grpc",
+			EndpointVersion: "v2",
+			MetricsEnabled:  true,
+			TracesEnabled:   true,
+			LogsEnabled:     false,
+			TLSEnabled:      false,
+			BatchSize:       100,
+			FlushInterval:   1 * time.Second,
+			Timeout:         5 * time.Second,
+			Logger:          logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		stats := exp.Stats()
+		assert.Equal(t, "v2", stats.EndpointVersion)
+		assert.True(t, stats.MetricsEnabled)
+		assert.True(t, stats.TracesEnabled)
+		assert.False(t, stats.LogsEnabled)
+
+		_ = exp.Stop(ctx)
+	})
+}
+
+func TestOTLPExporterHTTPEndpointPaths(t *testing.T) {
+	t.Run("should use custom endpoint paths for HTTP protocol", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:             "http-path-001",
+			AgentName:           "HTTP Path Agent",
+			Hostname:            "http-path-host",
+			Environment:         "test",
+			Version:             "1.0.0",
+			Endpoint:            "localhost:4318",
+			Protocol:            "http",
+			EndpointVersion:     "v2",
+			MetricsEndpointPath: "/v2/metrics",
+			TracesEndpointPath:  "/v2/traces",
+			LogsEndpointPath:    "/v2/logs",
+			MetricsEnabled:      true,
+			TracesEnabled:       true,
+			LogsEnabled:         true,
+			TLSEnabled:          false,
+			BatchSize:           100,
+			FlushInterval:       1 * time.Second,
+			Timeout:             5 * time.Second,
+			Logger:              logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+		assert.True(t, exp.IsRunning())
+
+		_ = exp.Stop(ctx)
+	})
+
+	t.Run("should use v1 endpoint paths for OTEL standard", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:             "v1-path-001",
+			AgentName:           "V1 Path Agent",
+			Hostname:            "v1-path-host",
+			Environment:         "test",
+			Version:             "1.0.0",
+			Endpoint:            "localhost:4318",
+			Protocol:            "http",
+			EndpointVersion:     "v1",
+			MetricsEndpointPath: "/v1/metrics",
+			TracesEndpointPath:  "/v1/traces",
+			LogsEndpointPath:    "/v1/logs",
+			MetricsEnabled:      true,
+			TracesEnabled:       false,
+			LogsEnabled:         false,
+			TLSEnabled:          false,
+			BatchSize:           100,
+			FlushInterval:       1 * time.Second,
+			Timeout:             5 * time.Second,
+			Logger:              logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		require.NotNil(t, exp)
+
+		ctx := context.Background()
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		_ = exp.Stop(ctx)
+	})
+}
+
+func TestOTLPExporterFromConfigWithDualEndpoints(t *testing.T) {
+	t.Run("should create exporter from config with v2 endpoints", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := config.DefaultConfig()
+		cfg.Agent.ID = "config-dual-001"
+		cfg.Agent.Name = "Config Dual Endpoint Agent"
+		cfg.Agent.Hostname = "config-dual-host"
+		cfg.Agent.Version = "2.0.0"
+		cfg.Agent.Tags = map[string]string{"environment": "test"}
+		cfg.TelemetryFlow.Endpoint = "localhost:4317"
+		cfg.TelemetryFlow.Protocol = "grpc"
+		cfg.Exporter.OTLP.EndpointVersion = "v2"
+		cfg.Exporter.OTLP.Metrics.Enabled = true
+		cfg.Exporter.OTLP.Traces.Enabled = true
+		cfg.Exporter.OTLP.Logs.Enabled = false
+
+		exp := exporter.NewOTLPExporterFromConfig(cfg, logger)
+		require.NotNil(t, exp)
+		assert.False(t, exp.IsRunning())
+	})
+
+	t.Run("should create exporter from config with v1 endpoints", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := config.DefaultConfig()
+		cfg.Agent.ID = "config-v1-001"
+		cfg.TelemetryFlow.Endpoint = "localhost:4318"
+		cfg.TelemetryFlow.Protocol = "http"
+		cfg.Exporter.OTLP.EndpointVersion = "v1"
+		cfg.Exporter.OTLP.Metrics.Enabled = true
+		cfg.Exporter.OTLP.Traces.Enabled = false
+		cfg.Exporter.OTLP.Logs.Enabled = false
+
+		exp := exporter.NewOTLPExporterFromConfig(cfg, logger)
+		require.NotNil(t, exp)
+	})
+
+	t.Run("should default to v2 when endpoint version not specified", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := config.DefaultConfig()
+		cfg.Agent.ID = "config-default-001"
+		cfg.Exporter.OTLP.EndpointVersion = "" // Empty, should default to v2
+
+		exp := exporter.NewOTLPExporterFromConfig(cfg, logger)
+		require.NotNil(t, exp)
+
+		// Start to verify the endpoint version is set
+		ctx := context.Background()
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		stats := exp.Stats()
+		assert.Equal(t, "v2", stats.EndpointVersion)
+
+		_ = exp.Stop(ctx)
+	})
+
+	t.Run("should respect all signal enable flags from config", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := config.DefaultConfig()
+		cfg.Agent.ID = "config-signals-001"
+		cfg.TelemetryFlow.Endpoint = "localhost:4317"
+		cfg.TelemetryFlow.Protocol = "grpc"
+		cfg.Exporter.OTLP.Enabled = true
+		cfg.Exporter.OTLP.Metrics.Enabled = true
+		cfg.Exporter.OTLP.Traces.Enabled = true
+		cfg.Exporter.OTLP.Logs.Enabled = true
+
+		exp := exporter.NewOTLPExporterFromConfig(cfg, logger)
+		require.NotNil(t, exp)
+
+		ctx := context.Background()
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		stats := exp.Stats()
+		assert.True(t, stats.MetricsEnabled)
+		assert.True(t, stats.TracesEnabled)
+		assert.True(t, stats.LogsEnabled)
+
+		_ = exp.Stop(ctx)
+	})
+}
+
+func TestOTLPExporterTraceProvider(t *testing.T) {
+	t.Run("should return nil tracer before start", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:        "tracer-nil-001",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			TracesEnabled:  true,
+			MetricsEnabled: false,
+			LogsEnabled:    false,
+			Logger:         logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		tracer := exp.Tracer()
+		assert.Nil(t, tracer)
+	})
+
+	t.Run("should return tracer after start when traces enabled", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:        "tracer-enabled-001",
+			AgentName:      "Tracer Test Agent",
+			Hostname:       "tracer-host",
+			Environment:    "test",
+			Version:        "1.0.0",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			TracesEnabled:  true,
+			MetricsEnabled: false,
+			LogsEnabled:    false,
+			TLSEnabled:     false,
+			BatchSize:      100,
+			FlushInterval:  1 * time.Second,
+			Timeout:        5 * time.Second,
+			Logger:         logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		tracer := exp.Tracer()
+		assert.NotNil(t, tracer)
+
+		_ = exp.Stop(ctx)
+	})
+
+	t.Run("should return nil tracer when traces disabled", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:        "tracer-disabled-001",
+			AgentName:      "Tracer Disabled Agent",
+			Hostname:       "tracer-disabled-host",
+			Environment:    "test",
+			Version:        "1.0.0",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			TracesEnabled:  false,
+			MetricsEnabled: true,
+			LogsEnabled:    false,
+			TLSEnabled:     false,
+			BatchSize:      100,
+			FlushInterval:  1 * time.Second,
+			Timeout:        5 * time.Second,
+			Logger:         logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		tracer := exp.Tracer()
+		assert.Nil(t, tracer)
+
+		_ = exp.Stop(ctx)
+	})
+}
+
+func TestOTLPExporterLogProvider(t *testing.T) {
+	t.Run("should return nil logger provider before start", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:        "log-nil-001",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			LogsEnabled:    true,
+			MetricsEnabled: false,
+			TracesEnabled:  false,
+			Logger:         logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		logProvider := exp.LoggerProvider()
+		assert.Nil(t, logProvider)
+	})
+
+	t.Run("should return logger provider after start when logs enabled", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:        "log-enabled-001",
+			AgentName:      "Logger Test Agent",
+			Hostname:       "logger-host",
+			Environment:    "test",
+			Version:        "1.0.0",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			LogsEnabled:    true,
+			MetricsEnabled: false,
+			TracesEnabled:  false,
+			TLSEnabled:     false,
+			BatchSize:      100,
+			FlushInterval:  1 * time.Second,
+			Timeout:        5 * time.Second,
+			Logger:         logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		logProvider := exp.LoggerProvider()
+		assert.NotNil(t, logProvider)
+
+		_ = exp.Stop(ctx)
+	})
+
+	t.Run("should return nil logger provider when logs disabled", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+
+		cfg := exporter.OTLPExporterConfig{
+			AgentID:        "log-disabled-001",
+			AgentName:      "Logger Disabled Agent",
+			Hostname:       "logger-disabled-host",
+			Environment:    "test",
+			Version:        "1.0.0",
+			Endpoint:       "localhost:4317",
+			Protocol:       "grpc",
+			LogsEnabled:    false,
+			MetricsEnabled: true,
+			TracesEnabled:  false,
+			TLSEnabled:     false,
+			BatchSize:      100,
+			FlushInterval:  1 * time.Second,
+			Timeout:        5 * time.Second,
+			Logger:         logger,
+		}
+
+		exp := exporter.NewOTLPExporter(cfg)
+		ctx := context.Background()
+
+		err := exp.Start(ctx)
+		require.NoError(t, err)
+
+		logProvider := exp.LoggerProvider()
+		assert.Nil(t, logProvider)
+
 		_ = exp.Stop(ctx)
 	})
 }

@@ -1,5 +1,5 @@
-// package integrations provides unit tests for TelemetryFlow Agent Alloy integration.
-package integrations
+// package integrations_test provides unit tests for TelemetryFlow Agent Alloy integration.
+package integrations_test
 
 import (
 	"context"

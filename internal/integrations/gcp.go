@@ -536,6 +536,11 @@ func (g *GCPExporter) setAuthHeaders(req *http.Request) {
 	}
 }
 
+// SetAccessToken sets the access token for GCP API authentication
+func (g *GCPExporter) SetAccessToken(token string) {
+	g.accessToken = token
+}
+
 // mapSeverity maps log levels to GCP severity
 func (g *GCPExporter) mapSeverity(level LogLevel) string {
 	switch level {

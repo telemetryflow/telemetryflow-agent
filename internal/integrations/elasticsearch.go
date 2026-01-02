@@ -375,7 +375,7 @@ func (e *ElasticsearchExporter) Health(ctx context.Context) (*HealthStatus, erro
 			Latency:   time.Since(startTime),
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -463,7 +463,7 @@ func (e *ElasticsearchExporter) sendBulkRequest(ctx context.Context, body []byte
 	if err != nil {
 		return &ExportResult{Success: false, Error: err}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

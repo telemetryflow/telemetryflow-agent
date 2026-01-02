@@ -304,7 +304,7 @@ func (j *JaegerExporter) Health(ctx context.Context) (*HealthStatus, error) {
 				Latency:   time.Since(startTime),
 			}, nil
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		return &HealthStatus{
 			Healthy:   resp.StatusCode < 500,
@@ -354,7 +354,7 @@ func (j *JaegerExporter) sendRequest(ctx context.Context, body []byte) (*ExportR
 	if err != nil {
 		return &ExportResult{Success: false, Error: err}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)

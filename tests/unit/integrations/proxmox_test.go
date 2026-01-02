@@ -1,5 +1,5 @@
-// package integrations provides unit tests for TelemetryFlow Agent integrations.
-package integrations
+// package integrations_test provides unit tests for TelemetryFlow Agent integrations.
+package integrations_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -210,6 +211,394 @@ func TestProxmoxExporterHealth(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, status.Healthy)
 		assert.Equal(t, "integration disabled", status.Message)
+	})
+
+	t.Run("successful health check - HTTP 200", func(t *testing.T) {
+		// Create mock server that returns successful responses
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:health-test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			// Node status endpoint for health check
+			if r.URL.Path == "/api2/json/nodes/pve-health/status" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]interface{}{
+						"uptime": 86400,
+						"cpu":    0.25,
+					},
+				})
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-health",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.True(t, status.Healthy)
+		assert.Equal(t, "Proxmox connected", status.Message)
+		assert.NotZero(t, status.Latency)
+		assert.NotNil(t, status.Details)
+		assert.Equal(t, server.URL, status.Details["api_url"])
+		assert.Equal(t, "pve-health", status.Details["node"])
+	})
+
+	t.Run("failed health check - HTTP 500", func(t *testing.T) {
+		requestCount := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				requestCount++
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			// Return 500 for health check endpoint
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Internal Server Error"})
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-error",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+		assert.NotNil(t, status.LastError)
+		assert.NotZero(t, status.Latency)
+	})
+
+	t.Run("failed health check - HTTP 503 Service Unavailable", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			// Return 503 for health check endpoint
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Service Unavailable"})
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-unavailable",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+		assert.NotNil(t, status.LastError)
+	})
+
+	t.Run("authentication failure - HTTP 401", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			// Auth endpoint returns unauthorized
+			if r.URL.Path == "/api2/json/access/ticket" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid credentials"})
+				return
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "invalid",
+			Password: "wrongpassword",
+			Node:     "pve-auth-fail",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		// Init should fail with auth error
+		assert.Error(t, err)
+	})
+
+	t.Run("authentication failure during health check - token expired", func(t *testing.T) {
+		authCallCount := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				authCallCount++
+				if authCallCount == 1 {
+					// First auth succeeds
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
+						"data": map[string]string{
+							"ticket":              "PVE:root@pam:expired-ticket",
+							"CSRFPreventionToken": "test-csrf-token",
+						},
+					})
+					return
+				}
+				// Subsequent auth fails
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			// Health check returns 401 (expired token)
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "token expired"})
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-token-expired",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+	})
+
+	t.Run("connection timeout", func(t *testing.T) {
+		// Create server that delays response
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			// Simulate timeout by sleeping
+			time.Sleep(100 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-timeout",
+			Timeout:  50000000, // 50ms - shorter than sleep
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		// Use context with very short timeout
+		shortCtx, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+		defer cancel()
+
+		status, err := exporter.Health(shortCtx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+	})
+
+	t.Run("network error - server closed", func(t *testing.T) {
+		// Create server, get URL, then close it
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		serverURL := server.URL
+		// Don't close yet - we need to init first
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   serverURL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-network-error",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		// Now close the server to simulate network error
+		server.Close()
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+		assert.NotNil(t, status.LastError)
+	})
+
+	t.Run("health check with valid response contains latency", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			// Add small delay to ensure latency is measurable
+			time.Sleep(5 * time.Millisecond)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": map[string]interface{}{}})
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-latency",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.True(t, status.Healthy)
+		assert.GreaterOrEqual(t, status.Latency.Milliseconds(), int64(5))
+		assert.NotZero(t, status.LastCheck)
+	})
+
+	t.Run("health check with HTTP 403 Forbidden", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Forbidden - insufficient permissions"})
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-forbidden",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "connection failed")
+	})
+
+	t.Run("health check with malformed JSON response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api2/json/access/ticket" {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]string{
+						"ticket":              "PVE:root@pam:test-ticket",
+						"CSRFPreventionToken": "test-csrf-token",
+					},
+				})
+				return
+			}
+			// Return malformed JSON
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("{invalid json"))
+		}))
+		defer server.Close()
+
+		config := integrations.ProxmoxConfig{
+			Enabled:  true,
+			APIUrl:   server.URL,
+			Username: "root@pam",
+			Password: "password",
+			Node:     "pve-malformed",
+		}
+
+		exporter := integrations.NewProxmoxExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.NoError(t, err)
+
+		// Health check should still succeed as we only check connectivity
+		status, err := exporter.Health(ctx)
+		require.NoError(t, err)
+		// The result depends on whether the health check parses JSON
+		// Based on the implementation, it just checks for successful HTTP response
+		assert.True(t, status.Healthy)
 	})
 }
 
@@ -637,4 +1026,233 @@ func TestProxmoxExporterCollectMetricsAPIError(t *testing.T) {
 	// The implementation logs warnings but doesn't return errors for individual collection failures
 	assert.NoError(t, err)
 	assert.Empty(t, metrics, "Should return empty metrics when API returns errors")
+}
+
+// TestProxmoxExporterExportMetrics tests the ExportMetrics function
+// Proxmox is a data source, not a metrics destination, so ExportMetrics should return an error
+func TestProxmoxExporterExportMetrics(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		config  integrations.ProxmoxConfig
+		metrics []integrations.Metric
+	}{
+		{
+			name: "export metrics returns error - proxmox is a data source",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			metrics: []integrations.Metric{
+				{
+					Name:  "test_metric",
+					Value: 42.0,
+					Type:  integrations.MetricTypeGauge,
+					Tags:  map[string]string{"test": "true"},
+				},
+			},
+		},
+		{
+			name: "export metrics with empty slice returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			metrics: []integrations.Metric{},
+		},
+		{
+			name: "export metrics with nil slice returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			metrics: nil,
+		},
+		{
+			name: "export metrics with multiple metrics returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			metrics: []integrations.Metric{
+				{Name: "metric1", Value: 1.0, Type: integrations.MetricTypeGauge},
+				{Name: "metric2", Value: 2.0, Type: integrations.MetricTypeCounter},
+				{Name: "metric3", Value: 3.0, Type: integrations.MetricTypeHistogram},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := integrations.NewProxmoxExporter(tt.config, logger)
+
+			result, err := exporter.ExportMetrics(ctx, tt.metrics)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "proxmox is a data source, not a metrics destination")
+		})
+	}
+}
+
+// TestProxmoxExporterExportTraces tests the ExportTraces function
+// Proxmox does not support traces, so ExportTraces should return an error
+func TestProxmoxExporterExportTraces(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		config integrations.ProxmoxConfig
+		traces []integrations.Trace
+	}{
+		{
+			name: "export traces returns error - proxmox does not support traces",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			traces: []integrations.Trace{
+				{
+					TraceID:       "trace-123",
+					SpanID:        "span-456",
+					OperationName: "test-trace",
+				},
+			},
+		},
+		{
+			name: "export traces with empty slice returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			traces: []integrations.Trace{},
+		},
+		{
+			name: "export traces with nil slice returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			traces: nil,
+		},
+		{
+			name: "export traces with multiple traces returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			traces: []integrations.Trace{
+				{TraceID: "trace-1", SpanID: "span-1", OperationName: "trace1"},
+				{TraceID: "trace-2", SpanID: "span-2", OperationName: "trace2"},
+				{TraceID: "trace-3", SpanID: "span-3", OperationName: "trace3"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := integrations.NewProxmoxExporter(tt.config, logger)
+
+			result, err := exporter.ExportTraces(ctx, tt.traces)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "proxmox does not support traces")
+		})
+	}
+}
+
+// TestProxmoxExporterExportLogs tests the ExportLogs function
+// Proxmox does not support log ingestion, so ExportLogs should return an error
+func TestProxmoxExporterExportLogs(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		config integrations.ProxmoxConfig
+		logs   []integrations.LogEntry
+	}{
+		{
+			name: "export logs returns error - proxmox does not support log ingestion",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			logs: []integrations.LogEntry{
+				{
+					Message:    "test log message",
+					Level:      integrations.LogLevelInfo,
+					Attributes: map[string]string{"service": "test"},
+				},
+			},
+		},
+		{
+			name: "export logs with empty slice returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			logs: []integrations.LogEntry{},
+		},
+		{
+			name: "export logs with nil slice returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			logs: nil,
+		},
+		{
+			name: "export logs with multiple logs returns error",
+			config: integrations.ProxmoxConfig{
+				Enabled:  true,
+				APIUrl:   "https://proxmox.local:8006",
+				Username: "root@pam",
+				Password: "password",
+			},
+			logs: []integrations.LogEntry{
+				{Message: "log1", Level: "info"},
+				{Message: "log2", Level: "warn"},
+				{Message: "log3", Level: "error"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := integrations.NewProxmoxExporter(tt.config, logger)
+
+			result, err := exporter.ExportLogs(ctx, tt.logs)
+
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "proxmox does not support log ingestion")
+		})
+	}
 }

@@ -592,7 +592,7 @@ func (p *ProxmoxExporter) apiRequest(ctx context.Context, method, endpoint strin
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Proxmox API error: status=%d body=%s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("proxmox API error: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	return io.ReadAll(resp.Body)

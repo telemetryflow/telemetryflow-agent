@@ -616,7 +616,7 @@ func (a *AzureArcExporter) apiRequest(ctx context.Context, method, path string, 
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Azure Arc API error: status=%d body=%s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("azure arc API error: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	return io.ReadAll(resp.Body)

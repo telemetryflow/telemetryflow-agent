@@ -1,5 +1,5 @@
-// package integrations provides unit tests for the Blackbox exporter integration.
-package integrations
+// package integrations_test provides unit tests for the Blackbox exporter integration.
+package integrations_test
 
 import (
 	"context"
