@@ -110,10 +110,11 @@ func (h *Heartbeat) Start(ctx context.Context) error {
 				h.mu.Lock()
 				h.lastError = err
 				h.errorCount++
+				errCount := h.errorCount
 				h.mu.Unlock()
 				h.logger.Warn("Heartbeat failed",
 					zap.Error(err),
-					zap.Int("errorCount", h.errorCount),
+					zap.Int("errorCount", errCount),
 				)
 			} else {
 				h.mu.Lock()

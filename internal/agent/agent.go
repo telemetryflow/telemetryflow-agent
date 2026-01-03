@@ -214,7 +214,9 @@ func (a *Agent) shutdown() error {
 		return fmt.Errorf("shutdown errors: %v", errs)
 	}
 
+	a.mu.RLock()
 	uptime := time.Since(a.started)
+	a.mu.RUnlock()
 	a.logger.Info("Agent shutdown complete", zap.Duration("uptime", uptime))
 	return nil
 }

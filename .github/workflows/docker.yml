@@ -17,7 +17,7 @@
 #
 # =============================================================================
 
-name: Docker Build
+name: Docker Build - TFO Agent
 
 on:
   push:
@@ -48,7 +48,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., 1.0.0)'
+        description: 'Version tag (e.g., 1.1.2)'
         required: false
         default: ''
       push:
