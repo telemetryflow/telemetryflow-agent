@@ -69,15 +69,25 @@ func TestAgentIntegration(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 
+			// Start agent and wait for it to be running
+			errChan := make(chan error, 1)
 			go func() {
-				_ = ag.Run(ctx)
+				errChan <- ag.Run(ctx)
 			}()
 
-			time.Sleep(100 * time.Millisecond)
+			// Wait for agent to start
+			for j := 0; j < 10; j++ {
+				if ag.IsRunning() {
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
 			assert.True(t, ag.IsRunning())
 
+			// Stop agent and wait for shutdown
 			cancel()
-			time.Sleep(100 * time.Millisecond)
+			err := <-errChan
+			assert.NoError(t, err)
 			assert.False(t, ag.IsRunning())
 		}
 	})

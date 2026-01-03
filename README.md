@@ -459,19 +459,19 @@ TelemetryFlow Agent supports **39+ integrations** for enterprise environments ac
 
 ### Integration Categories
 
-| Category               | Integrations                                                 | Count |
-| ---------------------- | ------------------------------------------------------------ | ----- |
-| **Cloud Providers**    | GCP, Azure, Alibaba Cloud, AWS CloudWatch                    | 4     |
-| **Infrastructure**     | Proxmox, VMware vSphere, Nutanix, Azure Arc                  | 4     |
-| **Network & IoT**      | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3, MQTT              | 3     |
-| **Kernel/System**      | eBPF (syscalls, network, file I/O, scheduler), Cilium Hubble | 2     |
-| **APM Platforms**      | Dynatrace, IBM Instana, Datadog, New Relic                   | 4     |
-| **OSS Observability**  | SigNoz, Coroot, HyperDX, OpenObserve, Netdata                | 5     |
-| **Observability**      | Prometheus, Splunk, Elasticsearch                            | 3     |
-| **Streaming & Logs**   | Kafka, Loki, InfluxDB                                        | 3     |
-| **Tracing**            | Jaeger, Zipkin                                               | 2     |
-| **Monitoring Tools**   | Telegraf, Grafana Alloy, Percona PMM, Blackbox, ManageEngine | 5     |
-| **Custom**             | Webhook                                                      | 1     |
+| Category              | Integrations                                                 | Count |
+| --------------------- | ------------------------------------------------------------ | ----- |
+| **Cloud Providers**   | GCP, Azure, Alibaba Cloud, AWS CloudWatch                    | 4     |
+| **Infrastructure**    | Proxmox, VMware vSphere, Nutanix, Azure Arc                  | 4     |
+| **Network & IoT**     | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3, MQTT              | 3     |
+| **Kernel/System**     | eBPF (syscalls, network, file I/O, scheduler), Cilium Hubble | 2     |
+| **APM Platforms**     | Dynatrace, IBM Instana, Datadog, New Relic                   | 4     |
+| **OSS Observability** | SigNoz, Coroot, HyperDX, OpenObserve, Netdata                | 5     |
+| **Observability**     | Prometheus, Splunk, Elasticsearch                            | 3     |
+| **Streaming & Logs**  | Kafka, Loki, InfluxDB                                        | 3     |
+| **Tracing**           | Jaeger, Zipkin                                               | 2     |
+| **Monitoring Tools**  | Telegraf, Grafana Alloy, Percona PMM, Blackbox, ManageEngine | 5     |
+| **Custom**            | Webhook                                                      | 1     |
 
 ### Data Type Support Matrix
 
@@ -548,19 +548,19 @@ Legend: ✅ Full Support | ⚠️ Partial/Plugin | ❌ Not Supported
 
 ### Open Source Observability Comparison
 
-| Feature              | TFO Platform | SigNoz | Coroot | HyperDX | OpenObserve | Netdata |
-| -------------------- | :----------: | :----: | :----: | :-----: | :---------: | :-----: |
-| **OTLP Native**      |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ❌    |
-| **Metrics**          |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ✅    |
-| **Logs**             |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ❌    |
-| **Traces**           |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ❌    |
-| **eBPF Support**     |      ✅      |   ⚠️   |   ✅   |   ❌    |     ❌      |   ✅    |
-| **Auto-Discovery**   |      ✅      |   ✅   |   ✅   |   ⚠️    |     ⚠️      |   ✅    |
-| **Service Maps**     |      ✅      |   ✅   |   ✅   |   ✅    |     ⚠️      |   ❌    |
-| **ClickHouse**       |      ✅      |   ✅   |   ✅   |   ✅    |     ❌      |   ❌    |
-| **Self-Hosted**      |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ✅    |
-| **Cloud Offering**   |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ✅    |
-| **License**          |   Apache 2   | MIT/EE | Apache | MIT/EE  |  Apache/EE  | GPLv3   |
+| Feature            | TFO Platform | SigNoz | Coroot | HyperDX | OpenObserve | Netdata |
+| ------------------ | :----------: | :----: | :----: | :-----: | :---------: | :-----: |
+| **OTLP Native**    |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ❌    |
+| **Metrics**        |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ✅    |
+| **Logs**           |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ❌    |
+| **Traces**         |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ❌    |
+| **eBPF Support**   |      ✅      |   ⚠️   |   ✅   |   ❌    |     ❌      |   ✅    |
+| **Auto-Discovery** |      ✅      |   ✅   |   ✅   |   ⚠️    |     ⚠️      |   ✅    |
+| **Service Maps**   |      ✅      |   ✅   |   ✅   |   ✅    |     ⚠️      |   ❌    |
+| **ClickHouse**     |      ✅      |   ✅   |   ✅   |   ✅    |     ❌      |   ❌    |
+| **Self-Hosted**    |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ✅    |
+| **Cloud Offering** |      ✅      |   ✅   |   ✅   |   ✅    |     ✅      |   ✅    |
+| **License**        |   Apache 2   | MIT/EE | Apache | MIT/EE  |  Apache/EE  |  GPLv3  |
 
 Legend: ✅ Full Support | ⚠️ Partial/Plugin | ❌ Not Supported
 
