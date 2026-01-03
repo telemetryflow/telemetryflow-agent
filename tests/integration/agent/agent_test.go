@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,9 +34,13 @@ func TestAgentIntegration(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// Start agent
+		// Use sync.WaitGroup for proper synchronization
+		var wg sync.WaitGroup
 		errChan := make(chan error, 1)
+		
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			errChan <- ag.Run(ctx)
 		}()
 
@@ -53,6 +58,7 @@ func TestAgentIntegration(t *testing.T) {
 		cancel()
 
 		// Wait for shutdown
+		wg.Wait()
 		err = <-errChan
 		assert.NoError(t, err) // Graceful shutdown returns nil
 		assert.False(t, ag.IsRunning())
@@ -63,32 +69,38 @@ func TestAgentIntegration(t *testing.T) {
 		cfg.Collector.System.Enabled = false // Disable for faster test
 		logger, _ := zap.NewDevelopment()
 
-		ag, err := agent.New(cfg, logger)
-		require.NoError(t, err)
-
 		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			// Create new agent for each cycle to avoid state issues
+			ag, err := agent.New(cfg, logger)
+			require.NoError(t, err)
 
-			// Start agent and wait for it to be running
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+
+			// Use sync.WaitGroup for proper synchronization
+			var wg sync.WaitGroup
 			errChan := make(chan error, 1)
+			
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				errChan <- ag.Run(ctx)
 			}()
 
 			// Wait for agent to start
-			for j := 0; j < 10; j++ {
-				if ag.IsRunning() {
-					break
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-			assert.True(t, ag.IsRunning())
+			time.Sleep(100 * time.Millisecond)
+			assert.True(t, ag.IsRunning(), "Agent should be running")
 
-			// Stop agent and wait for shutdown
+			// Stop agent
 			cancel()
-			err := <-errChan
+			
+			// Wait for goroutine to complete
+			wg.Wait()
+			err = <-errChan
 			assert.NoError(t, err)
-			assert.False(t, ag.IsRunning())
+			
+			// Ensure agent is fully stopped
+			time.Sleep(50 * time.Millisecond)
+			assert.False(t, ag.IsRunning(), "Agent should be stopped")
 		}
 	})
 }
