@@ -55,7 +55,18 @@ Features:
   • Graceful shutdown with signal handling
   • Cross-platform support (Linux, macOS, Windows)
 
+Usage:
+  tfo-agent [flags]              Start the agent (default behavior)
+  tfo-agent start [flags]        Start the agent
+  tfo-agent version [flags]      Print version information
+  tfo-agent config <command>     Configuration management
+
   `, version.Banner()),
+		// Run agent by default when no subcommand is provided
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// If no subcommand provided, run the agent
+			return runAgent()
+		},
 	}
 
 	// Add subcommands

@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.1-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
 
 This document provides an overview of all third-party integrations supported by the TelemetryFlow Agent.
 
@@ -34,15 +34,22 @@ flowchart TB
             EBPF[eBPF Exporter]
         end
 
+        subgraph "APM Platforms"
+            DD[Datadog]
+            NR[New Relic]
+            DT[Dynatrace]
+            INST[IBM Instana]
+        end
+
         subgraph "Observability Backends"
             PROM[Prometheus]
-            DD[Datadog]
             SPLUNK[Splunk]
             ES[Elasticsearch]
             INFLUX[InfluxDB]
             KAFKA[Kafka]
             LOKI[Loki]
             JAEGER[Jaeger]
+            ME[ManageEngine]
         end
     end
 
@@ -50,18 +57,19 @@ flowchart TB
     IM --> PROXMOX & VMWARE & NUTANIX & AZUREARC
     IM --> CISCO & SNMP & MQTT
     IM --> EBPF
-    IM --> PROM & DD & SPLUNK & ES & INFLUX & KAFKA & LOKI & JAEGER
+    IM --> DD & NR & DT & INST
+    IM --> PROM & SPLUNK & ES & INFLUX & KAFKA & LOKI & JAEGER & ME
 ```
 
 ## Integration Categories
 
 | Category | Integrations | Description |
 |----------|-------------|-------------|
-| [Cloud Providers](cloud-providers.md) | GCP, Azure, Alibaba | Major cloud platform integrations |
-| [Infrastructure](infrastructure.md) | Proxmox, VMware, Nutanix, Azure Arc | Virtualization and hybrid cloud |
-| [Network & IoT](network.md) | Cisco, SNMP, MQTT | Network devices and IoT messaging |
-| [Kernel/System](kernel.md) | eBPF | Linux kernel-level observability |
-| [Observability](observability.md) | Prometheus, Datadog, Splunk, etc. | Monitoring backends |
+| [Cloud Providers](CLOUD-PROVIDERS.md) | GCP, Azure, Alibaba | Major cloud platform integrations |
+| [Infrastructure](INFRASTRUCTURE.md) | Proxmox, VMware, Nutanix, Azure Arc | Virtualization and hybrid cloud |
+| [Network & IoT](NETWORK.md) | Cisco, SNMP, MQTT | Network devices and IoT messaging |
+| [Kernel/System](KERNEL.md) | eBPF | Linux kernel-level observability |
+| [Observability](OBSERVABILITY.md) | Prometheus, Datadog, Dynatrace, Instana, ManageEngine, Splunk, etc. | APM & monitoring backends |
 
 ## Data Flow
 
@@ -137,6 +145,9 @@ graph LR
 | SNMP | ✅ | ❌ | ❌ |
 | MQTT | ✅ | ✅ | ✅ |
 | eBPF | ✅ | ❌ | ❌ |
+| Dynatrace | ✅ | ✅ | ✅ |
+| IBM Instana | ✅ | ✅ | ✅ |
+| ManageEngine | ✅ | ✅ | ❌ |
 
 ## Configuration
 

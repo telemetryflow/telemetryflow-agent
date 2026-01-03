@@ -61,7 +61,7 @@ services:
   otel-collector:
     platform: linux/amd64
     # =============================================================================
-    # TelemetryFlow Collector (TFO-Collector) - Custom TFO format with OTLP support (v1.1.1+)
+    # TelemetryFlow Collector (TFO-Collector) - Custom TFO format with OTLP support (v1.1.2+)
     image: telemetryflow/telemetryflow-collector:${TFO_VERSION:-latest}
     command: ["--config=/etc/tfo-collector/tfo-collector.yaml"]
     # =============================================================================
@@ -85,13 +85,13 @@ services:
       # OTEL Collector Community Contributor config (Standard OTEL format)
       # - ./tests/e2e/testdata/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC (v1 & v2)
-      - "4318:4318"   # OTLP HTTP (v1 & v2)
-      - "8888:8888"   # Prometheus metrics (self)
-      - "8889:8889"   # Prometheus exporter
+      - "4317:4317" # OTLP gRPC (v1 & v2)
+      - "4318:4318" # OTLP HTTP (v1 & v2)
+      - "8888:8888" # Prometheus metrics (self)
+      - "8889:8889" # Prometheus exporter
       - "13133:13133" # Health check
       - "55679:55679" # zPages
-      - "1777:1777"   # pprof
+      - "1777:1777" # pprof
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133"]
       interval: 10s

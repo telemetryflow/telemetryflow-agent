@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.1-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
@@ -38,6 +38,7 @@ We take the security of TelemetryFlow Core seriously. If you believe you have fo
 **Please DO NOT report security vulnerabilities through public GitHub issues.**
 
 Instead, please report them via email to:
+
 - **Security Team**: security@telemetryflow.id
 - **Project Lead**: support@telemetryflow.id
 
@@ -73,6 +74,7 @@ Please include the following information in your report:
 ### For Users
 
 #### 1. Environment Variables
+
 ```bash
 # Never commit .env files
 echo ".env" >> .gitignore
@@ -82,6 +84,7 @@ pnpm run generate:secrets
 ```
 
 #### 2. Database Security
+
 ```bash
 # Use strong passwords
 POSTGRES_PASSWORD=<strong-random-password>
@@ -92,6 +95,7 @@ CLICKHOUSE_PASSWORD=<strong-random-password>
 ```
 
 #### 3. JWT Configuration
+
 ```bash
 # Use minimum 32 characters for secrets
 JWT_SECRET=<min-32-chars-random-string>
@@ -102,6 +106,7 @@ JWT_EXPIRES_IN=24h  # Adjust based on your needs
 ```
 
 #### 4. Production Deployment
+
 ```bash
 # Always use NODE_ENV=production
 NODE_ENV=production
@@ -118,6 +123,7 @@ LOG_LEVEL=warn
 #### 1. Code Security
 
 **Never commit:**
+
 - Passwords or API keys
 - Private keys or certificates
 - Database credentials
@@ -125,6 +131,7 @@ LOG_LEVEL=warn
 - Personal information
 
 **Always:**
+
 - Use environment variables for sensitive data
 - Validate all user inputs
 - Sanitize database queries
@@ -147,12 +154,42 @@ pnpm update
 #### 3. Code Review
 
 All code changes must:
+
 - Pass security review
 - Include tests for security-critical features
 - Follow OWASP security guidelines
 - Be reviewed by at least one maintainer
 
 ## Security Features
+
+### TLS Security
+
+All third-party integrations enforce secure TLS configuration:
+
+- **Minimum TLS Version**: TLS 1.2 enforced for all integrations
+- **Certificate Verification**: Enabled by default, `tls_skip_verify` available for self-signed certificates
+- **Supported Integrations**: VMware, Kafka, MQTT, Cisco, Elasticsearch, Nutanix, Proxmox, Splunk, Dynatrace, ManageEngine, IBM Instana
+
+```yaml
+# Example secure TLS configuration
+integrations:
+  dynatrace:
+    enabled: true
+    tls_skip_verify: false # Verify certificates (recommended)
+    # For self-signed certificates in enterprise environments:
+    # tls_skip_verify: true  # Use with caution
+```
+
+### Static Analysis (gosec)
+
+The codebase is scanned with gosec for security vulnerabilities:
+
+| Rule | Description                  | Status                           |
+| ---- | ---------------------------- | -------------------------------- |
+| G115 | Integer overflow conversion  | Fixed with bounds checking       |
+| G304 | Potential file inclusion     | Fixed with hardcoded paths       |
+| G402 | TLS InsecureSkipVerify       | Fixed with MinVersion TLS 1.2    |
+| G505 | Weak cryptographic primitive | Documented (required by Alibaba) |
 
 ### Authentication & Authorization
 
@@ -193,6 +230,7 @@ No security vulnerabilities have been reported yet.
 ### Security Advisories
 
 Security advisories will be published at:
+
 - GitHub Security Advisories
 - Project documentation
 - Release notes
@@ -202,6 +240,7 @@ Security advisories will be published at:
 ### Standards
 
 TelemetryFlow Core follows:
+
 - **OWASP Top 10** security guidelines
 - **CWE/SANS Top 25** vulnerability prevention
 - **NIST Cybersecurity Framework** principles
@@ -209,22 +248,26 @@ TelemetryFlow Core follows:
 ### Certifications
 
 Currently pursuing:
+
 - SOC 2 Type II compliance
 - ISO 27001 certification
 
 ## Security Contacts
 
 ### Primary Contact
+
 - **Email**: security@telemetryflow.id
 - **Response Time**: 48 hours
 
 ### Alternative Contact
+
 - **Email**: support@telemetryflow.id
 - **GitHub**: [@telemetryflow](https://github.com/telemetryflow)
 
 ## Bug Bounty Program
 
 We currently do not have a formal bug bounty program, but we:
+
 - Acknowledge security researchers in release notes
 - Provide public recognition for valid reports
 - Consider monetary rewards for critical vulnerabilities (case-by-case basis)
@@ -234,10 +277,11 @@ We currently do not have a formal bug bounty program, but we:
 ### Notification Channels
 
 Stay informed about security updates:
+
 - **GitHub Releases**: Watch repository for releases
 - **Security Advisories**: Enable GitHub security alerts
 - **Changelog**: Check [CHANGELOG.md](./CHANGELOG.md)
-- **Release Notes**: Review [docs/RELEASE_NOTES_*.md](./docs/)
+- **Release Notes**: Review [docs/RELEASE*NOTES*\*.md](./docs/)
 
 ### Update Process
 
@@ -293,17 +337,20 @@ pnpm test
 ## Additional Resources
 
 ### Documentation
+
 - [README.md](./README.md) - Project overview
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) - Community standards
 
 ### Security Tools
+
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [npm audit](https://docs.npmjs.com/cli/v8/commands/npm-audit)
 - [Snyk](https://snyk.io/) - Vulnerability scanning
 - [SonarQube](https://www.sonarqube.org/) - Code quality & security
 
 ### Security Training
+
 - [OWASP WebGoat](https://owasp.org/www-project-webgoat/)
 - [PortSwigger Web Security Academy](https://portswigger.net/web-security)
 - [HackerOne Resources](https://www.hackerone.com/resources)
@@ -312,12 +359,12 @@ pnpm test
 
 We would like to thank the following security researchers for their contributions:
 
-*No security researchers have been acknowledged yet.*
+_No security researchers have been acknowledged yet._
 
 ---
 
 - **Last Updated**: December 23, 2025
-- **Version**: 1.1.1
+- **Version**: 1.1.2
 - **Project**: TelemetryFlow Agent
 
 **Built with ❤️ by DevOpsCorner Indonesia**

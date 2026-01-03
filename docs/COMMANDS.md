@@ -1,7 +1,7 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.1.1
-- **Last Updated:** December 2025
+- **Version:** 1.1.2
+- **Last Updated:** January 2026
 
 ---
 
@@ -118,7 +118,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
                        \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    TelemetryFlow Agent v1.1.1
+    TelemetryFlow Agent v1.1.2
     Community Enterprise Observability Platform (CEOP)
   ══════════════════════════════════════════════════════════════════════════════
     Platform     darwin/arm64
@@ -134,7 +134,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
     Copyright (c) 2024-2026 DevOpsCorner Indonesia
   ══════════════════════════════════════════════════════════════════════════════
 
-{"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.1.1"}
+{"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.1.2"}
 {"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Configuration loaded","file":"configs/tfo-agent.yaml"}
 {"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Agent started","id":"agent-001","hostname":"server-01"}
 ```
@@ -172,7 +172,7 @@ Displays version and build information.
 
 # Short version only
 ./build/tfo-agent version --short
-# Output: 1.1.1
+# Output: 1.1.2
 
 # JSON format
 ./build/tfo-agent version --json
@@ -181,7 +181,7 @@ Displays version and build information.
 **Output (Default):**
 
 ```
-TelemetryFlow Agent v1.1.1
+TelemetryFlow Agent v1.1.2
 
   Build Information
   ─────────────────────────────────────────────
@@ -208,7 +208,7 @@ TelemetryFlow Agent v1.1.1
 {
   "product": "TelemetryFlow Agent",
   "description": "Enterprise telemetry collection agent",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "git_commit": "abc1234",
   "git_branch": "main",
   "build_time": "2025-12-17T10:00:00Z",

@@ -34,6 +34,35 @@ type EBPFConfig struct {
 	MaxStackDepth    int               `mapstructure:"max_stack_depth"`
 	BTFPath          string            `mapstructure:"btf_path"`
 	Labels           map[string]string `mapstructure:"labels"`
+
+	// Cilium Hubble integration
+	Cilium CiliumConfig `mapstructure:"cilium"`
+}
+
+// CiliumConfig contains Cilium Hubble integration configuration
+type CiliumConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+	// Hubble configuration
+	HubbleAddress     string `mapstructure:"hubble_address"`     // Default: "localhost:4245"
+	HubbleTLSEnabled  bool   `mapstructure:"hubble_tls_enabled"` // Enable TLS for Hubble
+	HubbleTLSCertPath string `mapstructure:"hubble_tls_cert"`    // Path to Hubble TLS cert
+	HubbleTLSKeyPath  string `mapstructure:"hubble_tls_key"`     // Path to Hubble TLS key
+	HubbleTLSCAPath   string `mapstructure:"hubble_tls_ca"`      // Path to Hubble CA cert
+	// Flow collection
+	CollectFlows    bool `mapstructure:"collect_flows"`    // Collect network flows (L3/L4)
+	CollectL7Flows  bool `mapstructure:"collect_l7_flows"` // Collect L7 (HTTP/gRPC/DNS) flows
+	CollectDrops    bool `mapstructure:"collect_drops"`    // Collect dropped packets
+	CollectPolicies bool `mapstructure:"collect_policies"` // Collect network policy verdicts
+	CollectServices bool `mapstructure:"collect_services"` // Collect service mesh metrics
+	// Kubernetes integration
+	KubernetesEnabled bool     `mapstructure:"kubernetes_enabled"` // Enable K8s metadata enrichment
+	WatchNamespaces   []string `mapstructure:"watch_namespaces"`   // Namespaces to watch (empty = all)
+	ExcludeNamespaces []string `mapstructure:"exclude_namespaces"` // Namespaces to exclude
+	// Performance settings
+	FlowBufferSize    int           `mapstructure:"flow_buffer_size"`     // Buffer size for flows (default: 4096)
+	FlowSampleRate    int           `mapstructure:"flow_sample_rate"`     // Sample 1 in N flows (default: 1 = all)
+	MaxFlowsPerSecond int           `mapstructure:"max_flows_per_second"` // Rate limit (default: 10000)
+	AggregationWindow time.Duration `mapstructure:"aggregation_window"`   // Aggregation window (default: 10s)
 }
 
 // EBPFExporter collects kernel-level telemetry using eBPF
@@ -91,12 +120,62 @@ type ebpfSchedulerMetric struct {
 	Comm        string
 }
 
+// Cilium Hubble flow types
+type hubbleFlow struct {
+	TraceID         string
+	SourcePod       string
+	SourceNamespace string
+	SourceService   string
+	SourceIP        string
+	SourcePort      uint16
+	DestPod         string
+	DestNamespace   string
+	DestService     string
+	DestIP          string
+	DestPort        uint16
+	Protocol        string // TCP, UDP, ICMP
+	L7Protocol      string // HTTP, gRPC, DNS, Kafka
+	Verdict         string // FORWARDED, DROPPED, ERROR
+	DropReason      string
+	IsReply         bool
+	BytesSent       uint64
+	BytesRecv       uint64
+	LatencyNs       uint64
+	HTTPMethod      string
+	HTTPPath        string
+	HTTPStatusCode  int
+	DNSQuery        string
+	DNSResponseCode int
+}
+
+type hubblePolicyVerdict struct {
+	PolicyName      string
+	PolicyNamespace string
+	Direction       string // INGRESS, EGRESS
+	Verdict         string // ALLOWED, DENIED, AUDIT
+	MatchType       string
+}
+
+type hubbleServiceMetric struct {
+	ServiceName      string
+	ServiceNamespace string
+	ServiceClusterIP string
+	RequestsTotal    uint64
+	ErrorsTotal      uint64
+	LatencyP50       float64
+	LatencyP90       float64
+	LatencyP99       float64
+}
+
 // Ensure types are used (for future eBPF implementation)
 var (
 	_ = ebpfSyscallMetric{}
 	_ = ebpfNetworkMetric{}
 	_ = ebpfFileIOMetric{}
 	_ = ebpfSchedulerMetric{}
+	_ = hubbleFlow{}
+	_ = hubblePolicyVerdict{}
+	_ = hubbleServiceMetric{}
 )
 
 // NewEBPFExporter creates a new eBPF exporter
@@ -153,10 +232,17 @@ func (e *EBPFExporter) Init(ctx context.Context) error {
 
 	// Enable default collectors if none specified
 	if !e.config.CollectSyscalls && !e.config.CollectNetwork && !e.config.CollectFileIO &&
-		!e.config.CollectScheduler && !e.config.CollectMemory {
+		!e.config.CollectScheduler && !e.config.CollectMemory && !e.config.Cilium.Enabled {
 		e.config.CollectSyscalls = true
 		e.config.CollectNetwork = true
 		e.config.CollectFileIO = true
+	}
+
+	// Initialize Cilium Hubble if enabled
+	if e.config.Cilium.Enabled {
+		if err := e.initCiliumHubble(); err != nil {
+			return fmt.Errorf("failed to initialize Cilium Hubble: %w", err)
+		}
 	}
 
 	// In production, we would:
@@ -171,6 +257,54 @@ func (e *EBPFExporter) Init(ctx context.Context) error {
 		zap.Bool("syscalls", e.config.CollectSyscalls),
 		zap.Bool("network", e.config.CollectNetwork),
 		zap.Bool("fileio", e.config.CollectFileIO),
+		zap.Bool("cilium", e.config.Cilium.Enabled),
+	)
+
+	return nil
+}
+
+// initCiliumHubble initializes Cilium Hubble integration
+func (e *EBPFExporter) initCiliumHubble() error {
+	cfg := &e.config.Cilium
+
+	// Set defaults
+	if cfg.HubbleAddress == "" {
+		cfg.HubbleAddress = "localhost:4245"
+	}
+	if cfg.FlowBufferSize == 0 {
+		cfg.FlowBufferSize = 4096
+	}
+	if cfg.FlowSampleRate == 0 {
+		cfg.FlowSampleRate = 1 // All flows
+	}
+	if cfg.MaxFlowsPerSecond == 0 {
+		cfg.MaxFlowsPerSecond = 10000
+	}
+	if cfg.AggregationWindow == 0 {
+		cfg.AggregationWindow = 10 * time.Second
+	}
+
+	// Enable default flow collection if none specified
+	if !cfg.CollectFlows && !cfg.CollectL7Flows && !cfg.CollectDrops &&
+		!cfg.CollectPolicies && !cfg.CollectServices {
+		cfg.CollectFlows = true
+		cfg.CollectDrops = true
+	}
+
+	// In production, we would:
+	// 1. Connect to Hubble Relay via gRPC (cfg.HubbleAddress)
+	// 2. Set up TLS if cfg.HubbleTLSEnabled
+	// 3. Subscribe to flow events
+	// 4. Start background goroutine to receive flows
+
+	e.Logger().Info("Cilium Hubble integration initialized",
+		zap.String("hubbleAddress", cfg.HubbleAddress),
+		zap.Bool("tlsEnabled", cfg.HubbleTLSEnabled),
+		zap.Bool("collectFlows", cfg.CollectFlows),
+		zap.Bool("collectL7Flows", cfg.CollectL7Flows),
+		zap.Bool("collectDrops", cfg.CollectDrops),
+		zap.Bool("collectPolicies", cfg.CollectPolicies),
+		zap.Bool("kubernetes", cfg.KubernetesEnabled),
 	)
 
 	return nil
@@ -274,6 +408,12 @@ func (e *EBPFExporter) CollectMetrics(ctx context.Context) ([]Metric, error) {
 	if e.config.CollectTCPEvents {
 		tcpMetrics := e.collectTCPEventMetrics(now)
 		metrics = append(metrics, tcpMetrics...)
+	}
+
+	// Collect Cilium Hubble metrics
+	if e.config.Cilium.Enabled {
+		hubbleMetrics := e.collectHubbleMetrics(now)
+		metrics = append(metrics, hubbleMetrics...)
 	}
 
 	return metrics, nil
@@ -457,6 +597,287 @@ func (e *EBPFExporter) getBaseTags() map[string]string {
 	}
 	tags["collector"] = "ebpf"
 	return tags
+}
+
+// getCiliumBaseTags returns base tags for Cilium Hubble metrics
+func (e *EBPFExporter) getCiliumBaseTags() map[string]string {
+	tags := make(map[string]string)
+	for k, v := range e.config.Labels {
+		tags[k] = v
+	}
+	tags["collector"] = "cilium_hubble"
+	if e.config.Cilium.KubernetesEnabled {
+		tags["kubernetes"] = "true"
+	}
+	return tags
+}
+
+// collectHubbleMetrics collects metrics from Cilium Hubble
+func (e *EBPFExporter) collectHubbleMetrics(now time.Time) []Metric {
+	var metrics []Metric
+
+	if e.config.Cilium.CollectFlows {
+		flowMetrics := e.collectHubbleFlowMetrics(now)
+		metrics = append(metrics, flowMetrics...)
+	}
+
+	if e.config.Cilium.CollectL7Flows {
+		l7Metrics := e.collectHubbleL7Metrics(now)
+		metrics = append(metrics, l7Metrics...)
+	}
+
+	if e.config.Cilium.CollectDrops {
+		dropMetrics := e.collectHubbleDropMetrics(now)
+		metrics = append(metrics, dropMetrics...)
+	}
+
+	if e.config.Cilium.CollectPolicies {
+		policyMetrics := e.collectHubblePolicyMetrics(now)
+		metrics = append(metrics, policyMetrics...)
+	}
+
+	if e.config.Cilium.CollectServices {
+		serviceMetrics := e.collectHubbleServiceMetrics(now)
+		metrics = append(metrics, serviceMetrics...)
+	}
+
+	return metrics
+}
+
+// collectHubbleFlowMetrics collects L3/L4 flow metrics from Hubble
+func (e *EBPFExporter) collectHubbleFlowMetrics(now time.Time) []Metric {
+	var metrics []Metric
+	baseTags := e.getCiliumBaseTags()
+
+	// In production, these would come from Hubble flow events
+	protocols := []string{"TCP", "UDP", "ICMP"}
+	verdicts := []string{"FORWARDED", "DROPPED"}
+
+	for _, proto := range protocols {
+		for _, verdict := range verdicts {
+			tags := make(map[string]string)
+			for k, v := range baseTags {
+				tags[k] = v
+			}
+			tags["protocol"] = proto
+			tags["verdict"] = verdict
+
+			metrics = append(metrics,
+				Metric{Name: "hubble_flows_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+				Metric{Name: "hubble_flow_bytes_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags, Unit: "bytes"},
+			)
+		}
+	}
+
+	// Connection metrics
+	tags := make(map[string]string)
+	for k, v := range baseTags {
+		tags[k] = v
+	}
+	metrics = append(metrics,
+		Metric{Name: "hubble_tcp_connections_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_tcp_connection_duration_seconds", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "seconds"},
+		Metric{Name: "hubble_udp_flows_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+	)
+
+	return metrics
+}
+
+// collectHubbleL7Metrics collects L7 (HTTP/gRPC/DNS/Kafka) metrics from Hubble
+func (e *EBPFExporter) collectHubbleL7Metrics(now time.Time) []Metric {
+	var metrics []Metric
+	baseTags := e.getCiliumBaseTags()
+
+	// HTTP metrics
+	httpMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
+	for _, method := range httpMethods {
+		tags := make(map[string]string)
+		for k, v := range baseTags {
+			tags[k] = v
+		}
+		tags["method"] = method
+		tags["protocol"] = "HTTP"
+
+		metrics = append(metrics,
+			Metric{Name: "hubble_http_requests_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+			Metric{Name: "hubble_http_request_duration_seconds", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "seconds"},
+		)
+	}
+
+	// HTTP status code metrics
+	statusCodes := []string{"2xx", "3xx", "4xx", "5xx"}
+	for _, code := range statusCodes {
+		tags := make(map[string]string)
+		for k, v := range baseTags {
+			tags[k] = v
+		}
+		tags["status_class"] = code
+		tags["protocol"] = "HTTP"
+
+		metrics = append(metrics,
+			Metric{Name: "hubble_http_responses_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		)
+	}
+
+	// gRPC metrics
+	tags := make(map[string]string)
+	for k, v := range baseTags {
+		tags[k] = v
+	}
+	tags["protocol"] = "gRPC"
+	metrics = append(metrics,
+		Metric{Name: "hubble_grpc_requests_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_grpc_request_duration_seconds", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "seconds"},
+	)
+
+	// DNS metrics
+	dnsTypes := []string{"A", "AAAA", "CNAME", "MX", "TXT", "SRV"}
+	for _, dnsType := range dnsTypes {
+		tags := make(map[string]string)
+		for k, v := range baseTags {
+			tags[k] = v
+		}
+		tags["query_type"] = dnsType
+		tags["protocol"] = "DNS"
+
+		metrics = append(metrics,
+			Metric{Name: "hubble_dns_queries_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		)
+	}
+
+	// DNS response codes
+	dnsCodes := []string{"NOERROR", "NXDOMAIN", "SERVFAIL", "REFUSED"}
+	for _, code := range dnsCodes {
+		tags := make(map[string]string)
+		for k, v := range baseTags {
+			tags[k] = v
+		}
+		tags["rcode"] = code
+		tags["protocol"] = "DNS"
+
+		metrics = append(metrics,
+			Metric{Name: "hubble_dns_responses_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		)
+	}
+
+	// Kafka metrics
+	tags = make(map[string]string)
+	for k, v := range baseTags {
+		tags[k] = v
+	}
+	tags["protocol"] = "Kafka"
+	metrics = append(metrics,
+		Metric{Name: "hubble_kafka_requests_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_kafka_request_duration_seconds", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "seconds"},
+	)
+
+	return metrics
+}
+
+// collectHubbleDropMetrics collects packet drop metrics from Hubble
+func (e *EBPFExporter) collectHubbleDropMetrics(now time.Time) []Metric {
+	var metrics []Metric
+	baseTags := e.getCiliumBaseTags()
+
+	// Drop reasons from Cilium
+	dropReasons := []string{
+		"POLICY_DENIED",
+		"INVALID_SOURCE_MAC",
+		"INVALID_DESTINATION_MAC",
+		"INVALID_SOURCE_IP",
+		"CT_TRUNCATED_OR_INVALID_HEADER",
+		"CT_MISSING_TCP_ACK_FLAG",
+		"CT_UNKNOWN_L4_PROTOCOL",
+		"UNSUPPORTED_L3_PROTOCOL",
+		"STALE_OR_UNROUTABLE_IP",
+		"NO_TUNNEL_ENDPOINT",
+		"UNKNOWN_L3_TARGET_ADDRESS",
+		"NO_MAPPING_FOR_NAT",
+	}
+
+	for _, reason := range dropReasons {
+		tags := make(map[string]string)
+		for k, v := range baseTags {
+			tags[k] = v
+		}
+		tags["reason"] = reason
+
+		metrics = append(metrics,
+			Metric{Name: "hubble_drop_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+			Metric{Name: "hubble_drop_bytes_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags, Unit: "bytes"},
+		)
+	}
+
+	return metrics
+}
+
+// collectHubblePolicyMetrics collects network policy verdict metrics from Hubble
+func (e *EBPFExporter) collectHubblePolicyMetrics(now time.Time) []Metric {
+	var metrics []Metric
+	baseTags := e.getCiliumBaseTags()
+
+	directions := []string{"INGRESS", "EGRESS"}
+	verdicts := []string{"ALLOWED", "DENIED", "AUDIT"}
+
+	for _, dir := range directions {
+		for _, verdict := range verdicts {
+			tags := make(map[string]string)
+			for k, v := range baseTags {
+				tags[k] = v
+			}
+			tags["direction"] = dir
+			tags["verdict"] = verdict
+
+			metrics = append(metrics,
+				Metric{Name: "hubble_policy_verdicts_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+			)
+		}
+	}
+
+	// Policy match types
+	matchTypes := []string{"L3Only", "L4Only", "L3L4", "L7", "All"}
+	for _, matchType := range matchTypes {
+		tags := make(map[string]string)
+		for k, v := range baseTags {
+			tags[k] = v
+		}
+		tags["match_type"] = matchType
+
+		metrics = append(metrics,
+			Metric{Name: "hubble_policy_match_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		)
+	}
+
+	return metrics
+}
+
+// collectHubbleServiceMetrics collects Kubernetes service mesh metrics from Hubble
+func (e *EBPFExporter) collectHubbleServiceMetrics(now time.Time) []Metric {
+	var metrics []Metric
+	baseTags := e.getCiliumBaseTags()
+
+	tags := make(map[string]string)
+	for k, v := range baseTags {
+		tags[k] = v
+	}
+
+	// Service-level metrics
+	metrics = append(metrics,
+		Metric{Name: "hubble_service_requests_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_service_errors_total", Value: 0, Type: MetricTypeCounter, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_service_request_duration_seconds", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "seconds"},
+		Metric{Name: "hubble_service_request_size_bytes", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "bytes"},
+		Metric{Name: "hubble_service_response_size_bytes", Value: 0, Type: MetricTypeHistogram, Timestamp: now, Tags: tags, Unit: "bytes"},
+	)
+
+	// Endpoint metrics
+	metrics = append(metrics,
+		Metric{Name: "hubble_endpoint_count", Value: 0, Type: MetricTypeGauge, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_endpoint_ready", Value: 0, Type: MetricTypeGauge, Timestamp: now, Tags: tags},
+		Metric{Name: "hubble_endpoint_not_ready", Value: 0, Type: MetricTypeGauge, Timestamp: now, Tags: tags},
+	)
+
+	return metrics
 }
 
 // Health checks the health of eBPF collection

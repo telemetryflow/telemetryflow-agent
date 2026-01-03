@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Development Guide
 
-- **Version:** 1.1.1
+- **Version:** 1.1.2
 - **Last Updated:** January 2026
 - **Go Version:** 1.24+
 - **OTEL SDK Version:** 1.39.0
@@ -296,7 +296,7 @@ tests/
 │   │   ├── buffer/         # Buffer tests (1 file)
 │   │   ├── config/         # Config tests (1 file)
 │   │   └── exporter/       # Exporter tests (3 files)
-│   ├── integrations/       # 3rd party integration tests (31 files)
+│   ├── integrations/       # 3rd party integration tests (36 files)
 │   └── presentation/       # Presentation layer tests
 │       └── banner/         # Banner tests (1 file)
 ├── integration/            # Integration tests (with dependencies)
@@ -324,7 +324,7 @@ Run `make test-list` or `./scripts/test-specific.sh -l` to see all available pac
 | `infrastructure/buffer`     | Disk-backed retry buffer           | 1     |
 | `infrastructure/config`     | Configuration loader               | 1     |
 | `infrastructure/exporter`   | OTLP exporters (gRPC/HTTP)         | 3     |
-| `integrations`              | 3rd party integrations             | 31    |
+| `integrations`              | 3rd party integrations             | 36    |
 | `presentation/banner`       | ASCII art startup banner           | 1     |
 
 ### Writing Unit Tests
@@ -419,6 +419,51 @@ make fmt-check
 # Format code
 make fmt
 ```
+
+---
+
+## Continuous Integration
+
+### CI-Specific Makefile Targets
+
+The Makefile provides optimized targets for CI/CD pipelines:
+
+```bash
+# Run complete CI pipeline
+make ci                      # Runs ci-lint and ci-test
+
+# Individual CI targets
+make ci-lint                 # Run linters with CI-specific settings
+make ci-test                 # Run tests with race detection and coverage
+make ci-build                # Build optimized binary for CI
+make ci-release              # Build all platform binaries for release
+```
+
+### CI Pipeline Workflow
+
+| Stage   | Command           | Description                              |
+| ------- | ----------------- | ---------------------------------------- |
+| Lint    | `make ci-lint`    | Run golangci-lint with CI timeout        |
+| Test    | `make ci-test`    | Run tests with race detector and timeout |
+| Build   | `make ci-build`   | Build optimized production binary        |
+| Release | `make ci-release` | Build binaries for all platforms         |
+
+### GitHub Actions
+
+The project uses GitHub Actions for CI/CD with three main workflows:
+
+1. **CI Workflow** (`ci.yml`): Runs on PRs and pushes to main
+   - Linting with `make ci-lint`
+   - Testing with `make ci-test`
+   - Building with `make ci-build`
+
+2. **Docker Workflow** (`docker.yml`): Builds and pushes Docker images
+   - Multi-platform builds (linux/amd64, linux/arm64)
+   - Automatic tagging based on git tags
+
+3. **Release Workflow** (`release.yml`): Creates releases on tags
+   - Cross-platform binaries with `make ci-release`
+   - Automatic changelog generation
 
 ---
 
@@ -570,12 +615,12 @@ refactor: extract TLS config to helper function
 
 ```bash
 # Update version in internal/version/version.go
-const Version = "1.1.1"
+const Version = "1.1.2"
 
 # Update CHANGELOG.md
 # Create git tag
-git tag -a v1.1.1 -m "Release v1.1.1"
-git push origin v1.1.1
+git tag -a v1.1.2 -m "Release v1.1.2"
+git push origin v1.1.2
 ```
 
 ### Creating Release

@@ -1,6 +1,6 @@
 # Observability Backend Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.1-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
 
 This document covers integrations with observability backends and monitoring systems.
 
@@ -17,11 +17,25 @@ flowchart LR
     subgraph "Time Series DBs"
         PROM[Prometheus]
         INFLUX[InfluxDB]
+        ND[Netdata]
     end
 
     subgraph "APM Platforms"
         DD[Datadog]
         NR[New Relic]
+        DT[Dynatrace]
+        INST[IBM Instana]
+    end
+
+    subgraph "Open Source Observability"
+        SIGNOZ[SigNoz]
+        COROOT[Coroot]
+        HYPERDX[HyperDX]
+        OPENOBS[OpenObserve]
+    end
+
+    subgraph "IT Monitoring"
+        ME[ManageEngine]
     end
 
     subgraph "Log Management"
@@ -43,26 +57,34 @@ flowchart LR
         CW[AWS CloudWatch]
     end
 
-    M --> PROM & INFLUX & DD & NR & CW
-    L --> SPLUNK & ES & LOKI & DD & CW
-    T --> JAEGER & ZIPKIN & DD & NR
-    M & L & T --> KAFKA
+    M --> PROM & INFLUX & DD & NR & DT & INST & ME & CW & ND
+    L --> SPLUNK & ES & LOKI & DD & DT & INST & ME & CW
+    T --> JAEGER & ZIPKIN & DD & NR & DT & INST
+    M & L & T --> KAFKA & SIGNOZ & COROOT & HYPERDX & OPENOBS
 ```
 
 ## Quick Reference
 
 | Integration | Metrics | Logs | Traces | Protocol |
 |-------------|---------|------|--------|----------|
-| Prometheus | ✅ | ❌ | ❌ | Remote Write |
+| Coroot | ✅ | ✅ | ✅ | OTLP/HTTP |
 | Datadog | ✅ | ✅ | ✅ | HTTP/API |
-| New Relic | ✅ | ✅ | ✅ | HTTP/API |
-| Splunk | ✅ | ✅ | ❌ | HEC |
+| Dynatrace | ✅ | ✅ | ✅ | REST/OTLP |
 | Elasticsearch | ✅ | ✅ | ❌ | Bulk API |
+| HyperDX | ✅ | ✅ | ✅ | OTLP/HTTP |
+| IBM Instana | ✅ | ✅ | ✅ | REST |
 | InfluxDB | ✅ | ❌ | ❌ | Line Protocol |
+| Jaeger | ❌ | ❌ | ✅ | gRPC/Thrift |
 | Kafka | ✅ | ✅ | ✅ | Producer |
 | CloudWatch | ✅ | ✅ | ❌ | AWS SDK |
 | Loki | ❌ | ✅ | ❌ | Push API |
-| Jaeger | ❌ | ❌ | ✅ | gRPC/Thrift |
+| ManageEngine | ✅ | ✅ | ❌ | REST |
+| Netdata | ✅ | ❌ | ❌ | REST |
+| New Relic | ✅ | ✅ | ✅ | HTTP/API |
+| OpenObserve | ✅ | ✅ | ✅ | OTLP/HTTP |
+| Prometheus | ✅ | ❌ | ❌ | Remote Write |
+| SigNoz | ✅ | ✅ | ✅ | OTLP/HTTP |
+| Splunk | ✅ | ✅ | ❌ | HEC |
 | Zipkin | ❌ | ❌ | ✅ | HTTP |
 
 ## Prometheus
@@ -118,6 +140,108 @@ integrations:
       enabled: false
 ```
 
+## Dynatrace
+
+### Configuration
+
+```yaml
+integrations:
+  dynatrace:
+    enabled: true
+    api_token: "${DYNATRACE_API_TOKEN}"
+    environment_id: "${DYNATRACE_ENV_ID}"
+    environment_url: "https://${DYNATRACE_ENV_ID}.live.dynatrace.com"
+    # Optional: Override default endpoints
+    # metrics_endpoint: "https://abc.live.dynatrace.com/api/v2/metrics/ingest"
+    # logs_endpoint: "https://abc.live.dynatrace.com/api/v2/logs/ingest"
+    # traces_endpoint: "https://abc.live.dynatrace.com/api/v2/otlp/v1/traces"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 1000
+    flush_interval: 10s
+    tags:
+      environment: production
+```
+
+### Dynatrace Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as TFO Agent
+    participant DT as Dynatrace
+
+    loop Every flush_interval
+        Agent->>Agent: Collect Telemetry
+        Agent->>DT: POST /api/v2/metrics/ingest (MINT)
+        Agent->>DT: POST /api/v2/logs/ingest
+        Agent->>DT: POST /api/v2/otlp/v1/traces
+        DT-->>Agent: 200 OK
+    end
+```
+
+## IBM Instana
+
+### Configuration
+
+```yaml
+integrations:
+  instana:
+    enabled: true
+    agent_key: "${INSTANA_AGENT_KEY}"
+    endpoint_url: "https://serverless-us-west-2.instana.io"
+    zone: "us-west-2"
+    service_name: "tfo-agent"
+    host_id: "${HOSTNAME}"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 1000
+    flush_interval: 10s
+    tags:
+      environment: production
+```
+
+### Instana Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as TFO Agent
+    participant Instana as IBM Instana
+
+    Agent->>Instana: POST /metrics (X-INSTANA-KEY)
+    Agent->>Instana: POST /traces (spans)
+    Agent->>Instana: POST /events (logs as events)
+    Instana-->>Agent: 200 OK
+```
+
+## ManageEngine
+
+### Configuration
+
+```yaml
+integrations:
+  manageengine:
+    enabled: true
+    api_key: "${MANAGEENGINE_API_KEY}"
+    base_url: "https://opmanager.example.com:8060"
+    product: opmanager  # opmanager, site24x7, applications_manager
+    account_id: "${MANAGEENGINE_ACCOUNT_ID}"
+    monitor_group: "TelemetryFlow"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 500
+    flush_interval: 10s
+    tags:
+      environment: production
+```
+
+### Supported Products
+
+| Product                | Description                          |
+|------------------------|--------------------------------------|
+| `opmanager`            | ManageEngine OpManager (on-premise)  |
+| `site24x7`             | Site24x7 SaaS monitoring             |
+| `applications_manager` | Applications Manager APM             |
+
 ## Splunk
 
 ### Configuration
@@ -133,6 +257,7 @@ integrations:
     source_type: "tfo-agent"
     batch_size: 100
     timeout: 30s
+    tls_skip_verify: false
     metrics: true
     logs: true
 ```
@@ -307,6 +432,183 @@ integrations:
     batch_size: 100
     timeout: 30s
 ```
+
+## SigNoz
+
+[SigNoz](https://signoz.io/) is an open-source APM and observability platform built on OpenTelemetry. It provides a unified view of metrics, traces, and logs.
+
+### Configuration
+
+```yaml
+integrations:
+  signoz:
+    enabled: true
+    endpoint: "${SIGNOZ_ENDPOINT:-http://localhost:4318}"
+    access_token: "${SIGNOZ_ACCESS_TOKEN}"
+    # OTLP endpoints (auto-derived if not specified)
+    metrics_endpoint: ""
+    traces_endpoint: ""
+    logs_endpoint: ""
+    service_name: "tfo-agent"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 1000
+    flush_interval: 10s
+    tags:
+      source: tfo-agent
+```
+
+### SigNoz Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as TFO Agent
+    participant SigNoz as SigNoz
+
+    loop Every flush_interval
+        Agent->>Agent: Collect Telemetry
+        Agent->>SigNoz: POST /v1/metrics (OTLP)
+        Agent->>SigNoz: POST /v1/traces (OTLP)
+        Agent->>SigNoz: POST /v1/logs (OTLP)
+        SigNoz-->>Agent: 200 OK
+    end
+```
+
+## Coroot
+
+[Coroot](https://coroot.com/) is an open-source eBPF-based observability solution that provides automatic instrumentation and service map discovery.
+
+### Configuration
+
+```yaml
+integrations:
+  coroot:
+    enabled: true
+    endpoint: "${COROOT_ENDPOINT:-http://localhost:8080}"
+    api_key: "${COROOT_API_KEY}"
+    # OTLP endpoints (auto-derived if not specified)
+    metrics_endpoint: ""
+    traces_endpoint: ""
+    logs_endpoint: ""
+    service_name: "tfo-agent"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 100
+    flush_interval: 10s
+    tags:
+      source: tfo-agent
+```
+
+## HyperDX (ClickStack)
+
+[HyperDX](https://hyperdx.io/) (formerly ClickStack) is an open-source observability platform built on ClickHouse for fast log and trace analysis.
+
+### Configuration
+
+```yaml
+integrations:
+  hyperdx:
+    enabled: true
+    endpoint: "${HYPERDX_ENDPOINT:-https://in-otel.hyperdx.io}"
+    api_key: "${HYPERDX_API_KEY}"
+    # OTLP endpoints (auto-derived if not specified)
+    metrics_endpoint: ""
+    traces_endpoint: ""
+    logs_endpoint: ""
+    service_name: "tfo-agent"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 100
+    flush_interval: 10s
+    tags:
+      source: tfo-agent
+```
+
+### HyperDX Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as TFO Agent
+    participant HyperDX as HyperDX
+
+    loop Every flush_interval
+        Agent->>Agent: Collect Telemetry
+        Agent->>HyperDX: POST /v1/metrics (OTLP + API Key)
+        Agent->>HyperDX: POST /v1/traces (OTLP + API Key)
+        Agent->>HyperDX: POST /v1/logs (OTLP + API Key)
+        HyperDX-->>Agent: 200 OK
+    end
+```
+
+## OpenObserve
+
+[OpenObserve](https://openobserve.ai/) is an open-source observability platform optimized for logs, metrics, and traces with efficient storage and fast search capabilities.
+
+### Configuration
+
+```yaml
+integrations:
+  openobserve:
+    enabled: true
+    endpoint: "${OPENOBSERVE_ENDPOINT:-http://localhost:5080}"
+    username: "${OPENOBSERVE_USERNAME}"
+    password: "${OPENOBSERVE_PASSWORD}"
+    organization: "${OPENOBSERVE_ORG:-default}"
+    stream_name: "${OPENOBSERVE_STREAM:-default}"
+    # OTLP endpoints (auto-derived if not specified)
+    metrics_endpoint: ""
+    traces_endpoint: ""
+    logs_endpoint: ""
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 100
+    flush_interval: 10s
+    tags:
+      source: tfo-agent
+```
+
+### OpenObserve Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent as TFO Agent
+    participant OO as OpenObserve
+
+    loop Every flush_interval
+        Agent->>Agent: Collect Telemetry
+        Agent->>OO: POST /api/{org}/v1/metrics (OTLP)
+        Agent->>OO: POST /api/{org}/v1/traces (OTLP)
+        Agent->>OO: POST /api/{org}/_json (Logs)
+        OO-->>Agent: 200 OK
+    end
+```
+
+## Netdata
+
+[Netdata](https://netdata.cloud/) is a real-time infrastructure monitoring solution that focuses on system metrics with minimal overhead.
+
+### Configuration
+
+```yaml
+integrations:
+  netdata:
+    enabled: true
+    endpoint: "${NETDATA_ENDPOINT:-https://api.netdata.cloud}"
+    api_token: "${NETDATA_API_TOKEN}"
+    space_id: "${NETDATA_SPACE_ID}"
+    room_id: "${NETDATA_ROOM_ID}"
+    claim_token: "${NETDATA_CLAIM_TOKEN}"
+    metrics_endpoint: ""
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 1000
+    flush_interval: 10s
+    hostname_override: ""
+    tags:
+      source: tfo-agent
+```
+
+> **Note**: Netdata Cloud primarily supports metrics. Logs and traces are not natively supported.
 
 ## Webhook (Generic)
 

@@ -144,7 +144,12 @@ func (v *VMwareExporter) Init(ctx context.Context) error {
 		IdleConnTimeout:     90 * time.Second,
 	}
 	if v.config.TLSSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		// #nosec G402 -- InsecureSkipVerify is intentionally configurable for environments
+		// with self-signed certificates (common in VMware vCenter deployments)
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}
 	}
 
 	v.httpClient = &http.Client{

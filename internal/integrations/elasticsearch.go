@@ -104,7 +104,12 @@ func (e *ElasticsearchExporter) Init(ctx context.Context) error {
 	}
 
 	if e.config.TLSSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		// #nosec G402 -- InsecureSkipVerify is intentionally configurable for environments
+		// with self-signed certificates (common in Elasticsearch deployments)
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}
 	}
 
 	e.httpClient = &http.Client{

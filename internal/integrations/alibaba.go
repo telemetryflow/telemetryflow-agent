@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- SHA1 required by Alibaba Cloud API signature (HMAC-SHA1)
 	"encoding/base64"
 	"encoding/json"
 	"fmt"

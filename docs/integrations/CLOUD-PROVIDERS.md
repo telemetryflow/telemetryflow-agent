@@ -1,6 +1,6 @@
 # Cloud Provider Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.1-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
 
 This document covers cloud provider integrations for exporting telemetry data to major cloud platforms.
 

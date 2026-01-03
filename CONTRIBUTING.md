@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.1-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
@@ -134,14 +134,14 @@ telemetryflow-agent/
 
 ### Key Packages
 
-| Package | Description |
-|---------|-------------|
-| `cmd/tfo-agent` | Main entry point with Cobra CLI |
-| `internal/agent` | Core agent lifecycle management |
-| `internal/collector` | Telemetry collectors |
-| `internal/config` | Configuration parsing and validation |
-| `internal/exporter` | OTLP exporters |
-| `pkg/plugin` | Plugin registry for extensibility |
+| Package              | Description                          |
+| -------------------- | ------------------------------------ |
+| `cmd/tfo-agent`      | Main entry point with Cobra CLI      |
+| `internal/agent`     | Core agent lifecycle management      |
+| `internal/collector` | Telemetry collectors                 |
+| `internal/config`    | Configuration parsing and validation |
+| `internal/exporter`  | OTLP exporters                       |
+| `pkg/plugin`         | Plugin registry for extensibility    |
 
 ## Making Changes
 
@@ -179,6 +179,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 Types:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -307,20 +308,24 @@ make test-all
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] E2E tests added/updated
 
 ## Checklist
+
 - [ ] Code follows project style guidelines
 - [ ] Self-review completed
 - [ ] Documentation updated
@@ -420,6 +425,7 @@ func NewCollector(config *Config) *Collector {
 ### Recognition
 
 Contributors are recognized in:
+
 - Release notes
 - CONTRIBUTORS.md file
 - GitHub contributors page

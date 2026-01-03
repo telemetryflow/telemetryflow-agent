@@ -1,8 +1,8 @@
 # TelemetryFlow Agent Documentation
 
-- **Version:** 1.1.1
+- **Version:** 1.1.2
 - **OTEL SDK Version:** 1.39.0
-- **Last Updated:** December 2025
+- **Last Updated:** January 2026
 - **Status:** Production Ready
 
 ---
@@ -28,7 +28,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.1.1"
+    subgraph "TelemetryFlow Ecosystem v1.1.2"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.39.0]
         end
@@ -55,9 +55,9 @@ graph LR
 
 | Component | Version | OTEL Base | Description |
 |-----------|---------|-----------|-------------|
-| **TFO-Agent** | v1.1.1 | SDK v1.39.0 | Telemetry collection agent |
-| **TFO-Go-SDK** | v1.1.1 | SDK v1.39.0 | Go instrumentation SDK |
-| **TFO-Collector** | v1.1.1 | Collector v0.142.0 | Central telemetry collector |
+| **TFO-Agent** | v1.1.2 | SDK v1.39.0 | Telemetry collection agent |
+| **TFO-Go-SDK** | v1.1.2 | SDK v1.39.0 | Go instrumentation SDK |
+| **TFO-Collector** | v1.1.2 | Collector v0.142.0 | Central telemetry collector |
 
 This alignment ensures:
 - **Consistent telemetry format** across all components
@@ -69,6 +69,8 @@ This alignment ensures:
 
 ## Documentation Index
 
+### Core Documentation
+
 | Document | Description |
 |----------|-------------|
 | [README.md](README.md) | This file - Overview and quick reference |
@@ -76,9 +78,21 @@ This alignment ensures:
 | [CONFIGURATION.md](CONFIGURATION.md) | Configuration reference |
 | [COMMANDS.md](COMMANDS.md) | CLI commands reference |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Internal architecture with Mermaid diagrams |
+| [SYSTEM-INFO.md](SYSTEM-INFO.md) | System information collection capabilities (130+ metrics) |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development guide, coding standards, and testing |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting guide and common issues |
 | [GITHUB-WORKFLOWS.md](GITHUB-WORKFLOWS.md) | CI/CD workflows documentation |
+
+### Integration Documentation
+
+| Document | Description |
+|----------|-------------|
+| [integrations/README.md](integrations/README.md) | Integration overview and architecture |
+| [integrations/CLOUD-PROVIDERS.md](integrations/CLOUD-PROVIDERS.md) | GCP, Azure, Alibaba Cloud |
+| [integrations/INFRASTRUCTURE.md](integrations/INFRASTRUCTURE.md) | Proxmox, VMware, Nutanix, Azure Arc |
+| [integrations/NETWORK.md](integrations/NETWORK.md) | Cisco, SNMP, MQTT integrations |
+| [integrations/KERNEL.md](integrations/KERNEL.md) | eBPF kernel-level observability |
+| [integrations/OBSERVABILITY.md](integrations/OBSERVABILITY.md) | APM platforms (Dynatrace, Instana, etc.) |
 
 ---
 

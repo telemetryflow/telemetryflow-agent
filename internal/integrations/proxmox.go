@@ -147,7 +147,12 @@ func (p *ProxmoxExporter) Init(ctx context.Context) error {
 		IdleConnTimeout:     90 * time.Second,
 	}
 	if p.config.TLSSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		// #nosec G402 -- InsecureSkipVerify is intentionally configurable for environments
+		// with self-signed certificates (common in Proxmox VE deployments)
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}
 	}
 
 	p.httpClient = &http.Client{

@@ -1397,3 +1397,458 @@ func TestEBPFExporterConcurrentAccess(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// Cilium Hubble Configuration Tests
+// =============================================================================
+
+func TestCiliumConfigDefaults(t *testing.T) {
+	config := integrations.CiliumConfig{}
+
+	assert.False(t, config.Enabled)
+	assert.Empty(t, config.HubbleAddress)
+	assert.False(t, config.HubbleTLSEnabled)
+	assert.Empty(t, config.HubbleTLSCertPath)
+	assert.Empty(t, config.HubbleTLSKeyPath)
+	assert.Empty(t, config.HubbleTLSCAPath)
+	assert.False(t, config.CollectFlows)
+	assert.False(t, config.CollectL7Flows)
+	assert.False(t, config.CollectDrops)
+	assert.False(t, config.CollectPolicies)
+	assert.False(t, config.CollectServices)
+	assert.False(t, config.KubernetesEnabled)
+	assert.Nil(t, config.WatchNamespaces)
+	assert.Nil(t, config.ExcludeNamespaces)
+	assert.Equal(t, 0, config.FlowBufferSize)
+	assert.Equal(t, 0, config.FlowSampleRate)
+	assert.Equal(t, 0, config.MaxFlowsPerSecond)
+	assert.Equal(t, time.Duration(0), config.AggregationWindow)
+}
+
+func TestNewEBPFExporterWithCilium(t *testing.T) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "hubble-relay:4245",
+			CollectFlows:      true,
+			CollectL7Flows:    true,
+			CollectDrops:      true,
+			KubernetesEnabled: true,
+		},
+	}
+
+	exporter := integrations.NewEBPFExporter(config, logger)
+
+	require.NotNil(t, exporter)
+	assert.Equal(t, "ebpf", exporter.Name())
+	assert.True(t, exporter.IsEnabled())
+}
+
+func TestNewEBPFExporterWithCiliumDisabled(t *testing.T) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled: false,
+		},
+	}
+
+	exporter := integrations.NewEBPFExporter(config, logger)
+
+	require.NotNil(t, exporter)
+	assert.True(t, exporter.IsEnabled())
+}
+
+func TestNewEBPFExporterWithCiliumTLS(t *testing.T) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "hubble-relay.kube-system.svc:4245",
+			HubbleTLSEnabled:  true,
+			HubbleTLSCertPath: "/etc/hubble/tls.crt",
+			HubbleTLSKeyPath:  "/etc/hubble/tls.key",
+			HubbleTLSCAPath:   "/etc/hubble/ca.crt",
+			CollectFlows:      true,
+		},
+	}
+
+	exporter := integrations.NewEBPFExporter(config, logger)
+
+	require.NotNil(t, exporter)
+	assert.True(t, exporter.IsEnabled())
+}
+
+func TestNewEBPFExporterWithCiliumNamespaceFilters(t *testing.T) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "localhost:4245",
+			KubernetesEnabled: true,
+			WatchNamespaces:   []string{"production", "staging"},
+			ExcludeNamespaces: []string{"kube-system", "cilium"},
+			CollectFlows:      true,
+		},
+	}
+
+	exporter := integrations.NewEBPFExporter(config, logger)
+
+	require.NotNil(t, exporter)
+	assert.True(t, exporter.IsEnabled())
+}
+
+func TestNewEBPFExporterWithCiliumPerformanceSettings(t *testing.T) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "localhost:4245",
+			CollectFlows:      true,
+			FlowBufferSize:    8192,
+			FlowSampleRate:    10,
+			MaxFlowsPerSecond: 5000,
+			AggregationWindow: 30 * time.Second,
+		},
+	}
+
+	exporter := integrations.NewEBPFExporter(config, logger)
+
+	require.NotNil(t, exporter)
+	assert.True(t, exporter.IsEnabled())
+}
+
+func TestNewEBPFExporterWithCiliumAllCollectors(t *testing.T) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "localhost:4245",
+			CollectFlows:      true,
+			CollectL7Flows:    true,
+			CollectDrops:      true,
+			CollectPolicies:   true,
+			CollectServices:   true,
+			KubernetesEnabled: true,
+		},
+	}
+
+	exporter := integrations.NewEBPFExporter(config, logger)
+
+	require.NotNil(t, exporter)
+	assert.True(t, exporter.IsEnabled())
+}
+
+// =============================================================================
+// Cilium Hubble Init Tests
+// =============================================================================
+
+func TestEBPFExporterInitWithCilium(t *testing.T) {
+	logger := zap.NewNop()
+	ctx := context.Background()
+
+	t.Run("init with cilium enabled on non-linux", func(t *testing.T) {
+		if runtime.GOOS == "linux" {
+			t.Skip("Skipping non-Linux test on Linux")
+		}
+		config := integrations.EBPFConfig{
+			Enabled: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled:       true,
+				HubbleAddress: "localhost:4245",
+				CollectFlows:  true,
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		err := exporter.Init(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Linux")
+	})
+
+	t.Run("init with cilium sets default address", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectFlows: true,
+				// HubbleAddress left empty - should default to localhost:4245
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		err := exporter.Init(ctx)
+		// On non-Linux, will fail with platform error
+		if runtime.GOOS != "linux" {
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "Linux")
+		}
+	})
+
+	t.Run("init with cilium sets default buffer size", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectFlows: true,
+				// FlowBufferSize left as 0 - should default to 4096
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		err := exporter.Init(ctx)
+		if runtime.GOOS != "linux" {
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "Linux")
+		}
+	})
+
+	t.Run("init with cilium enables default collectors", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled: true,
+				// No collectors specified - should enable CollectFlows and CollectDrops
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		err := exporter.Init(ctx)
+		if runtime.GOOS != "linux" {
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "Linux")
+		}
+	})
+}
+
+// =============================================================================
+// Cilium Hubble Collector Combinations Tests
+// =============================================================================
+
+func TestEBPFExporterWithCiliumCollectorCombinations(t *testing.T) {
+	logger := zap.NewNop()
+
+	testCases := []struct {
+		name   string
+		config integrations.CiliumConfig
+	}{
+		{
+			name: "flows only",
+			config: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectFlows: true,
+			},
+		},
+		{
+			name: "l7 flows only",
+			config: integrations.CiliumConfig{
+				Enabled:        true,
+				CollectL7Flows: true,
+			},
+		},
+		{
+			name: "drops only",
+			config: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectDrops: true,
+			},
+		},
+		{
+			name: "policies only",
+			config: integrations.CiliumConfig{
+				Enabled:         true,
+				CollectPolicies: true,
+			},
+		},
+		{
+			name: "services only",
+			config: integrations.CiliumConfig{
+				Enabled:         true,
+				CollectServices: true,
+			},
+		},
+		{
+			name: "flows and drops",
+			config: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectFlows: true,
+				CollectDrops: true,
+			},
+		},
+		{
+			name: "l7 and policies",
+			config: integrations.CiliumConfig{
+				Enabled:         true,
+				CollectL7Flows:  true,
+				CollectPolicies: true,
+			},
+		},
+		{
+			name: "all collectors",
+			config: integrations.CiliumConfig{
+				Enabled:         true,
+				CollectFlows:    true,
+				CollectL7Flows:  true,
+				CollectDrops:    true,
+				CollectPolicies: true,
+				CollectServices: true,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := integrations.EBPFConfig{
+				Enabled: true,
+				Cilium:  tc.config,
+			}
+			exporter := integrations.NewEBPFExporter(config, logger)
+			require.NotNil(t, exporter)
+			assert.True(t, exporter.IsEnabled())
+		})
+	}
+}
+
+// =============================================================================
+// Cilium Hubble with eBPF Collector Combinations Tests
+// =============================================================================
+
+func TestEBPFExporterWithBothEBPFAndCilium(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("ebpf syscalls with cilium flows", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled:         true,
+			CollectSyscalls: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectFlows: true,
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		require.NotNil(t, exporter)
+		assert.True(t, exporter.IsEnabled())
+	})
+
+	t.Run("ebpf network with cilium l7", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled:        true,
+			CollectNetwork: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled:        true,
+				CollectL7Flows: true,
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		require.NotNil(t, exporter)
+		assert.True(t, exporter.IsEnabled())
+	})
+
+	t.Run("all ebpf with all cilium", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled:          true,
+			CollectSyscalls:  true,
+			CollectNetwork:   true,
+			CollectFileIO:    true,
+			CollectScheduler: true,
+			CollectMemory:    true,
+			CollectTCPEvents: true,
+			Cilium: integrations.CiliumConfig{
+				Enabled:           true,
+				HubbleAddress:     "hubble-relay:4245",
+				CollectFlows:      true,
+				CollectL7Flows:    true,
+				CollectDrops:      true,
+				CollectPolicies:   true,
+				CollectServices:   true,
+				KubernetesEnabled: true,
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		require.NotNil(t, exporter)
+		assert.True(t, exporter.IsEnabled())
+	})
+
+	t.Run("cilium only without ebpf collectors", func(t *testing.T) {
+		config := integrations.EBPFConfig{
+			Enabled: true,
+			// No eBPF collectors enabled
+			Cilium: integrations.CiliumConfig{
+				Enabled:      true,
+				CollectFlows: true,
+				CollectDrops: true,
+			},
+		}
+		exporter := integrations.NewEBPFExporter(config, logger)
+		require.NotNil(t, exporter)
+		assert.True(t, exporter.IsEnabled())
+	})
+}
+
+// =============================================================================
+// Cilium Hubble Benchmark Tests
+// =============================================================================
+
+func BenchmarkNewEBPFExporterWithCilium(b *testing.B) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled: true,
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "localhost:4245",
+			CollectFlows:      true,
+			CollectL7Flows:    true,
+			CollectDrops:      true,
+			KubernetesEnabled: true,
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		integrations.NewEBPFExporter(config, logger)
+	}
+}
+
+func BenchmarkNewEBPFExporterWithCiliumAllOptions(b *testing.B) {
+	logger := zap.NewNop()
+	config := integrations.EBPFConfig{
+		Enabled:          true,
+		CollectSyscalls:  true,
+		CollectNetwork:   true,
+		CollectFileIO:    true,
+		CollectScheduler: true,
+		CollectMemory:    true,
+		CollectTCPEvents: true,
+		Labels: map[string]string{
+			"environment": "production",
+			"cluster":     "k8s-prod",
+		},
+		Cilium: integrations.CiliumConfig{
+			Enabled:           true,
+			HubbleAddress:     "hubble-relay.kube-system.svc:4245",
+			HubbleTLSEnabled:  true,
+			HubbleTLSCertPath: "/etc/hubble/tls.crt",
+			HubbleTLSKeyPath:  "/etc/hubble/tls.key",
+			HubbleTLSCAPath:   "/etc/hubble/ca.crt",
+			CollectFlows:      true,
+			CollectL7Flows:    true,
+			CollectDrops:      true,
+			CollectPolicies:   true,
+			CollectServices:   true,
+			KubernetesEnabled: true,
+			WatchNamespaces:   []string{"production", "staging"},
+			ExcludeNamespaces: []string{"kube-system", "cilium"},
+			FlowBufferSize:    8192,
+			FlowSampleRate:    1,
+			MaxFlowsPerSecond: 10000,
+			AggregationWindow: 10 * time.Second,
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		integrations.NewEBPFExporter(config, logger)
+	}
+}

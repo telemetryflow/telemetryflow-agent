@@ -159,8 +159,11 @@ func (m *MQTTExporter) Init(ctx context.Context) error {
 
 	// Configure TLS if enabled
 	if m.config.TLSEnabled {
+		// #nosec G402 -- InsecureSkipVerify is intentionally configurable for environments
+		// with self-signed certificates (common in enterprise MQTT deployments)
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: m.config.TLSSkipVerify,
+			MinVersion:         tls.VersionTLS12,
 		}
 		m.tlsConfig = tlsConfig
 	}

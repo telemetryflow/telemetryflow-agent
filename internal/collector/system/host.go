@@ -702,7 +702,7 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 			}
 			// Count threads
 			numThreads, err := p.NumThreads()
-			if err == nil {
+			if err == nil && numThreads >= 0 {
 				info.ThreadCount += uint64(numThreads)
 			}
 		}
@@ -772,8 +772,13 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 	// Agent Metadata
 	// ==========================================================================
 	info.AgentVersion = version.Version
-	info.AgentStartTime = uint64(agentStartTime.Unix())
-	info.AgentUptime = uint64(time.Since(agentStartTime).Seconds())
+	// Safe conversion with bounds checking to prevent integer overflow (gosec G115)
+	if unixTime := agentStartTime.Unix(); unixTime >= 0 {
+		info.AgentStartTime = uint64(unixTime)
+	}
+	if uptime := time.Since(agentStartTime).Seconds(); uptime >= 0 {
+		info.AgentUptime = uint64(uptime)
+	}
 	info.CollectionTime = time.Now().Unix()
 	info.CollectionDuration = time.Since(startTime).Nanoseconds()
 
@@ -886,6 +891,7 @@ func detectVirtualization() (bool, string) {
 		}
 
 		for _, path := range paths {
+			// #nosec G304 -- paths are hardcoded system paths for virtualization detection
 			if data, err := os.ReadFile(path); err == nil {
 				content := strings.ToLower(string(data))
 				if strings.Contains(content, "vmware") {

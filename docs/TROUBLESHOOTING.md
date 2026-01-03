@@ -1,7 +1,7 @@
 # TelemetryFlow Agent Troubleshooting Guide
 
-- **Version:** 1.1.1
-- **Last Updated:** December 2025
+- **Version:** 1.1.2
+- **Last Updated:** January 2026
 
 ---
 
@@ -475,7 +475,7 @@ tail -f /var/log/tfo-agent/agent.log
 
 **Successful startup:**
 ```json
-{"level":"info","msg":"Starting TelemetryFlow Agent","version":"1.1.1"}
+{"level":"info","msg":"Starting TelemetryFlow Agent","version":"1.1.2"}
 {"level":"info","msg":"Configuration loaded","file":"config.yaml"}
 {"level":"info","msg":"Agent started","id":"agent-001","hostname":"server-01"}
 {"level":"info","msg":"Starting OTLP exporter","endpoint":"localhost:4317"}
@@ -505,7 +505,7 @@ tail -f /var/log/tfo-agent/agent.log
 curl http://localhost:13133/
 
 # Expected response
-{"status":"healthy","version":"1.1.1"}
+{"status":"healthy","version":"1.1.2"}
 ```
 
 ### Metrics Endpoint

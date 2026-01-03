@@ -32,7 +32,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		ProductName: "TelemetryFlow Agent",
-		Version:     "1.1.1",
+		Version:     "1.1.2",
 		Motto:       "Community Enterprise Observability Platform (CEOP)",
 		GitCommit:   "unknown",
 		BuildTime:   "unknown",

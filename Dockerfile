@@ -27,7 +27,7 @@
 FROM golang:1.24-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.1.1
+ARG VERSION=1.1.2
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
@@ -50,10 +50,10 @@ COPY . .
 # Build the binary with version information
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags "-s -w \
-        -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.Version=${VERSION}' \
-        -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.GitCommit=${GIT_COMMIT}' \
-        -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.GitBranch=${GIT_BRANCH}' \
-        -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.BuildTime=${BUILD_TIME}'" \
+    -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.Version=${VERSION}' \
+    -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.GitCommit=${GIT_COMMIT}' \
+    -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.GitBranch=${GIT_BRANCH}' \
+    -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.BuildTime=${BUILD_TIME}'" \
     -o /tfo-agent ./cmd/tfo-agent
 
 # Verify binary
@@ -68,20 +68,20 @@ FROM alpine:3.21
 # TelemetryFlow Metadata Labels (OCI Image Spec)
 # =============================================================================
 LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
-      org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
-      org.opencontainers.image.version="1.1.1" \
-      org.opencontainers.image.vendor="TelemetryFlow" \
-      org.opencontainers.image.authors="DevOpsCorner Indonesia <support@devopscorner.id>" \
-      org.opencontainers.image.url="https://telemetryflow.id" \
-      org.opencontainers.image.documentation="https://docs.telemetryflow.id" \
-      org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-platform" \
-      org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.base.name="alpine:3.21" \
-      # TelemetryFlow specific labels
-      io.telemetryflow.product="TelemetryFlow Agent" \
-      io.telemetryflow.component="tfo-agent" \
-      io.telemetryflow.platform="CEOP" \
-      io.telemetryflow.maintainer="DevOpsCorner Indonesia"
+    org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
+    org.opencontainers.image.version="1.1.2" \
+    org.opencontainers.image.vendor="TelemetryFlow" \
+    org.opencontainers.image.authors="DevOpsCorner Indonesia <support@devopscorner.id>" \
+    org.opencontainers.image.url="https://telemetryflow.id" \
+    org.opencontainers.image.documentation="https://docs.telemetryflow.id" \
+    org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-platform" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.base.name="alpine:3.21" \
+    # TelemetryFlow specific labels
+    io.telemetryflow.product="TelemetryFlow Agent" \
+    io.telemetryflow.component="tfo-agent" \
+    io.telemetryflow.platform="CEOP" \
+    io.telemetryflow.maintainer="DevOpsCorner Indonesia"
 
 # Update packages to get security patches (CVE fixes) and install runtime dependencies
 RUN apk upgrade --no-cache && \
@@ -145,11 +145,11 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 # =============================================================================
 # Build with:
 #   docker build \
-#     --build-arg VERSION=1.1.1 \
+#     --build-arg VERSION=1.1.2 \
 #     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
 #     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
 #     --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-#     -t telemetryflow/telemetryflow-agent:1.1.1 .
+#     -t telemetryflow/telemetryflow-agent:1.1.2 .
 #
 # Run with:
 #   docker run -d \
@@ -160,5 +160,5 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 #     -p 13133:13133 \
 #     -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
 #     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-#     telemetryflow/telemetryflow-agent:1.1.1
+#     telemetryflow/telemetryflow-agent:1.1.2
 # =============================================================================

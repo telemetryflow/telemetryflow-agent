@@ -1,6 +1,6 @@
 # Network & IoT Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.1-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
 
 This document covers network device and IoT messaging integrations.
 

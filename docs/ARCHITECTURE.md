@@ -59,7 +59,7 @@ graph LR
     end
 
     subgraph "SDKs"
-        SDK[TFO-Go-SDK<br/>v1.1.1]
+        SDK[TFO-Go-SDK<br/>v1.1.2]
     end
 
     subgraph "Agents"
@@ -116,6 +116,168 @@ sequenceDiagram
         Backend-->>Agent: ACK
     end
 ```
+
+## System Information Payload
+
+The agent collects comprehensive system information and submits it to the backend via heartbeat. This enables full infrastructure visibility in the TelemetryFlow Platform.
+
+### Collected Data Categories
+
+```mermaid
+graph TB
+    subgraph "System Information Payload"
+        HOST[Host Info]
+        CPU[CPU Info]
+        MEM[Memory Info]
+        DISK[Disk Info]
+        NET[Network Info]
+        PROC[Process Info]
+        SYS[System Resources]
+        CONT[Container/VM]
+        CLOUD[Cloud Metadata]
+        AGENT[Agent Metadata]
+    end
+
+    PAYLOAD[SystemInfoPayload<br/>100+ fields]
+    API[POST /agents/id/heartbeat]
+
+    HOST -->|hostname, os, platform, kernel, uptime| PAYLOAD
+    CPU -->|cores, model, usage%, load avg, per-core| PAYLOAD
+    MEM -->|total, used, available, cached, swap| PAYLOAD
+    DISK -->|total, used, I/O, latency, partitions| PAYLOAD
+    NET -->|bytes, packets, errors, TCP states, interfaces| PAYLOAD
+    PROC -->|count, running, zombie, threads, ctx switches| PAYLOAD
+    SYS -->|file descriptors, entropy| PAYLOAD
+    CONT -->|container ID, runtime, image| PAYLOAD
+    CLOUD -->|provider, instance, region, zone| PAYLOAD
+    AGENT -->|version, uptime, collection time| PAYLOAD
+
+    PAYLOAD --> API
+```
+
+### Data Fields Reference
+
+**Host Information** - Host identification and OS details
+
+- `hostname`, `os`, `osVersion`, `platform`, `platformFamily`
+- `kernelVersion`, `architecture`, `uptime`, `bootTime`, `hostId`, `timezone`
+
+**CPU Information** - CPU specifications and utilization
+
+- `cpuCores`, `cpuLogicalCores`, `cpuPhysicalCores`, `cpuModel`, `cpuVendor`, `cpuMhz`, `cpuCacheSize`
+- `cpuUsage`, `cpuUserPercent`, `cpuSystemPercent`, `cpuIdlePercent`, `cpuIowaitPercent`, `cpuStealPercent`
+- `loadAvg1`, `loadAvg5`, `loadAvg15`, `cpuPerCore[]`
+
+**Memory Information** - Memory and swap statistics
+
+- `memoryTotal`, `memoryUsed`, `memoryAvailable`, `memoryFree`, `memoryUsage`
+- `memoryCached`, `memoryBuffers`, `memoryActive`, `memoryInactive`, `memoryWired`, `memorySlab`
+- `swapTotal`, `swapUsed`, `swapFree`, `swapUsage`, `swapIn`, `swapOut`
+
+**Disk Information** - Storage capacity and I/O metrics
+
+- `diskTotal`, `diskUsed`, `diskAvailable`, `diskUsage`, `diskInodes`
+- `diskReadBytes`, `diskWriteBytes`, `diskReadOps`, `diskWriteOps`, `diskIOTime`
+- `diskLatencyRead`, `diskLatencyWrite`, `diskPartitions[]`
+
+**Network Information** - Network traffic and TCP states
+
+- `networkBytesSent`, `networkBytesRecv`, `networkPacketsSent`, `networkPacketsRecv`
+- `networkErrorsIn`, `networkErrorsOut`, `networkDropsIn`, `networkDropsOut`
+- `tcpConnectionsEstablished`, `tcpConnectionsTimeWait`, `tcpConnectionsCloseWait`, `tcpConnectionsListen`
+- `networkInterfaces[]`
+
+**Process Information** - Process and scheduling statistics
+
+- `processCount`, `processRunning`, `processSleeping`, `processStopped`, `processZombie`, `processBlocked`
+- `threadCount`, `contextSwitches`, `interrupts`, `softInterrupts`
+
+**System Resources** - System resource limits
+
+- `openFileDescriptors`, `maxFileDescriptors`, `fileDescriptorsUsage`, `entropyAvailable`
+
+**Container Detection** - Docker, containerd, cri-o
+
+- `isContainer`, `containerId`, `containerRuntime`, `containerName`, `containerImage`
+
+**Virtualization Detection** - KVM, VMware, Xen, Hyper-V
+
+- `isVirtualized`, `virtualizationType`
+
+**Cloud Metadata** - AWS, GCP, Azure
+
+- `cloudProvider`, `cloudInstanceId`, `cloudInstanceType`, `cloudRegion`, `cloudZone`
+
+**Agent Metadata** - Agent telemetry
+
+- `agentVersion`, `agentStartTime`, `agentUptime`, `collectionTime`, `collectionDuration`
+
+### Heartbeat Data Flow
+
+```mermaid
+sequenceDiagram
+    participant Host as Host System
+    participant Collector as HostCollector
+    participant Heartbeat as Heartbeat
+    participant API as TelemetryFlow API
+
+    loop Every 60s (Heartbeat Interval)
+        Collector->>Host: Collect system metrics
+        Host-->>Collector: CPU, Memory, Disk, Network, Process...
+
+        Collector->>Collector: GetSystemInfo()
+        Note right of Collector: 100+ fields collected<br/>including container/cloud detection
+
+        Collector->>Heartbeat: SystemInfo
+        Heartbeat->>Heartbeat: mapSystemInfoToPayload()
+
+        Heartbeat->>API: POST /agents/{agentId}/heartbeat
+        Note right of Heartbeat: Content-Type: application/json<br/>X-API-Key-ID: tfk_xxx<br/>X-API-Key-Secret: tfs_xxx
+
+        API-->>Heartbeat: 200 OK
+    end
+```
+
+### Example Payload
+
+```json
+{
+  "systemInfo": {
+    "hostname": "prod-server-01",
+    "os": "linux",
+    "osVersion": "22.04",
+    "platform": "ubuntu",
+    "kernelVersion": "5.15.0-91-generic",
+    "architecture": "amd64",
+    "uptime": 864000,
+    "cpuCores": 8,
+    "cpuModel": "Intel(R) Xeon(R) CPU E5-2686 v4",
+    "cpuUsage": 45.2,
+    "loadAvg1": 2.1,
+    "loadAvg5": 1.8,
+    "loadAvg15": 1.5,
+    "memoryTotal": 17179869184,
+    "memoryUsed": 12884901888,
+    "memoryUsage": 75.0,
+    "diskTotal": 107374182400,
+    "diskUsed": 53687091200,
+    "diskUsage": 50.0,
+    "networkBytesSent": 1073741824,
+    "networkBytesRecv": 2147483648,
+    "tcpConnectionsEstablished": 150,
+    "processCount": 245,
+    "threadCount": 1200,
+    "isContainer": true,
+    "containerRuntime": "docker",
+    "cloudProvider": "aws",
+    "cloudRegion": "us-west-2",
+    "agentVersion": "1.1.2",
+    "agentUptime": 86400
+  }
+}
+```
+
+---
 
 ## Configuration Structure
 
@@ -349,9 +511,9 @@ graph TD
 ```mermaid
 graph LR
     subgraph "TelemetryFlow Ecosystem"
-        SDK[TFO-GO-SDK<br/>v1.1.1]
-        AGENT[TFO-Agent<br/>v1.1.1]
-        COLL[TFO-Collector<br/>v1.1.1]
+        SDK[TFO-GO-SDK<br/>v1.1.2]
+        AGENT[TFO-Agent<br/>v1.1.2]
+        COLL[TFO-Collector<br/>v1.1.2]
     end
 
     subgraph "OpenTelemetry"
