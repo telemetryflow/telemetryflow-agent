@@ -44,7 +44,7 @@ RED := \033[0;31m
 NC := \033[0m
 
 .PHONY: all build build-all build-linux build-darwin clean test test-unit test-integration test-e2e test-all test-coverage test-script test-short bench \
-	run dev deps deps-update tidy lint lint-fix fmt vet check validate-config install uninstall ci release-check docs godoc \
+	test-run test-list run dev deps deps-update tidy lint lint-fix fmt vet check validate-config install uninstall ci release-check docs godoc \
 	docker-build docker-push version help fmt-check staticcheck verify deps-verify test-unit-ci test-integration-ci test-e2e-ci \
 	security govulncheck coverage-merge coverage-report ci-lint ci-test ci-build
 
@@ -73,6 +73,8 @@ help:
 	@echo "  make test-integration - Run integration tests only"
 	@echo "  make test-unit        - Run unit tests only"
 	@echo "  make test-all         - Run all tests"
+	@echo "  make test-run         - Run specific test (PKG=<pkg> TEST=<name>)"
+	@echo "  make test-list        - List available test packages"
 	@echo "  make test-coverage    - Run tests with coverage report"
 	@echo "  make test-script      - Run test script"
 	@echo "  make test-short       - Run short tests (skip E2E)"
@@ -183,6 +185,27 @@ test-short:
 bench:
 	@echo "$(GREEN)Running benchmarks...$(NC)"
 	@$(GOTEST) -bench=. -benchmem ./...
+
+## Run specific test (usage: make test-run PKG=integrations or TEST=TestPerconaCollector)
+test-run:
+	@if [ -n "$(PKG)" ] && [ -n "$(TEST)" ]; then \
+		./scripts/test-specific.sh $(PKG):$(TEST); \
+	elif [ -n "$(PKG)" ]; then \
+		./scripts/test-specific.sh $(PKG); \
+	elif [ -n "$(TEST)" ]; then \
+		./scripts/test-specific.sh $(TEST); \
+	else \
+		echo "$(YELLOW)Usage: make test-run PKG=<package> TEST=<test-name>$(NC)"; \
+		echo "  Examples:"; \
+		echo "    make test-run PKG=integrations"; \
+		echo "    make test-run TEST=TestPerconaCollector"; \
+		echo "    make test-run PKG=domain/agent TEST=TestAgentStart"; \
+		./scripts/test-specific.sh -l; \
+	fi
+
+## List available test packages
+test-list:
+	@./scripts/test-specific.sh -l
 
 ## Dependencies
 deps:

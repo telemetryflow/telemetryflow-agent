@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1210,9 +1211,9 @@ func TestPerconaExporterConcurrentExports(t *testing.T) {
 	logger := zap.NewNop()
 	ctx := context.Background()
 
-	requestCount := 0
+	var requestCount int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -1253,7 +1254,7 @@ func TestPerconaExporterConcurrentExports(t *testing.T) {
 		<-done
 	}
 
-	assert.Equal(t, concurrency, requestCount)
+	assert.Equal(t, int32(concurrency), atomic.LoadInt32(&requestCount))
 }
 
 // Benchmark tests
