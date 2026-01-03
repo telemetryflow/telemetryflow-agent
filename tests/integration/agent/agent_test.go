@@ -37,7 +37,7 @@ func TestAgentIntegration(t *testing.T) {
 		// Use sync.WaitGroup for proper synchronization
 		var wg sync.WaitGroup
 		errChan := make(chan error, 1)
-		
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -79,7 +79,7 @@ func TestAgentIntegration(t *testing.T) {
 			// Use sync.WaitGroup for proper synchronization
 			var wg sync.WaitGroup
 			errChan := make(chan error, 1)
-			
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -92,12 +92,12 @@ func TestAgentIntegration(t *testing.T) {
 
 			// Stop agent
 			cancel()
-			
+
 			// Wait for goroutine to complete
 			wg.Wait()
 			err = <-errChan
 			assert.NoError(t, err)
-			
+
 			// Ensure agent is fully stopped
 			time.Sleep(50 * time.Millisecond)
 			assert.False(t, ag.IsRunning(), "Agent should be stopped")
