@@ -1,7 +1,7 @@
 # TelemetryFlow Agent Development Guide
 
 - **Version:** 1.1.1
-- **Last Updated:** December 2025
+- **Last Updated:** January 2026
 - **Go Version:** 1.24+
 - **OTEL SDK Version:** 1.39.0
 
@@ -213,41 +213,119 @@ func (e *OTLPExporter) Start(ctx context.Context) error {
 ### Running Tests
 
 ```bash
-# Run all unit tests
-make test
-
-# Run tests with verbose output
-make test-verbose
+# Run all tests
+make test                    # Run unit and integration tests
+make test-all                # Run unit, integration, and E2E tests
+make test-unit               # Run unit tests only
+make test-integration        # Run integration tests only
+make test-e2e                # Run E2E tests only
 
 # Run tests with race detector (CI mode)
 make ci-test
 
 # Run tests with coverage
 make test-coverage
+```
 
-# Run specific test
-go test -v -run TestNewOTLPExporter ./tests/unit/...
+### Running Specific Tests
+
+Use the `test-specific.sh` script or `make test-run` for targeted test execution:
+
+```bash
+# Using make targets
+make test-run PKG=integrations                      # Run all integration tests
+make test-run PKG=domain/agent                      # Run agent domain tests
+make test-run TEST=TestPerconaCollector             # Run test by name pattern
+make test-run PKG=integrations TEST=TestKafka       # Run specific test in package
+make test-list                                       # List available test packages
+
+# Using test script directly
+./scripts/test-specific.sh integrations             # Run all integration tests
+./scripts/test-specific.sh domain/agent             # Run agent domain tests
+./scripts/test-specific.sh TestPerconaCollector     # Run test by name pattern
+./scripts/test-specific.sh integrations:TestKafka   # Run specific test in package
+```
+
+### Test Script Options
+
+| Option            | Description                               |
+| ----------------- | ----------------------------------------- |
+| `-h, --help`      | Show help message                         |
+| `-l, --list`      | List all available test packages          |
+| `-q, --quiet`     | Quiet mode (no verbose output)            |
+| `-c, --coverage`  | Generate coverage report                  |
+| `-r, --race`      | Enable race detector                      |
+| `-s, --short`     | Run in short mode (skip long tests)       |
+| `-t, --timeout`   | Set test timeout (default: 5m)            |
+| `-n, --count`     | Run tests N times (default: 1)            |
+| `--ci`            | CI mode (race + coverage + 10m timeout)   |
+
+### Test Script Examples
+
+```bash
+# Run with coverage
+./scripts/test-specific.sh -c infrastructure/buffer
+
+# Run with race detector
+./scripts/test-specific.sh -r TestExporter
+
+# Run multiple times to detect flaky tests
+./scripts/test-specific.sh -n 5 TestHeartbeat
+
+# CI mode (race detection + coverage)
+./scripts/test-specific.sh --ci domain
+
+# Quiet mode with timeout
+./scripts/test-specific.sh -q -t 10m integrations
 ```
 
 ### Test Organization
 
-Tests are organized by layer:
+Tests are organized by layer following Domain-Driven Design (DDD):
 
 ```
 tests/
 ├── unit/                   # Unit tests (isolated, fast)
-│   ├── application/        # CLI and main tests
+│   ├── application/        # CLI and main tests (3 files)
 │   ├── domain/             # Domain logic tests
-│   │   ├── agent/          # Agent tests
-│   │   └── telemetry/      # Collector tests
-│   └── infrastructure/     # Infrastructure tests
-│       ├── api/            # API client tests
-│       ├── buffer/         # Buffer tests
-│       ├── config/         # Config tests
-│       └── exporter/       # Exporter tests
+│   │   ├── agent/          # Agent lifecycle tests (2 files)
+│   │   ├── plugin/         # Plugin registry tests (1 file)
+│   │   └── telemetry/      # Collector tests (2 files)
+│   ├── infrastructure/     # Infrastructure tests
+│   │   ├── api/            # API client tests (1 file)
+│   │   ├── buffer/         # Buffer tests (1 file)
+│   │   ├── config/         # Config tests (1 file)
+│   │   └── exporter/       # Exporter tests (3 files)
+│   ├── integrations/       # 3rd party integration tests (31 files)
+│   └── presentation/       # Presentation layer tests
+│       └── banner/         # Banner tests (1 file)
 ├── integration/            # Integration tests (with dependencies)
-└── e2e/                    # End-to-end tests (full system)
+│   ├── agent/              # Agent integration tests (1 file)
+│   └── exporter/           # Exporter integration tests (1 file)
+├── e2e/                    # End-to-end tests (full system, 4 files)
+├── fixtures/               # Test fixtures and data
+│   ├── configs/            # Sample configuration files
+│   ├── otlp/               # OTLP test data
+│   └── responses/          # Mock API responses
+└── mocks/                  # Mock implementations
 ```
+
+### Available Test Packages
+
+Run `make test-list` or `./scripts/test-specific.sh -l` to see all available packages:
+
+| Package                     | Description                        | Files |
+| --------------------------- | ---------------------------------- | ----- |
+| `application`               | CLI commands and configuration     | 3     |
+| `domain/agent`              | Agent lifecycle management         | 2     |
+| `domain/plugin`             | Plugin registry system             | 1     |
+| `domain/telemetry`          | Telemetry collection               | 2     |
+| `infrastructure/api`        | Backend API client                 | 1     |
+| `infrastructure/buffer`     | Disk-backed retry buffer           | 1     |
+| `infrastructure/config`     | Configuration loader               | 1     |
+| `infrastructure/exporter`   | OTLP exporters (gRPC/HTTP)         | 3     |
+| `integrations`              | 3rd party integrations             | 31    |
+| `presentation/banner`       | ASCII art startup banner           | 1     |
 
 ### Writing Unit Tests
 

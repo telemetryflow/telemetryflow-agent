@@ -366,8 +366,6 @@ make build-darwin   # Build for macOS (amd64 and arm64)
 # Development Commands
 make run            # Build and run agent
 make dev            # Run with go run (faster for development)
-make test           # Run tests
-make test-coverage  # Run tests with coverage report
 make lint           # Run linter
 make fmt            # Format code
 make vet            # Run go vet
@@ -385,6 +383,50 @@ make docker-build   # Build Docker image
 make docker-push    # Push Docker image
 make version        # Show version information
 ```
+
+### Testing
+
+```bash
+# Run all tests
+make test                    # Run unit and integration tests
+make test-all                # Run unit, integration, and E2E tests
+make test-unit               # Run unit tests only
+make test-integration        # Run integration tests only
+make test-e2e                # Run E2E tests only
+
+# Run specific tests
+make test-run PKG=integrations                      # Run all integration tests
+make test-run PKG=domain/agent                      # Run agent domain tests
+make test-run TEST=TestPerconaCollector             # Run test by name pattern
+make test-run PKG=integrations TEST=TestKafka       # Run specific test in package
+make test-list                                       # List available test packages
+
+# Coverage and CI
+make test-coverage           # Generate coverage report
+make ci-test                 # Run with race detection (CI mode)
+
+# Using test script directly
+./scripts/test-specific.sh integrations             # Run all integration tests
+./scripts/test-specific.sh -c domain/agent          # Run with coverage
+./scripts/test-specific.sh -r TestExporter          # Run with race detector
+./scripts/test-specific.sh --ci infrastructure      # CI mode (race + coverage)
+./scripts/test-specific.sh -l                       # List available packages
+```
+
+#### Test Packages
+
+| Package                   | Description                 | Test Files |
+| ------------------------- | --------------------------- | ---------- |
+| `application`             | CLI commands, configuration | 3          |
+| `domain/agent`            | Agent lifecycle management  | 2          |
+| `domain/plugin`           | Plugin registry             | 1          |
+| `domain/telemetry`        | Telemetry collection        | 2          |
+| `infrastructure/api`      | API client                  | 1          |
+| `infrastructure/buffer`   | Disk-backed buffer          | 1          |
+| `infrastructure/config`   | Configuration loader        | 1          |
+| `infrastructure/exporter` | OTLP exporters              | 3          |
+| `integrations`            | 3rd party integrations      | 31         |
+| `presentation/banner`     | Startup banner              | 1          |
 
 ## Systemd Service
 
@@ -413,16 +455,93 @@ sudo systemctl start tfo-agent
 
 ## 3rd Party Integrations
 
-TelemetryFlow Agent supports a wide range of integrations for enterprise environments:
+TelemetryFlow Agent supports **30+ integrations** for enterprise environments across multiple categories.
 
-| Category | Integrations |
-|----------|--------------|
-| **Cloud Providers** | GCP, Azure, Alibaba Cloud |
-| **Infrastructure** | Proxmox, VMware, Nutanix, Azure Arc |
-| **Network & IoT** | Cisco (DNA Center/Meraki), SNMP, MQTT |
-| **Kernel/System** | eBPF (Linux) |
-| **Observability** | Prometheus, Datadog, Splunk, Elasticsearch, InfluxDB |
-| **Streaming** | Kafka, Loki, Jaeger, Zipkin |
+### Integration Categories
+
+| Category              | Integrations                                             | Count |
+| --------------------- | -------------------------------------------------------- | ----- |
+| **Cloud Providers**   | GCP, Azure, Alibaba Cloud, AWS CloudWatch                | 4     |
+| **Infrastructure**    | Proxmox, VMware vSphere, Nutanix, Azure Arc              | 4     |
+| **Network & IoT**     | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3, MQTT          | 3     |
+| **Kernel/System**     | eBPF (syscalls, network, file I/O, scheduler)            | 1     |
+| **Observability**     | Prometheus, Datadog, Splunk, New Relic, Elasticsearch    | 5     |
+| **Streaming & Logs**  | Kafka, Loki, InfluxDB                                    | 3     |
+| **Tracing**           | Jaeger, Zipkin                                           | 2     |
+| **Monitoring Tools**  | Telegraf, Grafana Alloy, Percona PMM, Blackbox           | 4     |
+| **Custom**            | Webhook                                                  | 1     |
+
+### Data Type Support Matrix
+
+| Integration       | Metrics | Logs | Traces | Protocol        |
+| ----------------- | :-----: | :--: | :----: | --------------- |
+| **Cloud**         |         |      |        |                 |
+| GCP               |   ✅    |  ✅  |   ✅   | gRPC/REST       |
+| Azure             |   ✅    |  ✅  |   ✅   | REST            |
+| Alibaba Cloud     |   ✅    |  ✅  |   ✅   | REST            |
+| AWS CloudWatch    |   ✅    |  ✅  |   ❌   | REST            |
+| **Infrastructure**|         |      |        |                 |
+| Proxmox           |   ✅    |  ❌  |   ❌   | REST            |
+| VMware vSphere    |   ✅    |  ❌  |   ❌   | REST/SOAP       |
+| Nutanix           |   ✅    |  ❌  |   ❌   | REST            |
+| Azure Arc         |   ✅    |  ❌  |   ❌   | REST            |
+| **Network**       |         |      |        |                 |
+| Cisco             |   ✅    |  ❌  |   ❌   | REST            |
+| SNMP              |   ✅    |  ❌  |   ❌   | SNMP v1/v2c/v3  |
+| MQTT              |   ✅    |  ✅  |   ✅   | MQTT            |
+| **System**        |         |      |        |                 |
+| eBPF              |   ✅    |  ❌  |   ❌   | Kernel          |
+| **Observability** |         |      |        |                 |
+| Prometheus        |   ✅    |  ❌  |   ❌   | Remote Write    |
+| Datadog           |   ✅    |  ✅  |   ✅   | REST            |
+| Splunk            |   ✅    |  ✅  |   ❌   | HEC             |
+| New Relic         |   ✅    |  ✅  |   ✅   | REST            |
+| Elasticsearch     |   ✅    |  ✅  |   ❌   | REST            |
+| **Streaming**     |         |      |        |                 |
+| Kafka             |   ✅    |  ✅  |   ✅   | Kafka Protocol  |
+| Loki              |   ❌    |  ✅  |   ❌   | REST            |
+| InfluxDB          |   ✅    |  ❌  |   ❌   | Line Protocol   |
+| **Tracing**       |         |      |        |                 |
+| Jaeger            |   ❌    |  ❌  |   ✅   | gRPC/Thrift     |
+| Zipkin            |   ❌    |  ❌  |   ✅   | REST            |
+| **Tools**         |         |      |        |                 |
+| Telegraf          |   ✅    |  ❌  |   ❌   | InfluxDB LP     |
+| Grafana Alloy     |   ✅    |  ✅  |   ✅   | OTLP            |
+| Percona PMM       |   ✅    |  ❌  |   ❌   | REST            |
+| Blackbox          |   ✅    |  ❌  |   ❌   | HTTP Probe      |
+| Webhook           |   ✅    |  ✅  |   ✅   | HTTP/HTTPS      |
+
+### Integration Capabilities Comparison
+
+| Feature                  | TFO-Agent | OTEL Collector | Telegraf | Datadog Agent |
+| ------------------------ | :-------: | :------------: | :------: | :-----------: |
+| **OTLP Native**          |    ✅     |       ✅       |    ❌    |      ❌       |
+| **Multi-Cloud**          |    ✅     |       ⚠️       |    ✅    |      ⚠️       |
+| **Hybrid Infrastructure**|    ✅     |       ❌       |    ⚠️    |      ❌       |
+| **eBPF Support**         |    ✅     |       ⚠️       |    ❌    |      ✅       |
+| **Network Devices**      |    ✅     |       ⚠️       |    ✅    |      ⚠️       |
+| **IoT/MQTT**             |    ✅     |       ⚠️       |    ✅    |      ❌       |
+| **Disk-Backed Buffer**   |    ✅     |       ✅       |    ❌    |      ✅       |
+| **Enterprise SSO**       |    ✅     |       ❌       |    ❌    |      ✅       |
+| **Parallel Export**      |    ✅     |       ✅       |    ✅    |      ✅       |
+| **Health Monitoring**    |    ✅     |       ✅       |    ✅    |      ✅       |
+| **Auto-Discovery**       |    ✅     |       ⚠️       |    ✅    |      ✅       |
+| **License**              |  Apache 2 |    Apache 2    |   MIT    |  Proprietary  |
+
+Legend: ✅ Full Support | ⚠️ Partial/Plugin | ❌ Not Supported
+
+### Key Differentiators
+
+| Capability                | Description                                                    |
+| ------------------------- | -------------------------------------------------------------- |
+| **Unified Agent**         | Single agent for cloud, infrastructure, network, and system    |
+| **OTLP-First**            | Native OpenTelemetry Protocol support (gRPC & HTTP)            |
+| **Enterprise Ready**      | TLS, mTLS, API key authentication, retry with backoff          |
+| **Hybrid Cloud**          | Proxmox, VMware, Nutanix, Azure Arc in one agent               |
+| **Network Observability** | Cisco DNA/Meraki, SNMP v3, MQTT for IoT                        |
+| **Kernel-Level**          | eBPF for syscalls, network, file I/O, scheduler metrics        |
+| **Resilient**             | Disk-backed buffer with automatic retry and flush              |
+| **Extensible**            | Plugin architecture for custom integrations                    |
 
 See [Integration Documentation](docs/integrations/README.md) for detailed configuration.
 

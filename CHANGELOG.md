@@ -24,10 +24,27 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.1] - 2024-12-29
+## [1.1.1] - 2026-01-03
 
 ### Added
 
+- **Specific Test Runner Script**: New `scripts/test-specific.sh` for running individual unit tests
+  - Run tests by package name (e.g., `./scripts/test-specific.sh integrations`)
+  - Run tests by function name pattern (e.g., `./scripts/test-specific.sh TestPerconaCollector`)
+  - Run specific test in a package (e.g., `./scripts/test-specific.sh integrations:TestKafka`)
+  - Support for coverage, race detection, timeout, and count options
+  - CI mode with `--ci` flag for race detection and coverage combined
+  - List available test packages with `-l` or `--list` option
+- **Makefile Test Targets**: Added new make targets for specific test execution
+  - `make test-run PKG=<package>` - Run all tests in a package
+  - `make test-run TEST=<name>` - Run tests matching a name pattern
+  - `make test-run PKG=<package> TEST=<name>` - Run specific test in a package
+  - `make test-list` - List all available test packages
+- **README Integration Documentation**: Added comprehensive integration capabilities section
+  - Integration Categories table with 30+ integrations across 9 categories
+  - Data Type Support Matrix showing Metrics/Logs/Traces support per integration
+  - Integration Capabilities Comparison vs OTEL Collector, Telegraf, Datadog Agent
+  - Key Differentiators highlighting TFO-Agent unique features
 - **Enterprise 3rd Party Integrations**: Added comprehensive integration support for enterprise environments
   - **Cloud Providers**: GCP (Cloud Monitoring, Logging, Trace), Azure (Monitor, Log Analytics, App Insights), Alibaba Cloud (CMS, SLS, ARMS)
   - **Infrastructure**: Proxmox VE, VMware vSphere, Nutanix (Prism Central/Element), Azure Arc
@@ -197,12 +214,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date | OTEL SDK | Description |
-|---------|------|----------|-------------|
-| 1.1.1 | 2024-12-29 | v1.39.0 | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF) |
-| 1.1.0 | 2024-12-27 | v1.39.0 | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector |
-| 1.0.1 | 2024-12-17 | - | Docker workflow, SBOM, multi-platform support |
-| 1.0.0 | 2024-12-17 | - | Initial release |
+| Version | Date       | OTEL SDK | Description                                                                                                              |
+| ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 1.1.1   | 2026-01-03 | v1.39.0  | Specific test runner, enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)   |
+| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                        |
+| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                                            |
+| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                                          |
 
 ## Upgrade Guide
 
@@ -217,5 +234,5 @@ For future upgrades, check the changelog for breaking changes and follow the upg
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/telemetryflow/telemetryflow-platform/issues)
-- **Documentation**: [https://docs.telemetryflow.id](https://docs.telemetryflow.id)
-- **Email**: support@telemetryflow.id
+- **Documentation**: [TelemetryFlow Docs](https://docs.telemetryflow.id)
+- **Email**: [support@telemetryflow.id](mailto:support@telemetryflow.id)
