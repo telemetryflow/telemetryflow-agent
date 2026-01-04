@@ -1,0 +1,15 @@
+agent:
+  id: "test-agent"
+
+api:
+  endpoint: ""  # Invalid: empty endpoint
+
+heartbeat:
+  interval: 500ms  # Invalid: less than 1 second
+
+collectors:
+  system:
+    enabled: false
+
+logging:
+  level: "invalid"  # Invalid log level

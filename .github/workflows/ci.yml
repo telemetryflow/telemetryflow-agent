@@ -1,0 +1,421 @@
+# =============================================================================
+# TelemetryFlow Agent - CI Workflow
+# =============================================================================
+#
+# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+#
+# This workflow provides continuous integration for TelemetryFlow Agent:
+# - Code quality checks (lint, vet, fmt)
+# - Unit and integration tests
+# - Build verification (multi-platform)
+# - Security scanning
+# - Coverage reporting
+#
+# =============================================================================
+
+name: CI - TFO Agent
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - 'feature/**'
+      - 'release/**'
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'pkg/**'
+      - 'tests/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'pkg/**'
+      - 'tests/**'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'Run E2E tests'
+        required: false
+        type: boolean
+        default: false
+      skip_lint:
+        description: 'Skip linting'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GO_VERSION: '1.24'
+  PRODUCT_NAME: TelemetryFlow Agent
+  BINARY_NAME: tfo-agent
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # ===========================================================================
+  # Code Quality - Lint, Vet, Format
+  # ===========================================================================
+  lint:
+    name: Lint & Code Quality
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_lint }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download and verify dependencies
+        run: make deps-verify
+
+      - name: Check formatting
+        run: make fmt-check
+
+      - name: Run go vet
+        run: make vet
+
+      - name: Run staticcheck
+        run: make staticcheck
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.7.2
+          args: --timeout=5m
+          skip-cache: true
+          verify: false
+
+  # ===========================================================================
+  # Unit Tests
+  # ===========================================================================
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    if: always() && (needs.lint.result == 'success' || needs.lint.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Run unit tests
+        run: make test-unit-ci
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: coverage-unit.out
+          retention-days: 7
+
+  # ===========================================================================
+  # Integration Tests
+  # ===========================================================================
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    if: always() && (needs.lint.result == 'success' || needs.lint.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Build binary
+        run: make build-all
+
+      - name: Run integration tests
+        run: make test-integration-ci
+        env:
+          BUILD_DIR: ./build
+
+      - name: Upload integration test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage-integration.out
+          retention-days: 7
+
+  # ===========================================================================
+  # E2E Tests (Optional)
+  # ===========================================================================
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-integration]
+    if: ${{ inputs.run_e2e == true || github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Build agent
+        run: make build
+
+      - name: Run E2E tests
+        run: make test-e2e-ci
+        env:
+          TFO_AGENT_BINARY: ./build/tfo-agent
+
+  # ===========================================================================
+  # Build Verification
+  # ===========================================================================
+  build:
+    name: Build (${{ matrix.os }}/${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: lint
+    if: always() && (needs.lint.result == 'success' || needs.lint.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            runner: ubuntu-latest
+          - os: linux
+            arch: arm64
+            runner: ubuntu-latest
+          - os: darwin
+            arch: amd64
+            runner: macos-latest
+          - os: darwin
+            arch: arm64
+            runner: macos-latest
+          - os: windows
+            arch: amd64
+            runner: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          if [[ ! "$VERSION" =~ ^v[0-9] ]]; then
+            VERSION="0.0.0-dev"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        shell: bash
+        run: make ci-build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Verify binary
+        shell: bash
+        run: |
+          OUTPUT="build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}"
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            OUTPUT="${OUTPUT}.exe"
+          fi
+
+          if [ -f "$OUTPUT" ]; then
+            echo "Binary built successfully: $OUTPUT"
+            ls -la "$OUTPUT"
+          else
+            echo "Build failed: $OUTPUT not found"
+            exit 1
+          fi
+
+      - name: Test binary (version command)
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: |
+          chmod +x build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          ./build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }} version
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}*
+          retention-days: 7
+
+  # ===========================================================================
+  # Security Scan
+  # ===========================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    if: always() && (needs.lint.result == 'success' || needs.lint.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out gosec-results.sarif ./...'
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: gosec-results.sarif
+
+      - name: Run govulncheck
+        run: make govulncheck
+
+  # ===========================================================================
+  # Coverage Report
+  # ===========================================================================
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-integration]
+    if: always() && needs.test-unit.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download unit coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-unit
+          path: coverage/
+
+      - name: Download integration coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage/
+        continue-on-error: true
+
+      - name: Prepare coverage files
+        run: |
+          cp coverage/coverage-unit.out coverage-unit.out
+          if [ -f coverage/coverage-integration.out ]; then
+            cp coverage/coverage-integration.out coverage-integration.out
+          fi
+
+      - name: Generate coverage report
+        run: make coverage-report
+
+      - name: Move coverage files
+        run: |
+          mv coverage-merged.out coverage/coverage-merged.out
+          mv coverage-summary.txt coverage/coverage-summary.txt
+          mv coverage.html coverage/coverage.html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Coverage summary
+        run: |
+          echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat coverage/coverage-summary.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # CI Summary
+  # ===========================================================================
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-integration, build, security, coverage]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## ${{ env.PRODUCT_NAME }} - CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.test-unit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.test-integration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check overall status
+        run: |
+          if [[ "${{ needs.lint.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-unit.result }}" == "failure" ]] || \
+             [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "CI failed - one or more required jobs failed"
+            exit 1
+          fi
+          echo "CI passed successfully"

@@ -1,0 +1,1062 @@
+# =============================================================================
+# TelemetryFlow Agent - Release Workflow
+# =============================================================================
+#
+# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+#
+# This workflow builds and releases TelemetryFlow Agent for multiple platforms:
+# - Linux: RPM (RHEL/CentOS/Fedora), DEB (Debian/Ubuntu)
+# - Windows: EXE (64-bit)
+# - macOS: DMG (Intel and Apple Silicon)
+#
+# Triggers:
+# - Push tags matching v*.*.*
+# - Manual workflow dispatch
+#
+# =============================================================================
+
+name: Release - TFO Agent
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.1.2)'
+        required: true
+        default: '1.1.2'
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GO_VERSION: '1.24'
+  BINARY_NAME: tfo-agent
+  PRODUCT_NAME: TelemetryFlow Agent
+  VENDOR: DevOpsCorner Indonesia
+  MAINTAINER: support@telemetryflow.id
+  DESCRIPTION: Enterprise-grade telemetry collection agent for the TelemetryFlow platform
+  LICENSE: Apache-2.0
+  HOMEPAGE: https://telemetryflow.id
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ===========================================================================
+  # Prepare Release
+  # ===========================================================================
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+      branch: ${{ steps.version.outputs.branch }}
+      build_time: ${{ steps.version.outputs.build_time }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "branch=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+  # ===========================================================================
+  # Build Linux Binaries
+  # ===========================================================================
+  build-linux:
+    name: Build Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Build binary
+        run: make ci-build
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp build/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }} dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-linux-${{ matrix.arch }}
+          path: dist/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }}
+          retention-days: 1
+
+  # ===========================================================================
+  # Build Windows Binary
+  # ===========================================================================
+  build-windows:
+    name: Build Windows (amd64)
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Build binary
+        run: make ci-build
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          VERSION: ${{ needs.prepare.outputs.version }}
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp build/${{ env.BINARY_NAME }}-windows-amd64.exe dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-windows-amd64
+          path: dist/${{ env.BINARY_NAME }}-windows-amd64.exe
+          retention-days: 1
+
+  # ===========================================================================
+  # Build macOS Binaries
+  # ===========================================================================
+  build-macos:
+    name: Build macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    needs: prepare
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Build binary
+        run: make ci-build
+        env:
+          GOOS: darwin
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp build/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }} dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-darwin-${{ matrix.arch }}
+          path: dist/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }}
+          retention-days: 1
+
+  # ===========================================================================
+  # Package RPM
+  # ===========================================================================
+  package-rpm:
+    name: Package RPM (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: [prepare, build-linux]
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            rpm_arch: x86_64
+          - arch: arm64
+            rpm_arch: aarch64
+    steps:
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-linux-${{ matrix.arch }}
+          path: dist
+
+      - name: Create RPM structure
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}
+
+          # Copy binary
+          cp dist/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }} \
+             rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/${{ env.BINARY_NAME }}
+          chmod +x rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/${{ env.BINARY_NAME }}
+
+          # Copy config
+          mkdir -p rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/configs
+          cp configs/tfo-agent.yaml rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/configs/
+
+          # Create tarball
+          cd rpmbuild/SOURCES
+          tar czf ${{ env.BINARY_NAME }}-${VERSION}.tar.gz ${{ env.BINARY_NAME }}-${VERSION}
+
+      - name: Create RPM spec file
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          # Compute changelog date (RPM requires specific format)
+          CHANGELOG_DATE=$(date '+%a %b %d %Y')
+
+          cat > rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec << EOF
+          Name:           ${{ env.BINARY_NAME }}
+          Version:        ${{ needs.prepare.outputs.version }}
+          Release:        1%{?dist}
+          Summary:        ${{ env.DESCRIPTION }}
+          License:        ${{ env.LICENSE }}
+          URL:            ${{ env.HOMEPAGE }}
+          Source0:        %{name}-%{version}.tar.gz
+
+          # Note: BuildArch is intentionally omitted - we package pre-built binaries
+          # The target architecture is specified via rpmbuild --target flag
+
+          %description
+          ${{ env.PRODUCT_NAME }} is an enterprise-grade telemetry collection agent
+          for the TelemetryFlow platform. It provides comprehensive system monitoring
+          with metrics collection, heartbeat monitoring, and OTLP telemetry export.
+
+          %prep
+          %setup -q
+
+          %install
+          mkdir -p %{buildroot}/usr/local/bin
+          mkdir -p %{buildroot}/etc/tfo-agent
+          mkdir -p %{buildroot}/var/lib/tfo-agent/buffer
+          mkdir -p %{buildroot}/var/log/tfo-agent
+          mkdir -p %{buildroot}/usr/lib/systemd/system
+
+          install -m 755 ${{ env.BINARY_NAME }} %{buildroot}/usr/local/bin/
+          install -m 644 configs/tfo-agent.yaml %{buildroot}/etc/tfo-agent/
+
+          cat > %{buildroot}/usr/lib/systemd/system/tfo-agent.service << 'SYSTEMD'
+          [Unit]
+          Description=${{ env.PRODUCT_NAME }} - Community Enterprise Observability Platform
+          Documentation=${{ env.HOMEPAGE }}
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=telemetryflow
+          Group=telemetryflow
+          ExecStart=/usr/local/bin/tfo-agent start --config /etc/tfo-agent/tfo-agent.yaml
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=tfo-agent
+          LimitNOFILE=65536
+          MemoryMax=512M
+
+          [Install]
+          WantedBy=multi-user.target
+          SYSTEMD
+
+          %pre
+          getent group telemetryflow >/dev/null || groupadd -r telemetryflow
+          getent passwd telemetryflow >/dev/null || \
+            useradd -r -g telemetryflow -d /var/lib/tfo-agent -s /sbin/nologin \
+            -c "${{ env.PRODUCT_NAME }}" telemetryflow
+          exit 0
+
+          %post
+          systemctl daemon-reload
+
+          %preun
+          if [ \$1 -eq 0 ]; then
+            systemctl stop tfo-agent >/dev/null 2>&1 || :
+            systemctl disable tfo-agent >/dev/null 2>&1 || :
+          fi
+
+          %postun
+          systemctl daemon-reload
+
+          %files
+          %defattr(-,root,root,-)
+          /usr/local/bin/${{ env.BINARY_NAME }}
+          %config(noreplace) /etc/tfo-agent/tfo-agent.yaml
+          /usr/lib/systemd/system/tfo-agent.service
+          %dir /var/lib/tfo-agent
+          %dir /var/lib/tfo-agent/buffer
+          %dir /var/log/tfo-agent
+
+          %changelog
+          * ${CHANGELOG_DATE} ${{ env.VENDOR }} <${{ env.MAINTAINER }}> - ${{ needs.prepare.outputs.version }}-1
+          - Release version ${{ needs.prepare.outputs.version }}
+          EOF
+
+      - name: Build RPM
+        run: |
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" \
+                   --target ${{ matrix.rpm_arch }} \
+                   -bb rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-${{ matrix.arch }}
+          path: rpmbuild/RPMS/**/*.rpm
+          retention-days: 1
+
+  # ===========================================================================
+  # Package DEB
+  # ===========================================================================
+  package-deb:
+    name: Package DEB (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: [prepare, build-linux]
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-linux-${{ matrix.arch }}
+          path: dist
+
+      - name: Create DEB structure
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          PKG_DIR=${{ env.BINARY_NAME }}_${VERSION}_${{ matrix.arch }}
+          mkdir -p ${PKG_DIR}/DEBIAN
+          mkdir -p ${PKG_DIR}/usr/local/bin
+          mkdir -p ${PKG_DIR}/etc/tfo-agent
+          mkdir -p ${PKG_DIR}/var/lib/tfo-agent/buffer
+          mkdir -p ${PKG_DIR}/var/log/tfo-agent
+          mkdir -p ${PKG_DIR}/lib/systemd/system
+
+          # Copy binary
+          cp dist/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }} \
+             ${PKG_DIR}/usr/local/bin/${{ env.BINARY_NAME }}
+          chmod 755 ${PKG_DIR}/usr/local/bin/${{ env.BINARY_NAME }}
+
+          # Copy config
+          cp configs/tfo-agent.yaml ${PKG_DIR}/etc/tfo-agent/
+
+      - name: Create DEB control files
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          PKG_DIR=${{ env.BINARY_NAME }}_${VERSION}_${{ matrix.arch }}
+
+          # Control file
+          cat > ${PKG_DIR}/DEBIAN/control << EOF
+          Package: ${{ env.BINARY_NAME }}
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.arch }}
+          Maintainer: ${{ env.VENDOR }} <${{ env.MAINTAINER }}>
+          Description: ${{ env.DESCRIPTION }}
+           ${{ env.PRODUCT_NAME }} is an enterprise-grade telemetry collection agent
+           for the TelemetryFlow platform. It provides comprehensive system monitoring
+           with metrics collection, heartbeat monitoring, and OTLP telemetry export.
+          Homepage: ${{ env.HOMEPAGE }}
+          EOF
+
+          # Pre-install script
+          cat > ${PKG_DIR}/DEBIAN/preinst << 'EOF'
+          #!/bin/bash
+          set -e
+          getent group telemetryflow >/dev/null || groupadd -r telemetryflow
+          getent passwd telemetryflow >/dev/null || \
+            useradd -r -g telemetryflow -d /var/lib/tfo-agent -s /usr/sbin/nologin \
+            -c "TelemetryFlow Agent" telemetryflow
+          exit 0
+          EOF
+          chmod 755 ${PKG_DIR}/DEBIAN/preinst
+
+          # Post-install script
+          cat > ${PKG_DIR}/DEBIAN/postinst << 'EOF'
+          #!/bin/bash
+          set -e
+          chown -R telemetryflow:telemetryflow /var/lib/tfo-agent
+          chown -R telemetryflow:telemetryflow /var/log/tfo-agent
+          systemctl daemon-reload
+          echo "TelemetryFlow Agent installed successfully!"
+          echo "To start: sudo systemctl start tfo-agent"
+          echo "To enable on boot: sudo systemctl enable tfo-agent"
+          exit 0
+          EOF
+          chmod 755 ${PKG_DIR}/DEBIAN/postinst
+
+          # Pre-remove script
+          cat > ${PKG_DIR}/DEBIAN/prerm << 'EOF'
+          #!/bin/bash
+          set -e
+          if [ "$1" = "remove" ]; then
+            systemctl stop tfo-agent >/dev/null 2>&1 || true
+            systemctl disable tfo-agent >/dev/null 2>&1 || true
+          fi
+          exit 0
+          EOF
+          chmod 755 ${PKG_DIR}/DEBIAN/prerm
+
+          # Post-remove script
+          cat > ${PKG_DIR}/DEBIAN/postrm << 'EOF'
+          #!/bin/bash
+          set -e
+          systemctl daemon-reload
+          exit 0
+          EOF
+          chmod 755 ${PKG_DIR}/DEBIAN/postrm
+
+          # Conffiles
+          cat > ${PKG_DIR}/DEBIAN/conffiles << EOF
+          /etc/tfo-agent/tfo-agent.yaml
+          EOF
+
+      - name: Create systemd service
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          PKG_DIR=${{ env.BINARY_NAME }}_${VERSION}_${{ matrix.arch }}
+          cat > ${PKG_DIR}/lib/systemd/system/tfo-agent.service << EOF
+          [Unit]
+          Description=${{ env.PRODUCT_NAME }} - Community Enterprise Observability Platform
+          Documentation=${{ env.HOMEPAGE }}
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=telemetryflow
+          Group=telemetryflow
+          ExecStart=/usr/local/bin/tfo-agent start --config /etc/tfo-agent/tfo-agent.yaml
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=tfo-agent
+          LimitNOFILE=65536
+          MemoryMax=512M
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+      - name: Build DEB package
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          PKG_DIR=${{ env.BINARY_NAME }}_${VERSION}_${{ matrix.arch }}
+          dpkg-deb --build ${PKG_DIR}
+          mkdir -p packages
+          mv ${PKG_DIR}.deb packages/
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.arch }}
+          path: packages/*.deb
+          retention-days: 1
+
+  # ===========================================================================
+  # Package Windows EXE (ZIP with installer script)
+  # ===========================================================================
+  package-windows:
+    name: Package Windows EXE
+    runs-on: ubuntu-latest
+    needs: [prepare, build-windows]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-windows-amd64
+          path: dist
+
+      - name: Create Windows package
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          PKG_DIR=${{ env.BINARY_NAME }}-${VERSION}-windows-amd64
+          mkdir -p ${PKG_DIR}
+
+          # Copy binary
+          cp dist/${{ env.BINARY_NAME }}-windows-amd64.exe ${PKG_DIR}/${{ env.BINARY_NAME }}.exe
+
+          # Copy config
+          cp configs/tfo-agent.yaml ${PKG_DIR}/
+
+          # Create install script
+          cat > ${PKG_DIR}/install.ps1 << 'EOF'
+          # TelemetryFlow Agent Windows Installer
+          # Run as Administrator
+
+          $ErrorActionPreference = "Stop"
+
+          $InstallDir = "C:\Program Files\TelemetryFlow\Agent"
+          $ConfigDir = "C:\ProgramData\TelemetryFlow\Agent"
+          $LogDir = "C:\ProgramData\TelemetryFlow\Agent\logs"
+          $ServiceName = "TelemetryFlowAgent"
+
+          Write-Host "Installing TelemetryFlow Agent..." -ForegroundColor Green
+
+          # Create directories
+          New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+          # Copy files
+          Copy-Item -Path ".\tfo-agent.exe" -Destination "$InstallDir\tfo-agent.exe" -Force
+          Copy-Item -Path ".\tfo-agent.yaml" -Destination "$ConfigDir\tfo-agent.yaml" -Force
+
+          # Add to PATH
+          $envPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+          if ($envPath -notlike "*$InstallDir*") {
+              [Environment]::SetEnvironmentVariable("Path", "$envPath;$InstallDir", "Machine")
+          }
+
+          # Create Windows Service
+          if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+              Stop-Service -Name $ServiceName -Force
+              sc.exe delete $ServiceName
+          }
+
+          $binPath = "`"$InstallDir\tfo-agent.exe`" start --config `"$ConfigDir\tfo-agent.yaml`""
+          New-Service -Name $ServiceName `
+                      -DisplayName "TelemetryFlow Agent" `
+                      -Description "TelemetryFlow Agent - Community Enterprise Observability Platform" `
+                      -BinaryPathName $binPath `
+                      -StartupType Automatic
+
+          Write-Host "TelemetryFlow Agent installed successfully!" -ForegroundColor Green
+          Write-Host "To start: Start-Service $ServiceName" -ForegroundColor Yellow
+          Write-Host "To check status: Get-Service $ServiceName" -ForegroundColor Yellow
+          EOF
+
+          # Create uninstall script
+          cat > ${PKG_DIR}/uninstall.ps1 << 'EOF'
+          # TelemetryFlow Agent Windows Uninstaller
+          # Run as Administrator
+
+          $ErrorActionPreference = "Stop"
+
+          $InstallDir = "C:\Program Files\TelemetryFlow\Agent"
+          $ServiceName = "TelemetryFlowAgent"
+
+          Write-Host "Uninstalling TelemetryFlow Agent..." -ForegroundColor Yellow
+
+          # Stop and remove service
+          if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+              Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+              sc.exe delete $ServiceName
+          }
+
+          # Remove from PATH
+          $envPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+          $newPath = ($envPath.Split(';') | Where-Object { $_ -ne $InstallDir }) -join ';'
+          [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+
+          # Remove files
+          Remove-Item -Path $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "TelemetryFlow Agent uninstalled successfully!" -ForegroundColor Green
+          EOF
+
+          # Create README
+          cat > ${PKG_DIR}/README.txt << EOF
+          TelemetryFlow Agent v${VERSION}
+          ================================
+
+          Installation:
+          1. Run PowerShell as Administrator
+          2. Navigate to this directory
+          3. Run: .\install.ps1
+
+          Manual Usage:
+          tfo-agent.exe start --config tfo-agent.yaml
+          tfo-agent.exe version
+
+          Documentation: https://docs.telemetryflow.id
+          Support: support@telemetryflow.id
+
+          Copyright (c) 2024-2026 DevOpsCorner Indonesia
+          EOF
+
+          # Create ZIP
+          zip -r ${{ env.BINARY_NAME }}-${VERSION}-windows-amd64.zip ${PKG_DIR}
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64
+          path: ${{ env.BINARY_NAME }}-*.zip
+          retention-days: 1
+
+  # ===========================================================================
+  # Package macOS DMG
+  # ===========================================================================
+  package-macos:
+    name: Package macOS DMG (${{ matrix.arch }})
+    runs-on: macos-latest
+    needs: [prepare, build-macos]
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            macos_arch: x86_64
+            display_name: Intel
+          - arch: arm64
+            macos_arch: arm64
+            display_name: Apple Silicon
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-darwin-${{ matrix.arch }}
+          path: dist
+
+      - name: Create DMG structure
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          DMG_DIR="dmg-contents"
+          APP_NAME="${{ env.PRODUCT_NAME }}"
+
+          mkdir -p "${DMG_DIR}"
+
+          # Copy binary
+          cp dist/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }} \
+             "${DMG_DIR}/${{ env.BINARY_NAME }}"
+          chmod +x "${DMG_DIR}/${{ env.BINARY_NAME }}"
+
+          # Copy config
+          cp configs/tfo-agent.yaml "${DMG_DIR}/"
+
+          # Create install script
+          cat > "${DMG_DIR}/install.sh" << 'EOF'
+          #!/bin/bash
+          # TelemetryFlow Agent macOS Installer
+
+          set -e
+
+          INSTALL_DIR="/usr/local/bin"
+          CONFIG_DIR="/etc/tfo-agent"
+          DATA_DIR="/var/lib/tfo-agent"
+          LOG_DIR="/var/log/tfo-agent"
+          LAUNCH_DAEMON="/Library/LaunchDaemons/id.telemetryflow.agent.plist"
+
+          echo "Installing TelemetryFlow Agent..."
+
+          # Create directories
+          sudo mkdir -p "${CONFIG_DIR}"
+          sudo mkdir -p "${DATA_DIR}/buffer"
+          sudo mkdir -p "${LOG_DIR}"
+
+          # Copy files
+          sudo cp tfo-agent "${INSTALL_DIR}/"
+          sudo chmod +x "${INSTALL_DIR}/tfo-agent"
+
+          if [ ! -f "${CONFIG_DIR}/tfo-agent.yaml" ]; then
+            sudo cp tfo-agent.yaml "${CONFIG_DIR}/"
+          fi
+
+          # Create LaunchDaemon
+          sudo tee "${LAUNCH_DAEMON}" > /dev/null << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>Label</key>
+              <string>id.telemetryflow.agent</string>
+              <key>ProgramArguments</key>
+              <array>
+                  <string>/usr/local/bin/tfo-agent</string>
+                  <string>start</string>
+                  <string>--config</string>
+                  <string>/etc/tfo-agent/tfo-agent.yaml</string>
+              </array>
+              <key>RunAtLoad</key>
+              <true/>
+              <key>KeepAlive</key>
+              <true/>
+              <key>StandardOutPath</key>
+              <string>/var/log/tfo-agent/tfo-agent.log</string>
+              <key>StandardErrorPath</key>
+              <string>/var/log/tfo-agent/tfo-agent-error.log</string>
+          </dict>
+          </plist>
+          PLIST
+
+          echo ""
+          echo "TelemetryFlow Agent installed successfully!"
+          echo ""
+          echo "To start the service:"
+          echo "  sudo launchctl load ${LAUNCH_DAEMON}"
+          echo ""
+          echo "To stop the service:"
+          echo "  sudo launchctl unload ${LAUNCH_DAEMON}"
+          echo ""
+          echo "To check status:"
+          echo "  sudo launchctl list | grep telemetryflow"
+          EOF
+          chmod +x "${DMG_DIR}/install.sh"
+
+          # Create uninstall script
+          cat > "${DMG_DIR}/uninstall.sh" << 'EOF'
+          #!/bin/bash
+          # TelemetryFlow Agent macOS Uninstaller
+
+          set -e
+
+          LAUNCH_DAEMON="/Library/LaunchDaemons/id.telemetryflow.agent.plist"
+
+          echo "Uninstalling TelemetryFlow Agent..."
+
+          # Stop service
+          if [ -f "${LAUNCH_DAEMON}" ]; then
+            sudo launchctl unload "${LAUNCH_DAEMON}" 2>/dev/null || true
+            sudo rm -f "${LAUNCH_DAEMON}"
+          fi
+
+          # Remove binary
+          sudo rm -f /usr/local/bin/tfo-agent
+
+          echo "TelemetryFlow Agent uninstalled successfully!"
+          echo "Configuration files are preserved in /etc/tfo-agent/"
+          EOF
+          chmod +x "${DMG_DIR}/uninstall.sh"
+
+          # Create README
+          cat > "${DMG_DIR}/README.txt" << EOF
+          TelemetryFlow Agent v${VERSION}
+          ================================
+          Architecture: ${{ matrix.display_name }} (${{ matrix.macos_arch }})
+
+          Installation:
+          1. Open Terminal
+          2. Navigate to this directory
+          3. Run: ./install.sh
+
+          Manual Usage:
+          tfo-agent start --config /etc/tfo-agent/tfo-agent.yaml
+          tfo-agent version
+
+          Documentation: https://docs.telemetryflow.id
+          Support: support@telemetryflow.id
+
+          Copyright (c) 2024-2026 DevOpsCorner Indonesia
+          EOF
+
+      - name: Create DMG
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          DMG_NAME="${{ env.BINARY_NAME }}-${VERSION}-darwin-${{ matrix.arch }}.dmg"
+          VOLUME_NAME="${{ env.PRODUCT_NAME }} ${VERSION}"
+
+          # Prevent Spotlight indexing which can cause "Resource busy" errors
+          touch dmg-contents/.metadata_never_index
+
+          # Detach any existing mounted volumes with the same name
+          hdiutil detach "/Volumes/${VOLUME_NAME}" 2>/dev/null || true
+
+          # Remove any existing DMG file
+          rm -f "${DMG_NAME}"
+
+          # Sync filesystem and wait for file handles to be released
+          sync
+          sleep 2
+
+          hdiutil create -volname "${VOLUME_NAME}" \
+                         -srcfolder "dmg-contents" \
+                         -ov -format UDZO \
+                         "${DMG_NAME}"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: ${{ env.BINARY_NAME }}-*.dmg
+          retention-days: 1
+
+  # ===========================================================================
+  # Create Tarballs
+  # ===========================================================================
+  package-tarball:
+    name: Create Tarball (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: [prepare, build-linux, build-macos]
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist
+
+      - name: Create tarball
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          TAR_DIR="${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}"
+          mkdir -p "${TAR_DIR}"
+
+          cp dist/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }} \
+             "${TAR_DIR}/${{ env.BINARY_NAME }}"
+          chmod +x "${TAR_DIR}/${{ env.BINARY_NAME }}"
+          cp configs/tfo-agent.yaml "${TAR_DIR}/"
+          cp README.md "${TAR_DIR}/" 2>/dev/null || true
+          cp LICENSE "${TAR_DIR}/" 2>/dev/null || true
+
+          tar -czvf "${TAR_DIR}.tar.gz" "${TAR_DIR}"
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.BINARY_NAME }}-*.tar.gz
+          retention-days: 1
+
+  # ===========================================================================
+  # Create GitHub Release
+  # ===========================================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - package-rpm
+      - package-deb
+      - package-windows
+      - package-macos
+      - package-tarball
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download RPM packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rpm-*
+          path: artifacts/rpm
+          merge-multiple: true
+
+      - name: Download DEB packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: artifacts/deb
+          merge-multiple: true
+
+      - name: Download Windows packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: windows-*
+          path: artifacts/windows
+          merge-multiple: true
+
+      - name: Download macOS DMG packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dmg-*
+          path: artifacts/dmg
+          merge-multiple: true
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tarball-*
+          path: artifacts/tarball
+          merge-multiple: true
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+
+          echo "=== Downloaded artifacts structure ==="
+          find artifacts -type f -ls
+
+          echo ""
+          echo "=== Collecting RPM packages ==="
+          find artifacts/rpm -name "*.rpm" -exec cp {} release/ \; 2>/dev/null || echo "No RPM packages found"
+
+          echo "=== Collecting DEB packages ==="
+          find artifacts/deb -name "*.deb" -exec cp {} release/ \; 2>/dev/null || echo "No DEB packages found"
+
+          echo "=== Collecting Windows packages ==="
+          find artifacts/windows -name "*.zip" -exec cp {} release/ \; 2>/dev/null || echo "No Windows packages found"
+
+          echo "=== Collecting macOS DMG packages ==="
+          find artifacts/dmg -name "*.dmg" -exec cp {} release/ \; 2>/dev/null || echo "No DMG packages found"
+
+          echo "=== Collecting tarballs ==="
+          find artifacts/tarball -name "*.tar.gz" -exec cp {} release/ \; 2>/dev/null || echo "No tarballs found"
+
+          echo ""
+          echo "=== Release directory contents ==="
+          ls -la release/
+
+          echo ""
+          echo "=== Package summary ==="
+          echo "RPM packages: $(ls release/*.rpm 2>/dev/null | wc -l)"
+          echo "DEB packages: $(ls release/*.deb 2>/dev/null | wc -l)"
+          echo "Windows ZIP:  $(ls release/*.zip 2>/dev/null | wc -l)"
+          echo "macOS DMG:    $(ls release/*.dmg 2>/dev/null | wc -l)"
+          echo "Tarballs:     $(ls release/*.tar.gz 2>/dev/null | wc -l)"
+          echo "Total files:  $(ls release/ | wc -l)"
+
+          if [ -z "$(ls -A release/)" ]; then
+            echo "ERROR: No release assets found!"
+            exit 1
+          fi
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > checksums-sha256.txt
+          cat checksums-sha256.txt
+
+      - name: Create tag if not exists (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG_NAME="v${{ needs.prepare.outputs.version }}"
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+            git push origin "$TAG_NAME"
+            echo "Created tag: $TAG_NAME"
+          else
+            echo "Tag $TAG_NAME already exists"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ env.PRODUCT_NAME }} v${{ needs.prepare.outputs.version }}"
+          tag_name: "v${{ needs.prepare.outputs.version }}"
+          draft: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            release/*
+          body: |
+            ## ${{ env.PRODUCT_NAME }} v${{ needs.prepare.outputs.version }}
+
+            ### Downloads
+
+            | Platform | Architecture | Package |
+            |----------|--------------|---------|
+            | Linux | amd64 | RPM, DEB, tar.gz |
+            | Linux | arm64 | RPM, DEB, tar.gz |
+            | Windows | amd64 | ZIP (with installer) |
+            | macOS | Intel (amd64) | DMG, tar.gz |
+            | macOS | Apple Silicon (arm64) | DMG, tar.gz |
+
+            ### Installation
+
+            **Linux (DEB):**
+            ```bash
+            sudo dpkg -i tfo-agent_${{ needs.prepare.outputs.version }}_amd64.deb
+            sudo systemctl start tfo-agent
+            ```
+
+            **Linux (RPM):**
+            ```bash
+            sudo rpm -i tfo-agent-${{ needs.prepare.outputs.version }}-1.x86_64.rpm
+            sudo systemctl start tfo-agent
+            ```
+
+            **macOS:**
+            1. Open the DMG file
+            2. Run `./install.sh` in Terminal
+
+            **Windows:**
+            1. Extract the ZIP file
+            2. Run `install.ps1` as Administrator
+
+            ### Verification
+
+            Verify downloads using SHA256 checksums in `checksums-sha256.txt`.
+
+            ---
+
+            📚 [Documentation](https://docs.telemetryflow.id) | 🐛 [Report Issues](https://github.com/telemetryflow/telemetryflow-agent/issues)

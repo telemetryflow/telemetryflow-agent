@@ -1,0 +1,9 @@
+{
+  "success": false,
+  "error": "Invalid request",
+  "error_code": "INVALID_REQUEST",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "details": {
+    "message": "The request payload is malformed"
+  }
+}

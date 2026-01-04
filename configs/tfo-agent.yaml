@@ -1,0 +1,1356 @@
+# =============================================================================
+# TelemetryFlow Agent Configuration
+# =============================================================================
+# Community Enterprise Observability Platform (CEOP)
+# Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+#
+# This configuration file controls the TelemetryFlow Agent behavior.
+# Copy to: /etc/tfo-agent/tfo-agent.yaml or ~/.tfo-agent/
+#
+# =============================================================================
+# Environment Variables
+# =============================================================================
+#   TELEMETRYFLOW_API_KEY_ID      - API Key ID for authentication (tfk_xxx)
+#   TELEMETRYFLOW_API_KEY_SECRET  - API Key Secret for authentication (tfs_xxx)
+#   TELEMETRYFLOW_ENDPOINT        - TelemetryFlow backend endpoint (host:port)
+#   TELEMETRYFLOW_AGENT_ID        - Unique agent identifier (optional)
+#   TELEMETRYFLOW_AGENT_NAME      - Human-readable agent name (optional)
+#   TELEMETRYFLOW_ENVIRONMENT     - Deployment environment (optional)
+#
+# Example .env file:
+#   TELEMETRYFLOW_API_KEY_ID=tfk_your_key_id
+#   TELEMETRYFLOW_API_KEY_SECRET=tfs_your_key_secret
+#   TELEMETRYFLOW_ENDPOINT=collector.telemetryflow.id:4317
+#
+# =============================================================================
+
+# =============================================================================
+# TelemetryFlow Backend Connection
+# =============================================================================
+# Authentication and connection settings for TelemetryFlow backend
+telemetryflow:
+  # API Key ID (format: tfk_xxx) - used for agent identification
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  # API Key Secret (format: tfs_xxx) - used for authentication
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  # TelemetryFlow backend endpoint for sending telemetry
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+  # Protocol: grpc or http
+  protocol: grpc
+  # TLS settings for backend connection
+  tls:
+    enabled: true
+    insecure_skip_verify: false
+    # cert_file: /path/to/client.crt
+    # key_file: /path/to/client.key
+    # ca_file: /path/to/ca.crt
+  # Request timeout
+  timeout: 30s
+  # Retry settings
+  retry:
+    enabled: true
+    max_attempts: 3
+    initial_interval: 1s
+    max_interval: 30s
+
+# =============================================================================
+# Agent Identification
+# =============================================================================
+agent:
+  # Unique agent identifier (auto-generated if empty)
+  id: "${TELEMETRYFLOW_AGENT_ID}"
+  # Agent hostname (auto-detected if empty)
+  hostname: ""
+  # Human-readable agent name
+  name: "${TELEMETRYFLOW_AGENT_NAME:-TelemetryFlow Agent}"
+  # Human-readable description
+  description: "TelemetryFlow Agent - Community Enterprise Observability Platform"
+  # Agent version (auto-populated at build time)
+  version: ""
+  # Custom tags for labeling and filtering
+  tags:
+    environment: "${TELEMETRYFLOW_ENVIRONMENT:-production}"
+    datacenter: "default"
+    # team: platform
+    # region: us-west-2
+
+# =============================================================================
+# Heartbeat Settings
+# =============================================================================
+heartbeat:
+  # Heartbeat interval (how often to send heartbeats)
+  interval: 60s
+  # Heartbeat request timeout
+  timeout: 10s
+  # Include system info in heartbeat
+  include_system_info: true
+
+# =============================================================================
+# Collectors - Data Collection Configuration
+# =============================================================================
+collectors:
+  # System metrics collector
+  system:
+    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+    # Specific disk paths to monitor (empty = all)
+    disk_paths: []
+
+  # Log collector
+  logs:
+    enabled: false
+    paths: []
+    # - /var/log/syslog
+    # - /var/log/messages
+    include_patterns: []
+    exclude_patterns: []
+
+  # Process monitoring
+  process:
+    enabled: false
+    interval: 30s
+    processes: []
+    # - nginx
+    # - postgres
+    # - redis
+
+# =============================================================================
+# Exporter Settings - OTLP Export Configuration
+# =============================================================================
+# The agent supports dual OTLP endpoint versions for compatibility:
+#   v1: OTEL community standard endpoints (/v1/metrics, /v1/traces, /v1/logs)
+#   v2: TelemetryFlow Platform endpoints (/v2/metrics, /v2/traces, /v2/logs)
+#
+# TFO Collector supports both v1 and v2 endpoints simultaneously.
+# =============================================================================
+exporter:
+  otlp:
+    enabled: true
+    # Maximum batch size before sending
+    batch_size: 100
+    # Flush interval
+    flush_interval: 10s
+    # Compression (none, gzip)
+    compression: gzip
+
+    # ==========================================================================
+    # Dual Endpoint Version Support
+    # ==========================================================================
+    # Endpoint version: "v1" for OTEL standard, "v2" for TFO Platform (default)
+    # - v1: Compatible with any standard OTEL Collector
+    # - v2: Enhanced TelemetryFlow Platform features
+    endpoint_version: v2
+
+    # Custom endpoint paths (optional, auto-generated based on endpoint_version)
+    # metrics_endpoint: /v2/metrics
+    # traces_endpoint: /v2/traces
+    # logs_endpoint: /v2/logs
+
+    # ==========================================================================
+    # Signal Type Configuration
+    # ==========================================================================
+    # Metrics export configuration
+    metrics:
+      enabled: true
+      # endpoint: ""  # Override endpoint for metrics only
+
+    # Traces export configuration
+    traces:
+      enabled: false # Enable when distributed tracing is needed
+      # endpoint: ""  # Override endpoint for traces only
+
+    # Logs export configuration
+    logs:
+      enabled: false # Enable when log forwarding is needed
+      # endpoint: ""  # Override endpoint for logs only
+
+# =============================================================================
+# Buffer - Offline/Retry Storage
+# =============================================================================
+buffer:
+  enabled: true
+  # Maximum buffer size in MB
+  max_size_mb: 100
+  # Buffer directory path
+  path: "/var/lib/tfo-agent/buffer"
+  # Maximum age of buffered entries
+  max_age: 24h
+  # Flush interval for buffered data
+  flush_interval: 5s
+
+# =============================================================================
+# Logging Settings
+# =============================================================================
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+  # Log format: json, text
+  format: json
+  # Log file path (empty = stdout)
+  file: ""
+  # Log rotation settings
+  max_size_mb: 100
+  max_backups: 3
+  max_age_days: 7
+  # Include stack traces in error logs
+  include_stack_trace: false
+  # Log sampling (reduce log volume in high-throughput scenarios)
+  sampling_initial: 100
+  sampling_thereafter: 100
+
+# =============================================================================
+# Security Settings
+# =============================================================================
+# Enterprise-grade security features for secure data ingestion
+security:
+  enabled: true
+
+  # Encryption at rest for buffered/cached data
+  encryption_at_rest:
+    enabled: false
+    # Algorithm: aes-256-gcm (recommended), chacha20-poly1305
+    algorithm: aes-256-gcm
+    # key_file: /etc/tfo-agent/encryption.key
+    key_rotation_interval: 720h # 30 days
+
+  # Secure data ingestion settings
+  secure_ingestion:
+    # Require TLS for all connections
+    require_tls: true
+    # Minimum TLS version: 1.2, 1.3
+    min_tls_version: "1.2"
+    # Validate server certificates
+    validate_server_cert: true
+    # Enable mutual TLS (mTLS) authentication
+    mutual_tls: false
+    # Allowed cipher suites (empty = all secure ciphers)
+    allowed_cipher_suites:
+      - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+      - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+      - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+
+    # Data sanitization (PII/sensitive data protection)
+    data_sanitization:
+      enabled: false
+      # Fields to automatically redact
+      redact_fields:
+        - password
+        - secret
+        - token
+        - api_key
+        - apikey
+        - authorization
+        - credential
+        - private_key
+      # Hash PII instead of removing (preserves cardinality)
+      hash_pii: false
+
+  # API key rotation
+  api_key_rotation:
+    enabled: false
+    rotation_interval: 2160h # 90 days
+    grace_period: 24h
+
+  # Security audit logging
+  audit_log:
+    enabled: false
+    file: /var/log/tfo-agent/audit.log
+    include_data_access: false
+    include_config_changes: true
+
+# =============================================================================
+# Auto-Update / Firmware Patching
+# =============================================================================
+# Automatic agent updates with security patching capabilities
+auto_update:
+  enabled: true
+  # Update channel: stable, beta, canary
+  channel: stable
+  # How often to check for updates
+  check_interval: 1h
+  # Automatically restart after successful update
+  auto_restart: true
+  # Update server URL
+  update_server: "https://updates.telemetryflow.id"
+  # Verify update signatures (recommended)
+  signature_verification: true
+  # public_key_file: /etc/tfo-agent/update-signing.pub
+  # Rollback to previous version if update fails
+  rollback_on_failure: true
+  # Number of versions to keep for rollback
+  max_rollback_versions: 3
+  # Only apply security patches automatically (skip feature updates)
+  security_patch_only: false
+  # Send notification before applying update
+  notify_before_update: true
+  # Webhook for update notifications
+  # webhook_url: https://your-webhook.example.com/agent-updates
+
+  # Maintenance window for updates
+  maintenance_window:
+    enabled: true
+    # Time window in HH:MM format (24-hour)
+    start_time: "02:00"
+    end_time: "05:00"
+    # Days of week (0=Sunday, 1=Monday, ... 6=Saturday)
+    days_of_week: [0, 1, 2, 3, 4, 5, 6]
+    # Timezone for maintenance window
+    timezone: UTC
+
+# =============================================================================
+# Retention Policies
+# =============================================================================
+# Data retention settings (Community Edition: 15 days default)
+retention:
+  # Metrics retention
+  metrics:
+    enabled: true
+    # How long to retain metrics (Community: 15 days, Enterprise: configurable)
+    duration: 360h # 15 days
+    # Maximum storage size (0 = unlimited)
+    max_size_gb: 0
+    # Compress older data
+    compression: true
+    compression_after: 24h
+    # Downsample older metrics for efficiency
+    downsampling:
+      enabled: true
+      after: 168h # 7 days
+      resolution: 5m # 5 minute resolution
+
+  # Traces retention
+  traces:
+    enabled: true
+    duration: 360h # 15 days
+    max_size_gb: 0
+    compression: true
+    compression_after: 24h
+
+  # Logs retention
+  logs:
+    enabled: true
+    duration: 360h # 15 days
+    max_size_gb: 0
+    compression: true
+    compression_after: 24h
+
+  # Local buffer retention
+  local_buffer:
+    max_age: 48h
+    max_size_mb: 500
+    cleanup_interval: 1h
+
+# =============================================================================
+# Resource Limits - Lightweight Operation
+# =============================================================================
+# Resource constraints for minimal system impact
+resources:
+  enabled: true
+
+  # CPU limits
+  cpu:
+    # Maximum CPU usage percentage (0-100)
+    max_percent: 5.0
+    # Start throttling collection at this threshold
+    throttle_threshold: 3.0
+    # Number of cores to use (0 = all)
+    num_cores: 0
+
+  # Memory limits
+  memory:
+    # Maximum memory usage in MB
+    max_mb: 128
+    # Soft limit (triggers garbage collection)
+    soft_limit_mb: 100
+    # Go garbage collection percentage
+    gc_percent: 50
+
+  # Disk I/O limits
+  disk:
+    max_write_mbps: 10
+    max_read_mbps: 20
+    max_iops: 100
+
+  # Network bandwidth limits
+  network:
+    max_bandwidth_mbps: 10
+    max_connections_per_second: 10
+    rate_limit_requests: 100
+
+  # Lightweight mode (reduced collection for constrained environments)
+  lightweight_mode: false
+
+  # Adaptive collection based on system load
+  adaptive_collection:
+    enabled: true
+    # System load threshold to reduce collection
+    high_load_threshold: 80.0
+    # Collection interval during high load
+    reduced_interval: 60s
+    # Metrics to skip during high load
+    reduced_metrics:
+      - disk_partitions
+      - network_interfaces
+      - cpu_per_core
+
+# =============================================================================
+# Internal Cache Settings
+# =============================================================================
+# Caching for reliability and performance
+cache:
+  enabled: true
+  # Default cache TTL
+  ttl: 5s
+  # Maximum cache size in MB
+  max_size_mb: 50
+  # Maximum number of cache entries
+  max_entries: 10000
+  # Eviction policy: lru (Least Recently Used), lfu, fifo
+  eviction_policy: lru
+  # Persist cache to disk (survives restarts)
+  persist_to_disk: true
+  persist_path: /var/lib/tfo-agent/cache
+  # Return stale data on collection errors
+  stale_if_error: true
+  # How long stale data can be served
+  stale_ttl: 60s
+  # Preload cache from disk on startup
+  preload_on_start: true
+
+# =============================================================================
+# 3rd Party Integrations (Alphabetically Sorted)
+# =============================================================================
+# Export telemetry data to external monitoring systems
+# All integrations are disabled by default - enable as needed
+# Total: 35+ integrations across cloud, observability, and infrastructure
+integrations:
+  # ---------------------------------------------------------------------------
+  # Alibaba Cloud (Aliyun)
+  # ---------------------------------------------------------------------------
+  alibaba:
+    enabled: false
+    access_key_id: "${ALIBABA_ACCESS_KEY_ID}"
+    access_key_secret: "${ALIBABA_ACCESS_KEY_SECRET}"
+    region: "${ALIBABA_REGION:-cn-hangzhou}"
+    # CMS (Cloud Monitor Service)
+    cms:
+      enabled: true
+      namespace: "TelemetryFlow"
+      metric_prefix: "tfo"
+    # SLS (Simple Log Service)
+    sls:
+      enabled: true
+      project: "${ALIBABA_SLS_PROJECT}"
+      logstore: "${ALIBABA_SLS_LOGSTORE}"
+      endpoint: "${ALIBABA_SLS_ENDPOINT}"
+    # ARMS (Application Real-Time Monitoring Service)
+    arms:
+      enabled: false
+    batch_size: 100
+    timeout: 30s
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Grafana Alloy (Agent)
+  # ---------------------------------------------------------------------------
+  alloy:
+    enabled: false
+    endpoint: "http://localhost:12345"
+    # remote_write_url: "http://localhost:9009/api/v1/push"
+    timeout: 30s
+    batch_size: 100
+    labels:
+      source: alloy
+    # headers:
+    #   X-Scope-OrgID: tenant1
+
+  # ---------------------------------------------------------------------------
+  # Microsoft Azure Monitor
+  # ---------------------------------------------------------------------------
+  azure:
+    enabled: false
+    subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+    tenant_id: "${AZURE_TENANT_ID}"
+    client_id: "${AZURE_CLIENT_ID}"
+    client_secret: "${AZURE_CLIENT_SECRET}"
+    resource_group: "${AZURE_RESOURCE_GROUP}"
+    # Azure Monitor
+    monitor:
+      enabled: true
+      workspace_id: "${AZURE_WORKSPACE_ID}"
+      workspace_key: "${AZURE_WORKSPACE_KEY}"
+      log_type: "TelemetryFlow"
+    # Azure Application Insights
+    application_insights:
+      enabled: false
+      instrumentation_key: "${AZURE_APP_INSIGHTS_KEY}"
+      # connection_string: "${AZURE_APP_INSIGHTS_CONNECTION}"
+    # Use Managed Identity instead of service principal
+    use_managed_identity: false
+    region: "${AZURE_REGION:-eastus}"
+    batch_size: 100
+    timeout: 30s
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Azure Arc (Hybrid Cloud Management)
+  # ---------------------------------------------------------------------------
+  azure_arc:
+    enabled: false
+    subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+    tenant_id: "${AZURE_TENANT_ID}"
+    client_id: "${AZURE_CLIENT_ID}"
+    client_secret: "${AZURE_CLIENT_SECRET}"
+    resource_group: "${AZURE_RESOURCE_GROUP}"
+    location: "${AZURE_LOCATION:-eastus}"
+    machine_name: "${HOSTNAME}"
+    # Use Managed Identity (for Arc-enabled machines)
+    use_managed_identity: false
+    scrape_interval: 60s
+    timeout: 30s
+    # Collection options
+    collect_machines: true
+    collect_kubernetes: true
+    collect_data_services: false
+    collect_sql_servers: false
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Blackbox (Synthetic Monitoring)
+  # ---------------------------------------------------------------------------
+  blackbox:
+    enabled: false
+    interval: 60s
+    timeout: 10s
+    targets: []
+    # - name: "api-health"
+    #   url: "https://api.example.com/health"
+    #   method: GET
+    #   expected_status: 200
+    #   expected_body: ""
+    # - name: "dns-check"
+    #   type: dns
+    #   target: "example.com"
+    labels:
+      monitor: blackbox
+    # headers:
+    #   Authorization: "Bearer ${API_TOKEN}"
+
+  # ---------------------------------------------------------------------------
+  # Cisco (DNA Center / Meraki)
+  # ---------------------------------------------------------------------------
+  cisco:
+    enabled: false
+    # API type: dnac (DNA Center) or meraki (Meraki Dashboard)
+    api_type: dnac
+    # DNA Center configuration
+    dnac:
+      endpoint: "https://dnac.example.com"
+      username: "${CISCO_DNAC_USERNAME}"
+      password: "${CISCO_DNAC_PASSWORD}"
+    # Meraki configuration
+    meraki:
+      api_key: "${CISCO_MERAKI_API_KEY}"
+      # org_id: "${CISCO_MERAKI_ORG_ID}"  # Optional, auto-discovered
+    tls_skip_verify: false
+    scrape_interval: 60s
+    timeout: 30s
+    # Collection options
+    collect_devices: true
+    collect_networks: true
+    collect_clients: true
+    collect_health: true
+    collect_events: false
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # AWS CloudWatch
+  # ---------------------------------------------------------------------------
+  cloudwatch:
+    enabled: false
+    region: "${AWS_REGION:-us-west-2}"
+    # Authentication (uses AWS SDK chain if not specified)
+    # access_key_id: "${AWS_ACCESS_KEY_ID}"
+    # secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+    # role_arn: "arn:aws:iam::123456789012:role/TelemetryFlowRole"
+    namespace: "TelemetryFlow"
+    log_group: "/tfo-agent/logs"
+    log_stream: "${HOSTNAME}"
+    metrics: true
+    logs: false
+    batch_size: 100
+    flush_interval: 60s
+    # dimensions:
+    #   Environment: production
+
+  # ---------------------------------------------------------------------------
+  # Coroot (eBPF-based Observability)
+  # ---------------------------------------------------------------------------
+  coroot:
+    enabled: false
+    endpoint: "${COROOT_ENDPOINT:-http://localhost:8080}"
+    api_key: "${COROOT_API_KEY}"
+    # OTLP endpoints (auto-derived from endpoint if not specified)
+    metrics_endpoint: ""   # e.g., http://localhost:8080/v1/metrics
+    traces_endpoint: ""    # e.g., http://localhost:8080/v1/traces
+    logs_endpoint: ""      # e.g., http://localhost:8080/v1/logs
+    service_name: "tfo-agent"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 100
+    flush_interval: 10s
+    # Custom tags
+    tags:
+      source: tfo-agent
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Datadog
+  # ---------------------------------------------------------------------------
+  datadog:
+    enabled: false
+    api_key: "${DATADOG_API_KEY}"
+    # app_key: "${DATADOG_APP_KEY}"
+    # Site: us1, us3, us5, eu1, ap1
+    site: us1
+    # endpoint: ""  # Override default endpoint
+    tags:
+      - "env:production"
+      - "service:tfo-agent"
+    # host_tags:
+    #   datacenter: us-west-2
+    metrics:
+      enabled: true
+      batch_size: 100
+      flush_interval: 10s
+    logs:
+      enabled: false
+      batch_size: 100
+      flush_interval: 5s
+    apm:
+      enabled: false
+      batch_size: 100
+      flush_interval: 5s
+    profiling:
+      enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Dynatrace
+  # ---------------------------------------------------------------------------
+  dynatrace:
+    enabled: false
+    environment_id: "${DYNATRACE_ENVIRONMENT_ID}"
+    api_token: "${DYNATRACE_API_TOKEN}"
+    # Environment URL (SaaS or Managed)
+    # SaaS: https://{environment_id}.live.dynatrace.com
+    # Managed: https://{your-domain}/e/{environment_id}
+    environment_url: "https://${DYNATRACE_ENVIRONMENT_ID}.live.dynatrace.com"
+    # API endpoint version: v1 or v2
+    api_version: v2
+    # Metrics Ingest API
+    metrics:
+      enabled: true
+      endpoint: "/api/v2/metrics/ingest"
+      batch_size: 1000
+      flush_interval: 60s
+    # Logs Ingest API
+    logs:
+      enabled: false
+      endpoint: "/api/v2/logs/ingest"
+      batch_size: 100
+      flush_interval: 10s
+    # Traces/Spans via OTLP
+    traces:
+      enabled: false
+      endpoint: "/api/v2/otlp/v1/traces"
+    # ActiveGate configuration (optional, for Managed environments)
+    # active_gate:
+    #   enabled: false
+    #   endpoint: "https://activegate.example.com:9999/e/{environment_id}"
+    timeout: 30s
+    # Metric key prefix
+    metric_prefix: "telemetryflow"
+    # Default dimensions for all metrics
+    default_dimensions:
+      source: tfo-agent
+      # environment: production
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # eBPF (Extended Berkeley Packet Filter) - Linux Only
+  # ---------------------------------------------------------------------------
+  ebpf:
+    enabled: false
+    # eBPF programs directory
+    programs_path: /var/lib/tfo-agent/ebpf
+    # BPF FS pin path
+    pin_path: /sys/fs/bpf/tfo-agent
+    scrape_interval: 15s
+    # Collection options
+    collect_syscalls: true
+    collect_network: true
+    collect_file_io: true
+    collect_scheduler: false
+    collect_memory: false
+    collect_tcp_events: true
+    collect_dns: false
+    collect_http: false
+    # Process filtering
+    process_filter: []
+    # - nginx
+    # - postgres
+    container_filter: []
+    namespace_filter: []
+    exclude_processes:
+      - tfo-agent
+      - systemd
+    # Sampling settings
+    sample_rate: 100  # Percentage (1-100)
+    ring_buffer_size: 65536  # Ring buffer size in bytes
+    perf_buffer_size: 8192   # Perf buffer pages
+    max_stack_depth: 20
+    # BTF (BPF Type Format) path for CO-RE
+    btf_path: ""  # Auto-detected if empty
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Elasticsearch
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    enabled: false
+    endpoints:
+      - "https://elasticsearch:9200"
+    index: "telemetryflow-%Y.%m.%d"
+    # pipeline: "my-pipeline"
+    # Authentication (choose one method)
+    # username: "${ES_USERNAME}"
+    # password: "${ES_PASSWORD}"
+    # api_key: "${ES_API_KEY}"
+    # cloud_id: "${ELASTIC_CLOUD_ID}"
+    # tls:
+    #   enabled: true
+    #   ca_file: /path/to/ca.crt
+    batch_size: 100
+    flush_interval: 10s
+    metrics: true
+    logs: true
+    traces: false
+
+  # ---------------------------------------------------------------------------
+  # Google Cloud Platform (GCP)
+  # ---------------------------------------------------------------------------
+  gcp:
+    enabled: false
+    project_id: "${GCP_PROJECT_ID}"
+    # credentials_file: /path/to/service-account.json
+    # Region for GCP services
+    region: "${GCP_REGION:-us-central1}"
+    # GCP Monitoring (Cloud Monitoring)
+    monitoring:
+      enabled: true
+      metric_prefix: "custom.googleapis.com/telemetryflow"
+    # GCP Logging (Cloud Logging)
+    logging:
+      enabled: true
+      log_name: "telemetryflow-agent"
+    # GCP Trace (Cloud Trace)
+    trace:
+      enabled: false
+    # Resource type for monitored resources
+    resource_type: "generic_task"
+    resource_labels:
+      project_id: "${GCP_PROJECT_ID}"
+      location: "${GCP_REGION:-us-central1}"
+      namespace: "telemetryflow"
+      job: "tfo-agent"
+    batch_size: 100
+    timeout: 30s
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # HyperDX (ClickStack - Open Source Observability)
+  # ---------------------------------------------------------------------------
+  hyperdx:
+    enabled: false
+    endpoint: "${HYPERDX_ENDPOINT:-https://in-otel.hyperdx.io}"
+    api_key: "${HYPERDX_API_KEY}"
+    # OTLP endpoints (auto-derived from endpoint if not specified)
+    metrics_endpoint: ""   # e.g., https://in-otel.hyperdx.io/v1/metrics
+    traces_endpoint: ""    # e.g., https://in-otel.hyperdx.io/v1/traces
+    logs_endpoint: ""      # e.g., https://in-otel.hyperdx.io/v1/logs
+    service_name: "tfo-agent"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 100
+    flush_interval: 10s
+    # Custom tags
+    tags:
+      source: tfo-agent
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # InfluxDB
+  # ---------------------------------------------------------------------------
+  influxdb:
+    enabled: false
+    endpoint: "http://influxdb:8086"
+    # InfluxDB 2.x settings
+    token: "${INFLUXDB_TOKEN}"
+    org: "${INFLUXDB_ORG}"
+    bucket: "telemetryflow"
+    version: 2
+    # InfluxDB 1.x settings (use instead of token/org/bucket)
+    # username: "${INFLUXDB_USERNAME}"
+    # password: "${INFLUXDB_PASSWORD}"
+    # database: "telemetryflow"
+    # version: 1
+    precision: ns
+    batch_size: 1000
+    flush_interval: 10s
+    # tags:
+    #   environment: production
+
+  # ---------------------------------------------------------------------------
+  # IBM Instana
+  # ---------------------------------------------------------------------------
+  instana:
+    enabled: false
+    endpoint: "${INSTANA_ENDPOINT}"
+    # Instana Agent Key
+    agent_key: "${INSTANA_AGENT_KEY}"
+    # Zone name for agent grouping
+    zone: "${INSTANA_ZONE:-default}"
+    # Cluster name (for Kubernetes environments)
+    cluster_name: ""
+    # Host agent endpoint (if using local agent)
+    # host_agent: "localhost:42699"
+    # Backend configuration
+    backend:
+      # Metrics endpoint
+      metrics:
+        enabled: true
+        endpoint: "/metrics"
+        batch_size: 100
+        flush_interval: 10s
+      # Traces endpoint (Instana uses W3C Trace Context)
+      traces:
+        enabled: false
+        endpoint: "/traces"
+        batch_size: 100
+        flush_interval: 5s
+      # Events endpoint
+      events:
+        enabled: false
+        endpoint: "/events"
+    # TLS configuration
+    tls:
+      enabled: true
+      skip_verify: false
+      # ca_file: /path/to/ca.crt
+    timeout: 30s
+    # Custom tags
+    tags:
+      source: tfo-agent
+      # team: platform
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Jaeger (Distributed Tracing)
+  # ---------------------------------------------------------------------------
+  jaeger:
+    enabled: false
+    endpoint: "http://jaeger:14268/api/traces"
+    protocol: grpc # grpc, http/thrift
+    # agent_endpoint: "jaeger:6831"  # For UDP agent
+    # username: ""
+    # password: ""
+    # tls:
+    #   enabled: false
+    service_name: "tfo-agent"
+    batch_size: 100
+    # tags:
+    #   environment: production
+
+  # ---------------------------------------------------------------------------
+  # Apache Kafka
+  # ---------------------------------------------------------------------------
+  kafka:
+    enabled: false
+    brokers:
+      - "kafka:9092"
+    topic: "telemetryflow-metrics"
+    logs_topic: "telemetryflow-logs"
+    traces_topic: "telemetryflow-traces"
+    # SASL authentication
+    # sasl:
+    #   enabled: true
+    #   mechanism: SCRAM-SHA-256
+    #   username: "${KAFKA_USERNAME}"
+    #   password: "${KAFKA_PASSWORD}"
+    # tls:
+    #   enabled: true
+    compression: snappy # none, gzip, snappy, lz4, zstd
+    batch_size: 100
+    flush_interval: 5s
+    encoding: json # json, protobuf
+    partition_key: hostname
+
+  # ---------------------------------------------------------------------------
+  # Grafana Loki
+  # ---------------------------------------------------------------------------
+  loki:
+    enabled: false
+    endpoint: "http://loki:3100/loki/api/v1/push"
+    tenant_id: ""
+    # basic_auth:
+    #   username: ""
+    #   password: ""
+    # tls:
+    #   enabled: false
+    batch_size: 100
+    flush_interval: 5s
+    labels:
+      job: tfo-agent
+      # environment: production
+    # headers:
+    #   X-Custom-Header: value
+
+  # ---------------------------------------------------------------------------
+  # ManageEngine (OpManager / Applications Manager)
+  # ---------------------------------------------------------------------------
+  manageengine:
+    enabled: false
+    # Product type: opmanager, appmanager
+    product: opmanager
+    # OpManager configuration
+    opmanager:
+      endpoint: "https://opmanager.example.com:8060"
+      api_key: "${MANAGEENGINE_OPMANAGER_API_KEY}"
+      # username: "${MANAGEENGINE_USERNAME}"
+      # password: "${MANAGEENGINE_PASSWORD}"
+      # Device discovery
+      device_name: "${HOSTNAME}"
+      device_type: "Server"
+      category: "Linux"  # Windows, Linux, Network, etc.
+    # Applications Manager configuration
+    appmanager:
+      endpoint: "https://appmanager.example.com:9090"
+      api_key: "${MANAGEENGINE_APPMANAGER_API_KEY}"
+      # Monitor group
+      monitor_group: "TelemetryFlow"
+    # Metrics configuration
+    metrics:
+      enabled: true
+      # Custom metrics endpoint
+      endpoint: "/api/json/admin/addCustomMonitor"
+      batch_size: 50
+      flush_interval: 60s
+    # Alerts/Events configuration
+    alerts:
+      enabled: false
+      endpoint: "/api/json/alert/addAlert"
+      severity_mapping:
+        critical: 1
+        high: 2
+        medium: 3
+        low: 4
+        info: 5
+    # TLS configuration
+    tls:
+      enabled: true
+      skip_verify: false
+    timeout: 30s
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # MQTT (Message Queuing Telemetry Transport)
+  # ---------------------------------------------------------------------------
+  mqtt:
+    enabled: false
+    broker: "tcp://mqtt.example.com:1883"
+    # broker: "ssl://mqtt.example.com:8883"  # TLS/SSL
+    # broker: "ws://mqtt.example.com:8083/mqtt"  # WebSocket
+    client_id: "${HOSTNAME}-tfo-agent"
+    username: "${MQTT_USERNAME}"
+    password: "${MQTT_PASSWORD}"
+    # Topic configuration
+    metrics_topic: "telemetryflow/metrics"
+    logs_topic: "telemetryflow/logs"
+    traces_topic: "telemetryflow/traces"
+    # Topic prefix for all topics
+    topic_prefix: ""
+    # QoS level: 0 (at most once), 1 (at least once), 2 (exactly once)
+    qos: 1
+    # Retain messages on broker
+    retained: false
+    # Clean session on connect
+    clean_session: true
+    # Connection settings
+    connect_timeout: 30s
+    keep_alive: 60s
+    ping_timeout: 10s
+    # Reconnection settings
+    auto_reconnect: true
+    max_reconnect_interval: 5m
+    # TLS configuration
+    tls:
+      enabled: false
+      ca_file: ""
+      cert_file: ""
+      key_file: ""
+      skip_verify: false
+    # Message format: json, protobuf
+    encoding: json
+    batch_size: 100
+    flush_interval: 10s
+    # Last Will and Testament (LWT)
+    will:
+      enabled: true
+      topic: "telemetryflow/status/${HOSTNAME}"
+      payload: '{"status": "offline"}'
+      qos: 1
+      retained: true
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Netdata Cloud (Real-time Infrastructure Monitoring)
+  # ---------------------------------------------------------------------------
+  netdata:
+    enabled: false
+    endpoint: "${NETDATA_ENDPOINT:-https://api.netdata.cloud}"
+    api_token: "${NETDATA_API_TOKEN}"
+    space_id: "${NETDATA_SPACE_ID}"
+    room_id: "${NETDATA_ROOM_ID}"
+    # Claim token for connecting to Netdata Cloud
+    claim_token: "${NETDATA_CLAIM_TOKEN}"
+    # Metrics endpoint (auto-derived if not specified)
+    metrics_endpoint: ""
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 1000
+    flush_interval: 10s
+    # Hostname override
+    hostname_override: ""
+    # Custom tags
+    tags:
+      source: tfo-agent
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # New Relic
+  # ---------------------------------------------------------------------------
+  new_relic:
+    enabled: false
+    api_key: "${NEW_RELIC_API_KEY}"
+    account_id: "${NEW_RELIC_ACCOUNT_ID}"
+    # Region: US, EU
+    region: US
+    # endpoint: ""  # Override default endpoint
+    metrics: true
+    logs: false
+    traces: false
+    batch_size: 100
+    timeout: 30s
+    # attributes:
+    #   custom_attribute: value
+
+  # ---------------------------------------------------------------------------
+  # Nutanix (Prism Central / Prism Element)
+  # ---------------------------------------------------------------------------
+  nutanix:
+    enabled: false
+    prism_central_url: "https://prism-central.example.com:9440"
+    # prism_element_url: "https://prism-element.example.com:9440"
+    username: "${NUTANIX_USERNAME}"
+    password: "${NUTANIX_PASSWORD}"
+    tls_skip_verify: false
+    scrape_interval: 60s
+    timeout: 30s
+    api_version: "v2.0"  # v2.0, v3
+    # Collection options
+    collect_vms: true
+    collect_hosts: true
+    collect_clusters: true
+    collect_storage: true
+    collect_containers: true
+    collect_networks: false
+    collect_alerts: true
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # OpenObserve (Open Source Observability Platform)
+  # ---------------------------------------------------------------------------
+  openobserve:
+    enabled: false
+    endpoint: "${OPENOBSERVE_ENDPOINT:-http://localhost:5080}"
+    username: "${OPENOBSERVE_USERNAME}"
+    password: "${OPENOBSERVE_PASSWORD}"
+    organization: "${OPENOBSERVE_ORG:-default}"
+    stream_name: "${OPENOBSERVE_STREAM:-default}"
+    # OTLP endpoints (auto-derived from endpoint if not specified)
+    metrics_endpoint: ""   # e.g., http://localhost:5080/api/default/v1/metrics
+    traces_endpoint: ""    # e.g., http://localhost:5080/api/default/v1/traces
+    logs_endpoint: ""      # e.g., http://localhost:5080/api/default/_json
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 100
+    flush_interval: 10s
+    # Custom tags
+    tags:
+      source: tfo-agent
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Percona (PMM)
+  # ---------------------------------------------------------------------------
+  percona:
+    enabled: false
+    pmm_server: "https://pmm.example.com"
+    # username: "${PMM_USERNAME}"
+    # password: "${PMM_PASSWORD}"
+    # api_key: "${PMM_API_KEY}"
+    tls_skip_verify: false
+    collect_mysql: true
+    collect_mongodb: true
+    collect_postgresql: true
+    collect_proxysql: false
+    timeout: 30s
+    labels:
+      source: percona
+
+  # ---------------------------------------------------------------------------
+  # Prometheus Remote Write
+  # ---------------------------------------------------------------------------
+  prometheus:
+    enabled: false
+    endpoint: "http://prometheus:9090/api/v1/write"
+    # tls:
+    #   enabled: true
+    #   cert_file: /path/to/client.crt
+    #   key_file: /path/to/client.key
+    # basic_auth:
+    #   username: ""
+    #   password: ""
+    batch_size: 500
+    flush_interval: 30s
+    timeout: 30s
+    external_labels:
+      environment: production
+      # region: us-west-2
+    # headers:
+    #   X-Custom-Header: value
+
+  # ---------------------------------------------------------------------------
+  # Proxmox VE (Virtual Environment)
+  # ---------------------------------------------------------------------------
+  proxmox:
+    enabled: false
+    api_url: "https://proxmox.example.com:8006"
+    # Authentication: username/password or API token
+    username: "${PROXMOX_USERNAME}"
+    password: "${PROXMOX_PASSWORD}"
+    # token_id: "${PROXMOX_TOKEN_ID}"
+    # token_secret: "${PROXMOX_TOKEN_SECRET}"
+    realm: "pam"  # pam, pve, ldap, etc.
+    node: ""  # Specific node or empty for all
+    tls_skip_verify: false
+    scrape_interval: 60s
+    timeout: 30s
+    # Collection options
+    collect_vms: true
+    collect_containers: true
+    collect_storage: true
+    collect_network: true
+    collect_cluster: true
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # SigNoz (Open Source APM & Observability)
+  # ---------------------------------------------------------------------------
+  signoz:
+    enabled: false
+    endpoint: "${SIGNOZ_ENDPOINT:-http://localhost:4318}"
+    access_token: "${SIGNOZ_ACCESS_TOKEN}"
+    # OTLP endpoints (auto-derived from endpoint if not specified)
+    metrics_endpoint: ""   # e.g., http://localhost:4318/v1/metrics
+    traces_endpoint: ""    # e.g., http://localhost:4318/v1/traces
+    logs_endpoint: ""      # e.g., http://localhost:4318/v1/logs
+    service_name: "tfo-agent"
+    tls_skip_verify: false
+    timeout: 30s
+    batch_size: 1000
+    flush_interval: 10s
+    # Custom tags
+    tags:
+      source: tfo-agent
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # SNMP (Simple Network Management Protocol)
+  # ---------------------------------------------------------------------------
+  snmp:
+    enabled: false
+    version: v2c  # v1, v2c, v3
+    community: "${SNMP_COMMUNITY:-public}"
+    port: 161
+    timeout: 10s
+    retries: 3
+    scrape_interval: 60s
+    max_repetitions: 10
+    # SNMPv3 settings (when version is v3)
+    security_level: noAuthNoPriv  # noAuthNoPriv, authNoPriv, authPriv
+    username: "${SNMP_USERNAME}"
+    auth_protocol: SHA  # MD5, SHA
+    auth_password: "${SNMP_AUTH_PASSWORD}"
+    priv_protocol: AES  # DES, AES
+    priv_password: "${SNMP_PRIV_PASSWORD}"
+    context_name: ""
+    # Target devices
+    targets: []
+    # - address: "switch1.example.com"
+    #   port: 161
+    #   name: "Core Switch 1"
+    #   community: "private"  # Override global community
+    #   labels:
+    #     location: datacenter1
+    # - address: "router1.example.com"
+    #   name: "Edge Router 1"
+    # OIDs to collect
+    walk_oids: []
+    # - "1.3.6.1.2.1.2.2"  # IF-MIB::ifTable
+    # - "1.3.6.1.2.1.1"    # SNMPv2-MIB::system
+    get_oids: []
+    # - oid: "1.3.6.1.2.1.1.3.0"
+    #   name: "sysUpTime"
+    #   type: counter
+    # - oid: "1.3.6.1.2.1.1.5.0"
+    #   name: "sysName"
+    #   type: string
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Splunk HEC (HTTP Event Collector)
+  # ---------------------------------------------------------------------------
+  splunk:
+    enabled: false
+    endpoint: "https://splunk:8088/services/collector"
+    token: "${SPLUNK_HEC_TOKEN}"
+    index: "main"
+    source: "tfo-agent"
+    source_type: "tfo-agent"
+    # tls:
+    #   enabled: true
+    #   skip_verify: false
+    batch_size: 100
+    timeout: 30s
+    metrics: true
+    logs: true
+    traces: false
+
+  # ---------------------------------------------------------------------------
+  # Telegraf
+  # ---------------------------------------------------------------------------
+  telegraf:
+    enabled: false
+    socket_path: /tmp/telegraf.sock
+    # tcp_address: "localhost:8094"
+    # udp_address: "localhost:8092"
+    protocol: socket  # socket, tcp, udp
+    timeout: 30s
+    metrics_prefix: "telegraf"
+    batch_size: 100
+    labels:
+      source: telegraf
+
+  # ---------------------------------------------------------------------------
+  # VMware vSphere
+  # ---------------------------------------------------------------------------
+  vmware:
+    enabled: false
+    vcenter_url: "https://vcenter.example.com"
+    username: "${VMWARE_USERNAME}"
+    password: "${VMWARE_PASSWORD}"
+    tls_skip_verify: false
+    datacenter: ""  # Specific datacenter or empty for all
+    scrape_interval: 60s
+    timeout: 30s
+    # Collection options
+    collect_vms: true
+    collect_hosts: true
+    collect_datastores: true
+    collect_clusters: true
+    collect_resource_pools: false
+    # Performance metrics level (1-4, higher = more metrics)
+    performance_level: 2
+    labels:
+      environment: production
+
+  # ---------------------------------------------------------------------------
+  # Generic Webhooks
+  # ---------------------------------------------------------------------------
+  webhook:
+    enabled: false
+    endpoints: []
+    # - name: "custom-webhook"
+    #   url: "https://example.com/webhook"
+    #   method: POST
+    #   headers:
+    #     Authorization: "Bearer ${WEBHOOK_TOKEN}"
+    #   encoding: json  # json, protobuf
+    #   batch_size: 100
+    #   timeout: 30s
+    #   retry_attempts: 3
+    #   metrics: true
+    #   logs: true
+    #   traces: false
+
+  # ---------------------------------------------------------------------------
+  # Zipkin (Distributed Tracing)
+  # ---------------------------------------------------------------------------
+  zipkin:
+    enabled: false
+    endpoint: "http://zipkin:9411/api/v2/spans"
+    # tls:
+    #   enabled: false
+    service_name: "tfo-agent"
+    batch_size: 100
+    timeout: 30s
+    # tags:
+    #   environment: production
+
+  # ---------------------------------------------------------------------------
+  # Custom/Plugin Integrations
+  # ---------------------------------------------------------------------------
+  custom: []
+  # - name: "my-custom-integration"
+  #   type: plugin  # plugin, script, exec
+  #   path: /etc/tfo-agent/plugins/my-plugin.so
+  #   enabled: true
+  #   metrics: true
+  #   logs: false
+  #   traces: false
+  #   config:
+  #     custom_option: value
