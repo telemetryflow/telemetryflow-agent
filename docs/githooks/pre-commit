@@ -144,17 +144,40 @@ fi
 # ==============================================================================
 # Check 5: Run related tests (fast mode)
 # ==============================================================================
-if [ -n "$STAGED_TEST_FILES" ]; then
+# Check for staged test files (both inline _test.go and tests/ directory)
+STAGED_TESTS_DIR_FILES=$(echo "$STAGED_FILES" | grep '^tests/' || true)
+
+if [ -n "$STAGED_TEST_FILES" ] || [ -n "$STAGED_TESTS_DIR_FILES" ]; then
     info "Running staged test files..."
 
-    # Get unique package directories
-    PACKAGES=$(echo "$STAGED_TEST_FILES" | xargs -n1 dirname | sort -u | sed 's|^|./|')
+    # Get unique package directories from _test.go files
+    PACKAGES=""
+    if [ -n "$STAGED_TEST_FILES" ]; then
+        PACKAGES=$(echo "$STAGED_TEST_FILES" | xargs -n1 dirname | sort -u | sed 's|^|./|')
+    fi
 
-    if go test -short -race $PACKAGES 2>/dev/null; then
-        success "Tests passed"
+    # Add tests from tests/ directory (only if files exist in those directories)
+    if [ -n "$STAGED_TESTS_DIR_FILES" ]; then
+        for dir in $(echo "$STAGED_TESTS_DIR_FILES" | xargs -n1 dirname | sort -u); do
+            if [ -d "$dir" ] && ls "$dir"/*.go >/dev/null 2>&1; then
+                if [ -n "$PACKAGES" ]; then
+                    PACKAGES="$PACKAGES ./$dir/..."
+                else
+                    PACKAGES="./$dir/..."
+                fi
+            fi
+        done
+    fi
+
+    if [ -n "$PACKAGES" ]; then
+        if go test -short -race $PACKAGES 2>/dev/null; then
+            success "Tests passed"
+        else
+            error "Tests failed. Please fix failing tests before committing."
+            exit 1
+        fi
     else
-        error "Tests failed. Please fix failing tests before committing."
-        exit 1
+        info "No test packages to run"
     fi
     echo ""
 elif [ -n "$STAGED_GO_FILES" ]; then
@@ -162,6 +185,11 @@ elif [ -n "$STAGED_GO_FILES" ]; then
 
     # Get unique package directories from changed files
     PACKAGES=$(echo "$STAGED_GO_FILES" | xargs -n1 dirname | sort -u | sed 's|^|./|')
+
+    # Also run unit tests if directory exists and has Go files
+    if [ -d "tests/unit" ] && find tests/unit -name "*.go" -type f 2>/dev/null | grep -q .; then
+        PACKAGES="$PACKAGES ./tests/unit/..."
+    fi
 
     if go test -short -race $PACKAGES 2>/dev/null; then
         success "Related tests passed"

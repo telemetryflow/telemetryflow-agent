@@ -133,16 +133,94 @@ while read LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
     fi
 
     # ==========================================================================
-    # Check 5: Full test suite
+    # Check 5: Full test suite with 95% coverage (including tests/ directory)
     # ==========================================================================
-    info "Running full test suite..."
+    info "Running full test suite with coverage..."
 
-    if go test -race -cover ./... 2>/dev/null; then
-        success "All tests passed"
-    else
+    # Coverage threshold
+    COVERAGE_THRESHOLD=95
+
+    # Run all tests including tests/ directory
+    TEST_FAILED=false
+    COVERAGE_FILE=$(mktemp)
+
+    # Run tests from tests/ directory if it exists
+    if [ -d "tests" ]; then
+        # Run unit tests if directory exists and has Go files
+        if [ -d "tests/unit" ]; then
+            if find tests/unit -name "*.go" -type f 2>/dev/null | grep -q .; then
+                info "Running unit tests from tests/unit/..."
+                if ! go test -race -coverprofile="$COVERAGE_FILE" -covermode=atomic ./tests/unit/... 2>/dev/null; then
+                    TEST_FAILED=true
+                fi
+            else
+                info "No Go files in tests/unit/, skipping"
+            fi
+        fi
+
+        # Run integration tests (optional, can be skipped with env var)
+        if [ -d "tests/integration" ] && [ "$SKIP_INTEGRATION_TESTS" != "true" ]; then
+            if find tests/integration -name "*.go" -type f 2>/dev/null | grep -q .; then
+                info "Running integration tests from tests/integration/..."
+                if ! go test -race ./tests/integration/... 2>/dev/null; then
+                    warning "Integration tests failed (set SKIP_INTEGRATION_TESTS=true to skip)"
+                    TEST_FAILED=true
+                fi
+            else
+                info "No Go files in tests/integration/, skipping"
+            fi
+        fi
+
+        # Run e2e tests (optional, can be skipped with env var)
+        if [ -d "tests/e2e" ] && [ "$SKIP_E2E_TESTS" != "true" ]; then
+            if find tests/e2e -name "*.go" -type f 2>/dev/null | grep -q .; then
+                info "Running e2e tests from tests/e2e/..."
+                if ! go test -race ./tests/e2e/... 2>/dev/null; then
+                    warning "E2E tests failed (set SKIP_E2E_TESTS=true to skip)"
+                    TEST_FAILED=true
+                fi
+            else
+                info "No Go files in tests/e2e/, skipping"
+            fi
+        fi
+    fi
+
+    # Run main package tests with coverage
+    info "Running main package tests..."
+    if ! go test -race -coverprofile="$COVERAGE_FILE" -covermode=atomic ./... 2>/dev/null; then
+        TEST_FAILED=true
+    fi
+
+    if [ "$TEST_FAILED" = true ]; then
+        rm -f "$COVERAGE_FILE"
         error "Tests failed. Please fix all failing tests before pushing."
         exit 1
     fi
+
+    # Check coverage threshold
+    if [ -f "$COVERAGE_FILE" ] && [ -s "$COVERAGE_FILE" ]; then
+        COVERAGE=$(go tool cover -func="$COVERAGE_FILE" 2>/dev/null | grep total | awk '{print $3}' | sed 's/%//')
+        if [ -n "$COVERAGE" ]; then
+            echo -e "  ${CYAN}Coverage:${NC} ${COVERAGE}%"
+
+            # Compare coverage (using bc for float comparison, or awk as fallback)
+            if command -v bc &> /dev/null; then
+                COVERAGE_OK=$(echo "$COVERAGE >= $COVERAGE_THRESHOLD" | bc -l)
+            else
+                COVERAGE_OK=$(awk "BEGIN {print ($COVERAGE >= $COVERAGE_THRESHOLD) ? 1 : 0}")
+            fi
+
+            if [ "$COVERAGE_OK" != "1" ]; then
+                rm -f "$COVERAGE_FILE"
+                error "Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%"
+                exit 1
+            fi
+            success "Coverage meets threshold (${COVERAGE}% >= ${COVERAGE_THRESHOLD}%)"
+        fi
+    fi
+    rm -f "$COVERAGE_FILE"
+
+    success "All tests passed"
     echo ""
 
     # ==========================================================================
