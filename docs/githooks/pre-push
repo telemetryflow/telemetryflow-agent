@@ -223,7 +223,7 @@ while read LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
     # ==========================================================================
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║               All pre-push checks passed! 🚀                ║${NC}"
+    echo -e "${GREEN}║               All pre-push checks passed! 🚀                 ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "${CYAN}Pushing to:${NC} $REMOTE/$BRANCH"
