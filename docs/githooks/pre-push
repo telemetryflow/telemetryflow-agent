@@ -144,13 +144,28 @@ while read LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
     TEST_FAILED=false
     COVERAGE_FILE=$(mktemp)
 
+    # Determine coverage packages (exclude tests/ and vendor/ directories)
+    # This ensures we measure coverage of the actual source code, not test helpers
+    COVERPKG=""
+    if [ -d "internal" ] || [ -d "pkg" ] || [ -d "cmd" ]; then
+        # Build coverpkg list from actual source directories
+        COVERPKG_DIRS=""
+        [ -d "internal" ] && COVERPKG_DIRS="./internal/..."
+        [ -d "pkg" ] && COVERPKG_DIRS="$COVERPKG_DIRS,./pkg/..."
+        [ -d "cmd" ] && COVERPKG_DIRS="$COVERPKG_DIRS,./cmd/..."
+        COVERPKG_DIRS=$(echo "$COVERPKG_DIRS" | sed 's/^,//')
+        if [ -n "$COVERPKG_DIRS" ]; then
+            COVERPKG="-coverpkg=$COVERPKG_DIRS"
+        fi
+    fi
+
     # Run tests from tests/ directory if it exists
     if [ -d "tests" ]; then
         # Run unit tests if directory exists and has Go files
         if [ -d "tests/unit" ]; then
             if find tests/unit -name "*.go" -type f 2>/dev/null | grep -q .; then
                 info "Running unit tests from tests/unit/..."
-                if ! go test -race -coverprofile="$COVERAGE_FILE" -covermode=atomic ./tests/unit/... 2>/dev/null; then
+                if ! go test -race $COVERPKG -coverprofile="$COVERAGE_FILE" -covermode=atomic ./tests/unit/... 2>/dev/null; then
                     TEST_FAILED=true
                 fi
             else
@@ -185,10 +200,17 @@ while read LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
         fi
     fi
 
-    # Run main package tests with coverage
-    info "Running main package tests..."
-    if ! go test -race -coverprofile="$COVERAGE_FILE" -covermode=atomic ./... 2>/dev/null; then
-        TEST_FAILED=true
+    # Run all tests with coverage (including inline _test.go files)
+    # Use -coverpkg to measure coverage of source packages from all tests
+    info "Running all tests with coverage..."
+    if [ -n "$COVERPKG" ]; then
+        if ! go test -race $COVERPKG -coverprofile="$COVERAGE_FILE" -covermode=atomic ./... 2>/dev/null; then
+            TEST_FAILED=true
+        fi
+    else
+        if ! go test -race -coverprofile="$COVERAGE_FILE" -covermode=atomic ./... 2>/dev/null; then
+            TEST_FAILED=true
+        fi
     fi
 
     if [ "$TEST_FAILED" = true ]; then
