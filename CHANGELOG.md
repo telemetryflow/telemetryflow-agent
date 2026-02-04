@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.3-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,29 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.3] - 2026-02-04
+
+### Added
+
+- **Network Retransmit Metrics**: TCP retransmit segment counting from `/proc/net/snmp` (Linux)
+  - Parses `RetransSegs` from the TCP section of `/proc/net/snmp`
+  - Provides visibility into network reliability and congestion issues
+- **Network Throughput Rate Calculation**: Real-time bytes sent/recv rate metrics in `GetSystemInfo()`
+  - Calculates `NetworkBytesSentRate` and `NetworkBytesRecvRate` using cached previous values
+  - Thread-safe rate tracking via `systemInfoCache` with mutex protection
+- **Container Name Detection**: New `getContainerName()` function for container identity
+  - Supports `CONTAINER_NAME`, Docker Compose (`COMPOSE_PROJECT_NAME` + `COMPOSE_SERVICE`)
+  - Kubernetes pod name via `POD_NAME` environment variable
+  - Docker container name via `DOCKER_CONTAINER_NAME`
+- **Container Image Detection**: New `getContainerImage()` function for container image tracking
+  - Supports `CONTAINER_IMAGE`, Kubernetes `POD_IMAGE`, and Docker `DOCKER_IMAGE` environment variables
+- **Memory Page Fault Metrics**: Page fault tracking from `/proc/vmstat` (Linux)
+  - Major page faults (`pgmajfault`) and minor page faults (derived from total `pgfault` - major)
+- **Disk IOPS Calculation**: Operations per second metric derived from disk I/O counters
+  - Calculates IOPS from total read/write operations and IO time
+- **System Call Counting**: Aggregate system call metrics from all processes (Linux)
+  - Reads from `/proc/[pid]/io` to count read (`syscr`) and write (`syscw`) system calls
 
 ## [1.1.2] - 2026-01-03
 
@@ -256,6 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                        |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls                        |
 | 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine)          |
 | 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)                   |
 | 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                  |

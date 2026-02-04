@@ -27,7 +27,7 @@
 FROM golang:1.24-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.1.2
+ARG VERSION=1.1.3
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
@@ -69,7 +69,7 @@ FROM alpine:3.21
 # =============================================================================
 LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
-    org.opencontainers.image.version="1.1.2" \
+    org.opencontainers.image.version="1.1.3" \
     org.opencontainers.image.vendor="TelemetryFlow" \
     org.opencontainers.image.authors="DevOpsCorner Indonesia <support@devopscorner.id>" \
     org.opencontainers.image.url="https://telemetryflow.id" \
@@ -145,11 +145,11 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 # =============================================================================
 # Build with:
 #   docker build \
-#     --build-arg VERSION=1.1.2 \
+#     --build-arg VERSION=1.1.3 \
 #     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
 #     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
 #     --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-#     -t telemetryflow/telemetryflow-agent:1.1.2 .
+#     -t telemetryflow/telemetryflow-agent:1.1.3 .
 #
 # Run with:
 #   docker run -d \
@@ -160,5 +160,5 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 #     -p 13133:13133 \
 #     -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
 #     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-#     telemetryflow/telemetryflow-agent:1.1.2
+#     telemetryflow/telemetryflow-agent:1.1.3
 # =============================================================================
