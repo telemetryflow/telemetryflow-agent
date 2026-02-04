@@ -682,7 +682,7 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 			lines := strings.Split(string(data), "\n")
 			for i, line := range lines {
 				// Find the Tcp: header line
-				if strings.HasPrefix(line, "Tcp:") && !strings.Contains(line, " ") == false {
+				if strings.HasPrefix(line, "Tcp:") && strings.Contains(line, " ") {
 					// Check if this is the header line (contains column names)
 					if strings.Contains(line, "RtoAlgorithm") {
 						// Next line contains values
@@ -831,12 +831,10 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 
 		// System calls - aggregate from all processes' /proc/[pid]/io
 		// This counts read (syscr) and write (syscw) system calls
-		if procs != nil {
-			for _, p := range procs {
-				ioCounters, err := p.IOCounters()
-				if err == nil {
-					info.SystemCalls += ioCounters.ReadCount + ioCounters.WriteCount
-				}
+		for _, p := range procs {
+			ioCounters, err := p.IOCounters()
+			if err == nil {
+				info.SystemCalls += ioCounters.ReadCount + ioCounters.WriteCount
 			}
 		}
 	}
