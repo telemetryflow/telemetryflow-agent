@@ -343,6 +343,11 @@ type systemInfoCache struct {
 	info      *collector.SystemInfo
 	timestamp time.Time
 	ttl       time.Duration
+
+	// Network rate tracking
+	prevNetBytesSent uint64
+	prevNetBytesRecv uint64
+	prevNetTimestamp time.Time
 }
 
 var infoCache = &systemInfoCache{
@@ -497,6 +502,25 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 		info.SwapOut = swapInfo.Sout
 	}
 
+	// Page faults from /proc/vmstat (Linux only)
+	if runtime.GOOS == "linux" {
+		if data, err := os.ReadFile("/proc/vmstat"); err == nil {
+			var totalFaults uint64
+			for _, line := range strings.Split(string(data), "\n") {
+				switch {
+				case strings.HasPrefix(line, "pgmajfault "):
+					info.PageFaultsMajor = parseUint64(strings.TrimPrefix(line, "pgmajfault "))
+				case strings.HasPrefix(line, "pgfault "):
+					totalFaults = parseUint64(strings.TrimPrefix(line, "pgfault "))
+				}
+			}
+			// Minor faults = total faults - major faults
+			if totalFaults > info.PageFaultsMajor {
+				info.PageFaultsMinor = totalFaults - info.PageFaultsMajor
+			}
+		}
+	}
+
 	// ==========================================================================
 	// Disk Information
 	// ==========================================================================
@@ -553,6 +577,14 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 		if totalWriteOps > 0 && totalWriteTime > 0 {
 			info.DiskLatencyWrite = float64(totalWriteTime) / float64(totalWriteOps)
 		}
+
+		// Calculate IOPS (operations per second based on IO time)
+		// DiskIOTime is in milliseconds, represents time spent doing I/O
+		totalOps := totalReadOps + totalWriteOps
+		if totalOps > 0 && totalIOTime > 0 {
+			// IOPS = total operations / (IO time in seconds)
+			info.DiskIOPS = float64(totalOps) / (float64(totalIOTime) / 1000.0)
+		}
 	}
 
 	// Per-partition disk info
@@ -595,6 +627,24 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 		info.NetworkDropsOut = total.Dropout
 		info.NetworkFifoIn = total.Fifoin
 		info.NetworkFifoOut = total.Fifoout
+
+		// Calculate network rates using cached previous values
+		now := time.Now()
+		infoCache.mu.Lock()
+		if !infoCache.prevNetTimestamp.IsZero() {
+			elapsed := now.Sub(infoCache.prevNetTimestamp).Seconds()
+			if elapsed > 0 && total.BytesSent >= infoCache.prevNetBytesSent {
+				info.NetworkBytesSentRate = float64(total.BytesSent-infoCache.prevNetBytesSent) / elapsed
+			}
+			if elapsed > 0 && total.BytesRecv >= infoCache.prevNetBytesRecv {
+				info.NetworkBytesRecvRate = float64(total.BytesRecv-infoCache.prevNetBytesRecv) / elapsed
+			}
+		}
+		// Update previous values for next calculation
+		infoCache.prevNetBytesSent = total.BytesSent
+		infoCache.prevNetBytesRecv = total.BytesRecv
+		infoCache.prevNetTimestamp = now
+		infoCache.mu.Unlock()
 	}
 
 	// TCP connection states
@@ -622,6 +672,33 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 				info.TCPConnectionsLastAck++
 			case "CLOSING":
 				info.TCPConnectionsClosing++
+			}
+		}
+	}
+
+	// TCP Retransmits from /proc/net/snmp (Linux only)
+	if runtime.GOOS == "linux" {
+		if data, err := os.ReadFile("/proc/net/snmp"); err == nil {
+			lines := strings.Split(string(data), "\n")
+			for i, line := range lines {
+				// Find the Tcp: header line
+				if strings.HasPrefix(line, "Tcp:") && !strings.Contains(line, " ") == false {
+					// Check if this is the header line (contains column names)
+					if strings.Contains(line, "RtoAlgorithm") {
+						// Next line contains values
+						if i+1 < len(lines) {
+							values := strings.Fields(lines[i+1])
+							// RetransSegs is at index 12 (0-indexed)
+							// Columns: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens
+							//          AttemptFails EstabResets CurrEstab InSegs OutSegs RetransSegs
+							//          InErrs OutRsts InCsumErrors
+							if len(values) > 12 {
+								info.TCPRetransmits = parseUint64(values[12])
+							}
+						}
+						break
+					}
+				}
 			}
 		}
 	}
@@ -751,6 +828,17 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 				}
 			}
 		}
+
+		// System calls - aggregate from all processes' /proc/[pid]/io
+		// This counts read (syscr) and write (syscw) system calls
+		if procs != nil {
+			for _, p := range procs {
+				ioCounters, err := p.IOCounters()
+				if err == nil {
+					info.SystemCalls += ioCounters.ReadCount + ioCounters.WriteCount
+				}
+			}
+		}
 	}
 
 	// ==========================================================================
@@ -760,6 +848,8 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 	if info.IsContainer {
 		info.ContainerID = getContainerID()
 		info.ContainerRuntime = detectContainerRuntime()
+		info.ContainerName = getContainerName()
+		info.ContainerImage = getContainerImage()
 	}
 
 	info.IsVirtualized, info.VirtualizationType = detectVirtualization()
@@ -1006,4 +1096,45 @@ func getHostnameFallback() string {
 		return h
 	}
 	return "unknown"
+}
+
+// getContainerName returns the container name from environment variables
+func getContainerName() string {
+	// Check common environment variables for container name
+	// Kubernetes sets HOSTNAME to pod name
+	if name := os.Getenv("CONTAINER_NAME"); name != "" {
+		return name
+	}
+	// Docker Compose sets COMPOSE_PROJECT_NAME and service name
+	if project := os.Getenv("COMPOSE_PROJECT_NAME"); project != "" {
+		if service := os.Getenv("COMPOSE_SERVICE"); service != "" {
+			return project + "_" + service
+		}
+	}
+	// Kubernetes pod name
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		return podName
+	}
+	// Try to get from Docker environment
+	if name := os.Getenv("DOCKER_CONTAINER_NAME"); name != "" {
+		return name
+	}
+	return ""
+}
+
+// getContainerImage returns the container image from environment variables
+func getContainerImage() string {
+	// Check common environment variables for container image
+	if image := os.Getenv("CONTAINER_IMAGE"); image != "" {
+		return image
+	}
+	// Kubernetes commonly uses this downward API field
+	if image := os.Getenv("POD_IMAGE"); image != "" {
+		return image
+	}
+	// Docker environment variable
+	if image := os.Getenv("DOCKER_IMAGE"); image != "" {
+		return image
+	}
+	return ""
 }
