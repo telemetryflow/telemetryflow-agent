@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -46,9 +45,7 @@ func newHubbleClient(cfg config.CiliumCollectorConfig, logger *zap.Logger) *hubb
 
 // connect establishes a gRPC connection to Hubble Relay.
 func (h *hubbleClient) connect(ctx context.Context) error {
-	opts := []grpc.DialOption{
-		grpc.WithBlock(),
-	}
+	var opts []grpc.DialOption
 
 	if h.cfg.HubbleTLSEnabled {
 		tlsCfg, err := h.buildTLSConfig()
@@ -60,10 +57,7 @@ func (h *hubbleClient) connect(ctx context.Context) error {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(dialCtx, h.cfg.HubbleAddress, opts...)
+	conn, err := grpc.NewClient(h.cfg.HubbleAddress, opts...)
 	if err != nil {
 		return fmt.Errorf("hubble dial %s: %w", h.cfg.HubbleAddress, err)
 	}
@@ -187,6 +181,8 @@ func (h *hubbleClient) buildTLSConfig() (*tls.Config, error) {
 
 // recordFlow increments the appropriate counters based on flow type.
 // This is called from the Hubble flow observer goroutine.
+//
+//nolint:unused // Skeleton for future Hubble flow parsing implementation
 func (h *hubbleClient) recordFlow(isL7 bool, isDrop bool, isPolicyVerdict bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -205,6 +201,8 @@ func (h *hubbleClient) recordFlow(isL7 bool, isDrop bool, isPolicyVerdict bool) 
 }
 
 // recordDNS increments the DNS query counter.
+//
+//nolint:unused // Skeleton for future Hubble flow parsing implementation
 func (h *hubbleClient) recordDNS() {
 	h.mu.Lock()
 	h.dnsQueries++

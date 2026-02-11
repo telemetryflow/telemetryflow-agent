@@ -435,11 +435,13 @@ vet:
 staticcheck:
 	@echo "$(GREEN)Running staticcheck...$(NC)"
 	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck ./...; \
+		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022' $$($(GOCMD) list ./... | grep -v '/internal/collector/ebpf$$'); \
+		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022,-U1000' ./internal/collector/ebpf; \
 	else \
 		echo "$(YELLOW)Installing staticcheck...$(NC)"; \
 		$(GOINSTALL) honnef.co/go/tools/cmd/staticcheck@latest; \
-		staticcheck ./...; \
+		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022' $$($(GOCMD) list ./... | grep -v '/internal/collector/ebpf$$'); \
+		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022,-U1000' ./internal/collector/ebpf; \
 	fi
 
 ## Run all checks (fmt, vet, lint, test)
