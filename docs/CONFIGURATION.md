@@ -90,7 +90,7 @@ When connecting to TFO-Collector, the agent automatically sends these headers:
 # =============================================================================
 # TelemetryFlow Agent Configuration
 # =============================================================================
-# Version: 1.1.2
+# Version: 1.1.4
 # Format: Custom YAML (not standard OTEL format)
 # =============================================================================
 

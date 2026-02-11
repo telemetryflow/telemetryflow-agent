@@ -13,14 +13,14 @@ TelemetryFlow Agent (`tfo-agent`) is a custom-built enterprise-grade telemetry c
 
 ### Key Differentiators
 
-| Feature | tfo-agent (Custom) | OTEL Collector |
-|---------|-------------------|----------------|
-| SDK Base | OpenTelemetry SDK v1.39.0 | OTEL Collector |
-| CLI Framework | Cobra with subcommands | Standard OTEL |
-| Config Format | Custom YAML with `enabled` flags | Standard OTEL YAML |
-| Banner/Branding | Custom ASCII art banner | None |
-| Build System | Single Go binary | OCB-generated |
-| Commands | `start`, `version`, `config` | `--config` only |
+| Feature         | tfo-agent (Custom)               | OTEL Collector     |
+| --------------- | -------------------------------- | ------------------ |
+| SDK Base        | OpenTelemetry SDK v1.39.0        | OTEL Collector     |
+| CLI Framework   | Cobra with subcommands           | Standard OTEL      |
+| Config Format   | Custom YAML with `enabled` flags | Standard OTEL YAML |
+| Banner/Branding | Custom ASCII art banner          | None               |
+| Build System    | Single Go binary                 | OCB-generated      |
+| Commands        | `start`, `version`, `config`     | `--config` only    |
 
 ### TelemetryFlow Ecosystem Alignment
 
@@ -28,7 +28,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.1.2"
+    subgraph "TelemetryFlow Ecosystem v1.1.4"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.39.0]
         end
@@ -53,13 +53,14 @@ graph LR
     style COLLECTOR fill:#FFB74D,stroke:#F57C00
 ```
 
-| Component | Version | OTEL Base | Description |
-|-----------|---------|-----------|-------------|
-| **TFO-Agent** | v1.1.2 | SDK v1.39.0 | Telemetry collection agent |
-| **TFO-Go-SDK** | v1.1.2 | SDK v1.39.0 | Go instrumentation SDK |
-| **TFO-Collector** | v1.1.2 | Collector v0.142.0 | Central telemetry collector |
+| Component         | Version | OTEL Base          | Description                 |
+| ----------------- | ------- | ------------------ | --------------------------- |
+| **TFO-Agent**     | v1.1.4  | SDK v1.39.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.1.3  | SDK v1.39.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.1.3  | Collector v0.142.0 | Central telemetry collector |
 
 This alignment ensures:
+
 - **Consistent telemetry format** across all components
 - **Seamless integration** between agent and SDK instrumentation
 - **Unified authentication** using TelemetryFlow credentials (tfk_xxx / tfs_xxx)
@@ -71,28 +72,36 @@ This alignment ensures:
 
 ### Core Documentation
 
-| Document | Description |
-|----------|-------------|
-| [README.md](README.md) | This file - Overview and quick reference |
-| [INSTALLATION.md](INSTALLATION.md) | Installation and deployment guide |
-| [CONFIGURATION.md](CONFIGURATION.md) | Configuration reference |
-| [COMMANDS.md](COMMANDS.md) | CLI commands reference |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Internal architecture with Mermaid diagrams |
-| [SYSTEM-INFO.md](SYSTEM-INFO.md) | System information collection capabilities (130+ metrics) |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Development guide, coding standards, and testing |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting guide and common issues |
-| [GITHUB-WORKFLOWS.md](GITHUB-WORKFLOWS.md) | CI/CD workflows documentation |
+| Document                                   | Description                                               |
+| ------------------------------------------ | --------------------------------------------------------- |
+| [README.md](README.md)                     | This file - Overview and quick reference                  |
+| [INSTALLATION.md](INSTALLATION.md)         | Installation and deployment guide                         |
+| [CONFIGURATION.md](CONFIGURATION.md)       | Configuration reference                                   |
+| [COMMANDS.md](COMMANDS.md)                 | CLI commands reference                                    |
+| [ARCHITECTURE.md](ARCHITECTURE.md)         | Internal architecture with Mermaid diagrams               |
+| [SYSTEM-INFO.md](SYSTEM-INFO.md)           | System information collection capabilities (130+ metrics) |
+| [DEVELOPMENT.md](DEVELOPMENT.md)           | Development guide, coding standards, and testing          |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md)   | Troubleshooting guide and common issues                   |
+| [GITHUB-WORKFLOWS.md](GITHUB-WORKFLOWS.md) | CI/CD workflows documentation                             |
+
+### Kubernetes & Prometheus Documentation
+
+| Document                                                         | Description                                                   |
+| ---------------------------------------------------------------- | ------------------------------------------------------------- |
+| [KUBERNETES-COLLECTOR.md](integration/KUBERNETES-COLLECTOR.md)   | Kubernetes metrics collector (kube-state-metrics replacement) |
+| [PROMETHEUS-EXPORTER.md](integration/PROMETHEUS-EXPORTER.md)     | Prometheus /metrics scrape endpoint                           |
+| [KUBERNETES-DEPLOYMENT.md](integration/KUBERNETES-DEPLOYMENT.md) | Kubernetes DaemonSet deployment guide                         |
 
 ### Integration Documentation
 
-| Document | Description |
-|----------|-------------|
-| [integrations/README.md](integrations/README.md) | Integration overview and architecture |
-| [integrations/CLOUD-PROVIDERS.md](integrations/CLOUD-PROVIDERS.md) | GCP, Azure, Alibaba Cloud |
-| [integrations/INFRASTRUCTURE.md](integrations/INFRASTRUCTURE.md) | Proxmox, VMware, Nutanix, Azure Arc |
-| [integrations/NETWORK.md](integrations/NETWORK.md) | Cisco, SNMP, MQTT integrations |
-| [integrations/KERNEL.md](integrations/KERNEL.md) | eBPF kernel-level observability |
-| [integrations/OBSERVABILITY.md](integrations/OBSERVABILITY.md) | APM platforms (Dynatrace, Instana, etc.) |
+| Document                                                           | Description                              |
+| ------------------------------------------------------------------ | ---------------------------------------- |
+| [integrations/README.md](integrations/README.md)                   | Integration overview and architecture    |
+| [integrations/CLOUD-PROVIDERS.md](integrations/CLOUD-PROVIDERS.md) | GCP, Azure, Alibaba Cloud                |
+| [integrations/INFRASTRUCTURE.md](integrations/INFRASTRUCTURE.md)   | Proxmox, VMware, Nutanix, Azure Arc      |
+| [integrations/NETWORK.md](integrations/NETWORK.md)                 | Cisco, SNMP, MQTT integrations           |
+| [integrations/KERNEL.md](integrations/KERNEL.md)                   | eBPF kernel-level observability          |
+| [integrations/OBSERVABILITY.md](integrations/OBSERVABILITY.md)     | APM platforms (Dynatrace, Instana, etc.) |
 
 ---
 
@@ -234,7 +243,7 @@ sequenceDiagram
 # tfo-agent configuration (custom format)
 agent:
   id: "agent-001"
-  hostname: ""  # auto-detected
+  hostname: "" # auto-detected
   description: "Production Agent"
   tags:
     environment: "production"
@@ -266,12 +275,12 @@ buffer:
 
 ## Exposed Ports
 
-| Port | Protocol | Description |
-|------|----------|-------------|
-| 4317 | gRPC | OTLP gRPC receiver |
-| 4318 | HTTP | OTLP HTTP receiver |
-| 8888 | HTTP | Prometheus metrics (self) |
-| 13133 | HTTP | Health check |
+| Port  | Protocol | Description               |
+| ----- | -------- | ------------------------- |
+| 4317  | gRPC     | OTLP gRPC receiver        |
+| 4318  | HTTP     | OTLP HTTP receiver        |
+| 8888  | HTTP     | Prometheus metrics (self) |
+| 13133 | HTTP     | Health check              |
 
 ---
 
@@ -368,9 +377,9 @@ spec:
   template:
     spec:
       containers:
-      - name: tfo-agent
-        image: telemetryflow/telemetryflow-agent:latest
-        args: ["start", "--config", "/etc/tfo-agent/config.yaml"]
+        - name: tfo-agent
+          image: telemetryflow/telemetryflow-agent:latest
+          args: ["start", "--config", "/etc/tfo-agent/config.yaml"]
 ```
 
 ### Systemd

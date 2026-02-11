@@ -1,6 +1,6 @@
 # Kernel/System Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../../CHANGELOG.md)
 
 This document covers kernel-level observability integrations using eBPF.
 
@@ -76,12 +76,12 @@ sequenceDiagram
 
 ### Requirements
 
-| Requirement | Minimum Version |
-|-------------|-----------------|
-| Linux Kernel | 4.15+ (5.x recommended) |
-| BTF Support | Kernel 5.2+ |
-| CAP_SYS_ADMIN | Required |
-| BPF FS | Mounted at /sys/fs/bpf |
+| Requirement   | Minimum Version         |
+| ------------- | ----------------------- |
+| Linux Kernel  | 4.15+ (5.x recommended) |
+| BTF Support   | Kernel 5.2+             |
+| CAP_SYS_ADMIN | Required                |
+| BPF FS        | Mounted at /sys/fs/bpf  |
 
 ### Configuration
 
@@ -116,13 +116,13 @@ integrations:
       - systemd
 
     # Sampling settings
-    sample_rate: 100  # Percentage (1-100)
+    sample_rate: 100 # Percentage (1-100)
     ring_buffer_size: 65536
     perf_buffer_size: 8192
     max_stack_depth: 20
 
     # BTF path for CO-RE
-    btf_path: ""  # Auto-detected
+    btf_path: "" # Auto-detected
 ```
 
 ### Collected Data
@@ -139,11 +139,11 @@ graph LR
     end
 ```
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ebpf_syscall_count` | counter | Syscall count by type |
-| `ebpf_syscall_latency_ns` | histogram | Syscall latency |
-| `ebpf_syscall_errors` | counter | Failed syscalls |
+| Metric                    | Type      | Description           |
+| ------------------------- | --------- | --------------------- |
+| `ebpf_syscall_count`      | counter   | Syscall count by type |
+| `ebpf_syscall_latency_ns` | histogram | Syscall latency       |
+| `ebpf_syscall_errors`     | counter   | Failed syscalls       |
 
 #### Network Metrics
 
@@ -160,39 +160,39 @@ graph LR
     RTT --> M3[ebpf_tcp_rtt_us]
 ```
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ebpf_network_bytes_total` | counter | Bytes sent/received |
-| `ebpf_network_packets_total` | counter | Packets sent/received |
-| `ebpf_tcp_connections` | gauge | Active TCP connections |
-| `ebpf_tcp_connect_latency_ns` | histogram | TCP connect time |
-| `ebpf_tcp_rtt_us` | gauge | TCP round-trip time |
-| `ebpf_tcp_retransmits` | counter | TCP retransmissions |
+| Metric                        | Type      | Description            |
+| ----------------------------- | --------- | ---------------------- |
+| `ebpf_network_bytes_total`    | counter   | Bytes sent/received    |
+| `ebpf_network_packets_total`  | counter   | Packets sent/received  |
+| `ebpf_tcp_connections`        | gauge     | Active TCP connections |
+| `ebpf_tcp_connect_latency_ns` | histogram | TCP connect time       |
+| `ebpf_tcp_rtt_us`             | gauge     | TCP round-trip time    |
+| `ebpf_tcp_retransmits`        | counter   | TCP retransmissions    |
 
 #### File I/O Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ebpf_file_read_bytes` | counter | Bytes read |
-| `ebpf_file_write_bytes` | counter | Bytes written |
-| `ebpf_file_open_count` | counter | File opens |
-| `ebpf_file_io_latency_ns` | histogram | I/O latency |
+| Metric                    | Type      | Description   |
+| ------------------------- | --------- | ------------- |
+| `ebpf_file_read_bytes`    | counter   | Bytes read    |
+| `ebpf_file_write_bytes`   | counter   | Bytes written |
+| `ebpf_file_open_count`    | counter   | File opens    |
+| `ebpf_file_io_latency_ns` | histogram | I/O latency   |
 
 #### Scheduler Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ebpf_process_runtime_ns` | counter | Process CPU time |
-| `ebpf_context_switches` | counter | Context switches |
+| Metric                     | Type      | Description       |
+| -------------------------- | --------- | ----------------- |
+| `ebpf_process_runtime_ns`  | counter   | Process CPU time  |
+| `ebpf_context_switches`    | counter   | Context switches  |
 | `ebpf_runqueue_latency_ns` | histogram | Scheduler latency |
 
 #### Memory Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ebpf_page_faults` | counter | Page fault count |
+| Metric                    | Type    | Description        |
+| ------------------------- | ------- | ------------------ |
+| `ebpf_page_faults`        | counter | Page fault count   |
 | `ebpf_memory_allocations` | counter | Memory allocations |
-| `ebpf_oom_kills` | counter | OOM kill events |
+| `ebpf_oom_kills`          | counter | OOM kill events    |
 
 ### eBPF Program Types
 
@@ -222,12 +222,12 @@ graph TB
 
 ### Platform Support
 
-| Platform | Support |
-|----------|---------|
-| Linux x86_64 | ✅ Full |
-| Linux aarch64 | ✅ Full |
-| macOS | ❌ Not supported |
-| Windows | ❌ Not supported |
+| Platform      | Support          |
+| ------------- | ---------------- |
+| Linux x86_64  | ✅ Full          |
+| Linux aarch64 | ✅ Full          |
+| macOS         | ❌ Not supported |
+| Windows       | ❌ Not supported |
 
 ### Troubleshooting
 
@@ -249,12 +249,12 @@ capsh --print | grep cap_sys_admin
 
 #### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Permission denied | Run as root or with CAP_SYS_ADMIN |
-| BTF not found | Install kernel BTF or provide btf_path |
-| Program load failed | Check kernel version compatibility |
-| Ring buffer overflow | Increase ring_buffer_size |
+| Issue                | Solution                               |
+| -------------------- | -------------------------------------- |
+| Permission denied    | Run as root or with CAP_SYS_ADMIN      |
+| BTF not found        | Install kernel BTF or provide btf_path |
+| Program load failed  | Check kernel version compatibility     |
+| Ring buffer overflow | Increase ring_buffer_size              |
 
 ### Security Considerations
 
@@ -344,22 +344,22 @@ integrations:
       hubble_tls_ca: /etc/hubble/ca.crt
 
       # Flow collection
-      collect_flows: true        # L3/L4 network flows
-      collect_l7_flows: true     # HTTP, gRPC, DNS, Kafka
-      collect_drops: true        # Dropped packets
-      collect_policies: true     # Network policy verdicts
-      collect_services: true     # Service mesh metrics
+      collect_flows: true # L3/L4 network flows
+      collect_l7_flows: true # HTTP, gRPC, DNS, Kafka
+      collect_drops: true # Dropped packets
+      collect_policies: true # Network policy verdicts
+      collect_services: true # Service mesh metrics
 
       # Kubernetes integration
       kubernetes_enabled: true
-      watch_namespaces: []       # Empty = all namespaces
+      watch_namespaces: [] # Empty = all namespaces
       exclude_namespaces:
         - kube-system
         - cilium
 
       # Performance settings
       flow_buffer_size: 4096
-      flow_sample_rate: 1        # 1 = 100%, 10 = 10%
+      flow_sample_rate: 1 # 1 = 100%, 10 = 10%
       max_flows_per_second: 10000
       aggregation_window: 10s
 ```
@@ -368,33 +368,33 @@ integrations:
 
 #### Flow Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `hubble_flows_total` | counter | Total flows by protocol/verdict |
-| `hubble_flow_bytes_total` | counter | Total bytes by flow |
-| `hubble_tcp_connections_total` | counter | TCP connections |
-| `hubble_tcp_connection_duration_seconds` | histogram | TCP connection duration |
-| `hubble_udp_flows_total` | counter | UDP flows |
+| Metric                                   | Type      | Description                     |
+| ---------------------------------------- | --------- | ------------------------------- |
+| `hubble_flows_total`                     | counter   | Total flows by protocol/verdict |
+| `hubble_flow_bytes_total`                | counter   | Total bytes by flow             |
+| `hubble_tcp_connections_total`           | counter   | TCP connections                 |
+| `hubble_tcp_connection_duration_seconds` | histogram | TCP connection duration         |
+| `hubble_udp_flows_total`                 | counter   | UDP flows                       |
 
 #### L7 Protocol Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `hubble_http_requests_total` | counter | HTTP requests by method |
-| `hubble_http_request_duration_seconds` | histogram | HTTP request latency |
-| `hubble_http_responses_total` | counter | HTTP responses by status |
-| `hubble_grpc_requests_total` | counter | gRPC requests |
-| `hubble_grpc_request_duration_seconds` | histogram | gRPC request latency |
-| `hubble_dns_queries_total` | counter | DNS queries by type |
-| `hubble_dns_responses_total` | counter | DNS responses by rcode |
-| `hubble_kafka_requests_total` | counter | Kafka requests |
+| Metric                                 | Type      | Description              |
+| -------------------------------------- | --------- | ------------------------ |
+| `hubble_http_requests_total`           | counter   | HTTP requests by method  |
+| `hubble_http_request_duration_seconds` | histogram | HTTP request latency     |
+| `hubble_http_responses_total`          | counter   | HTTP responses by status |
+| `hubble_grpc_requests_total`           | counter   | gRPC requests            |
+| `hubble_grpc_request_duration_seconds` | histogram | gRPC request latency     |
+| `hubble_dns_queries_total`             | counter   | DNS queries by type      |
+| `hubble_dns_responses_total`           | counter   | DNS responses by rcode   |
+| `hubble_kafka_requests_total`          | counter   | Kafka requests           |
 
 #### Drop Metrics
 
-| Metric                   | Type    | Description                |
-|--------------------------|---------|----------------------------|
-| `hubble_drop_total`      | counter | Dropped packets by reason  |
-| `hubble_drop_bytes_total`| counter | Dropped bytes by reason    |
+| Metric                    | Type    | Description               |
+| ------------------------- | ------- | ------------------------- |
+| `hubble_drop_total`       | counter | Dropped packets by reason |
+| `hubble_drop_bytes_total` | counter | Dropped bytes by reason   |
 
 Common drop reasons:
 
@@ -405,20 +405,20 @@ Common drop reasons:
 
 #### Network Policy Metrics
 
-| Metric                        | Type    | Description                                 |
-|-------------------------------|---------|---------------------------------------------|
-| `hubble_policy_verdicts_total`| counter | Policy verdicts (ALLOWED/DENIED/AUDIT)      |
-| `hubble_policy_match_total`   | counter | Policy matches by type (L3, L4, L7)         |
+| Metric                         | Type    | Description                            |
+| ------------------------------ | ------- | -------------------------------------- |
+| `hubble_policy_verdicts_total` | counter | Policy verdicts (ALLOWED/DENIED/AUDIT) |
+| `hubble_policy_match_total`    | counter | Policy matches by type (L3, L4, L7)    |
 
 #### Service Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `hubble_service_requests_total` | counter | Service requests |
-| `hubble_service_errors_total` | counter | Service errors |
-| `hubble_service_request_duration_seconds` | histogram | Service latency |
-| `hubble_endpoint_count` | gauge | Active endpoints |
-| `hubble_endpoint_ready` | gauge | Ready endpoints |
+| Metric                                    | Type      | Description      |
+| ----------------------------------------- | --------- | ---------------- |
+| `hubble_service_requests_total`           | counter   | Service requests |
+| `hubble_service_errors_total`             | counter   | Service errors   |
+| `hubble_service_request_duration_seconds` | histogram | Service latency  |
+| `hubble_endpoint_count`                   | gauge     | Active endpoints |
+| `hubble_endpoint_ready`                   | gauge     | Ready endpoints  |
 
 ### Data Flow
 
@@ -444,12 +444,12 @@ sequenceDiagram
 
 ### Prerequisites
 
-| Requirement   | Minimum Version   |
-|---------------|-------------------|
-| Kubernetes    | 1.21+             |
-| Cilium        | 1.12+             |
-| Hubble        | Enabled in Cilium |
-| Hubble Relay  | Deployed          |
+| Requirement  | Minimum Version   |
+| ------------ | ----------------- |
+| Kubernetes   | 1.21+             |
+| Cilium       | 1.12+             |
+| Hubble       | Enabled in Cilium |
+| Hubble Relay | Deployed          |
 
 ### Installation with Cilium
 
@@ -482,21 +482,21 @@ spec:
   template:
     spec:
       containers:
-      - name: tfo-agent
-        image: telemetryflow/telemetryflow-agent:1.1.2
-        volumeMounts:
-        - name: hubble-tls
-          mountPath: /etc/hubble
-          readOnly: true
-        - name: config
-          mountPath: /etc/tfo-agent
+        - name: tfo-agent
+          image: telemetryflow/telemetryflow-agent:1.1.4
+          volumeMounts:
+            - name: hubble-tls
+              mountPath: /etc/hubble
+              readOnly: true
+            - name: config
+              mountPath: /etc/tfo-agent
       volumes:
-      - name: hubble-tls
-        secret:
-          secretName: hubble-relay-client-certs
-      - name: config
-        configMap:
-          name: tfo-agent-config
+        - name: hubble-tls
+          secret:
+            secretName: hubble-relay-client-certs
+        - name: config
+          configMap:
+            name: tfo-agent-config
 ```
 
 ### Troubleshooting Cilium Integration
@@ -518,12 +518,12 @@ hubble observe -n default
 kubectl logs -n telemetryflow -l app=tfo-agent | grep hubble
 ```
 
-| Issue                | Solution                        |
-|----------------------|---------------------------------|
-| Connection refused   | Verify Hubble Relay is running  |
-| TLS handshake failed | Check TLS certificates          |
-| No flows received    | Verify Cilium is the CNI        |
-| Missing L7 metrics   | Enable L7 visibility in Cilium  |
+| Issue                | Solution                       |
+| -------------------- | ------------------------------ |
+| Connection refused   | Verify Hubble Relay is running |
+| TLS handshake failed | Check TLS certificates         |
+| No flows received    | Verify Cilium is the CNI       |
+| Missing L7 metrics   | Enable L7 visibility in Cilium |
 
 ---
 

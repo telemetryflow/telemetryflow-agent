@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../../CHANGELOG.md)
 
 This document provides an overview of all third-party integrations supported by the TelemetryFlow Agent.
 
@@ -63,13 +63,16 @@ flowchart TB
 
 ## Integration Categories
 
-| Category | Integrations | Description |
-|----------|-------------|-------------|
-| [Cloud Providers](CLOUD-PROVIDERS.md) | GCP, Azure, Alibaba | Major cloud platform integrations |
-| [Infrastructure](INFRASTRUCTURE.md) | Proxmox, VMware, Nutanix, Azure Arc | Virtualization and hybrid cloud |
-| [Network & IoT](NETWORK.md) | Cisco, SNMP, MQTT | Network devices and IoT messaging |
-| [Kernel/System](KERNEL.md) | eBPF | Linux kernel-level observability |
-| [Observability](OBSERVABILITY.md) | Prometheus, Datadog, Dynatrace, Instana, ManageEngine, Splunk, etc. | APM & monitoring backends |
+| Category                                        | Integrations                                                        | Description                            |
+| ----------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------- |
+| [Cloud Providers](CLOUD-PROVIDERS.md)           | GCP, Azure, Alibaba                                                 | Major cloud platform integrations      |
+| [Infrastructure](INFRASTRUCTURE.md)             | Proxmox, VMware, Nutanix, Azure Arc                                 | Virtualization and hybrid cloud        |
+| [Network & IoT](NETWORK.md)                     | Cisco, SNMP, MQTT                                                   | Network devices and IoT messaging      |
+| [Kernel/System](KERNEL.md)                      | eBPF                                                                | Linux kernel-level observability       |
+| [Observability](OBSERVABILITY.md)               | Prometheus, Datadog, Dynatrace, Instana, ManageEngine, Splunk, etc. | APM & monitoring backends              |
+| [Prometheus Exporter](PROMETHEUS-EXPORTER.md)   | Prometheus /metrics endpoint                                        | Prometheus-compatible scrape endpoint  |
+| [Kubernetes Collector](KUBERNETES-COLLECTOR.md) | Kubernetes resource state                                           | Drop-in kube-state-metrics replacement |
+| [Node Exporter](NODE-EXPORTER.md)               | System metrics (CPU, Memory, Disk, Network, etc.)                   | Drop-in node_exporter replacement      |
 
 ## Data Flow
 
@@ -132,22 +135,22 @@ graph LR
     T --> E1
 ```
 
-| Integration | Metrics | Logs | Traces |
-|-------------|---------|------|--------|
-| GCP | ✅ | ✅ | ✅ |
-| Azure | ✅ | ✅ | ✅ |
-| Alibaba | ✅ | ✅ | ✅ |
-| Proxmox | ✅ | ❌ | ❌ |
-| VMware | ✅ | ❌ | ❌ |
-| Nutanix | ✅ | ❌ | ❌ |
-| Azure Arc | ✅ | ❌ | ❌ |
-| Cisco | ✅ | ❌ | ❌ |
-| SNMP | ✅ | ❌ | ❌ |
-| MQTT | ✅ | ✅ | ✅ |
-| eBPF | ✅ | ❌ | ❌ |
-| Dynatrace | ✅ | ✅ | ✅ |
-| IBM Instana | ✅ | ✅ | ✅ |
-| ManageEngine | ✅ | ✅ | ❌ |
+| Integration  | Metrics | Logs | Traces |
+| ------------ | ------- | ---- | ------ |
+| GCP          | ✅      | ✅   | ✅     |
+| Azure        | ✅      | ✅   | ✅     |
+| Alibaba      | ✅      | ✅   | ✅     |
+| Proxmox      | ✅      | ❌   | ❌     |
+| VMware       | ✅      | ❌   | ❌     |
+| Nutanix      | ✅      | ❌   | ❌     |
+| Azure Arc    | ✅      | ❌   | ❌     |
+| Cisco        | ✅      | ❌   | ❌     |
+| SNMP         | ✅      | ❌   | ❌     |
+| MQTT         | ✅      | ✅   | ✅     |
+| eBPF         | ✅      | ❌   | ❌     |
+| Dynatrace    | ✅      | ✅   | ✅     |
+| IBM Instana  | ✅      | ✅   | ✅     |
+| ManageEngine | ✅      | ✅   | ❌     |
 
 ## Configuration
 
@@ -214,6 +217,9 @@ stateDiagram-v2
 - [Network & IoT](NETWORK.md) - Cisco, SNMP, MQTT
 - [Kernel/System](KERNEL.md) - eBPF observability
 - [Observability Backends](OBSERVABILITY.md) - Prometheus, Datadog, etc.
+- [Prometheus Exporter](PROMETHEUS-EXPORTER.md) - Prometheus /metrics scrape endpoint
+- [Kubernetes Collector](KUBERNETES-COLLECTOR.md) - Kubernetes resource state metrics
+- [Node Exporter](NODE-EXPORTER.md) - Drop-in replacement for prometheus/node_exporter
 
 ---
 

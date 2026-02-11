@@ -1,6 +1,6 @@
 # Observability Backend Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../../CHANGELOG.md)
 
 This document covers integrations with observability backends and monitoring systems.
 
@@ -65,27 +65,27 @@ flowchart LR
 
 ## Quick Reference
 
-| Integration | Metrics | Logs | Traces | Protocol |
-|-------------|---------|------|--------|----------|
-| Coroot | ✅ | ✅ | ✅ | OTLP/HTTP |
-| Datadog | ✅ | ✅ | ✅ | HTTP/API |
-| Dynatrace | ✅ | ✅ | ✅ | REST/OTLP |
-| Elasticsearch | ✅ | ✅ | ❌ | Bulk API |
-| HyperDX | ✅ | ✅ | ✅ | OTLP/HTTP |
-| IBM Instana | ✅ | ✅ | ✅ | REST |
-| InfluxDB | ✅ | ❌ | ❌ | Line Protocol |
-| Jaeger | ❌ | ❌ | ✅ | gRPC/Thrift |
-| Kafka | ✅ | ✅ | ✅ | Producer |
-| CloudWatch | ✅ | ✅ | ❌ | AWS SDK |
-| Loki | ❌ | ✅ | ❌ | Push API |
-| ManageEngine | ✅ | ✅ | ❌ | REST |
-| Netdata | ✅ | ❌ | ❌ | REST |
-| New Relic | ✅ | ✅ | ✅ | HTTP/API |
-| OpenObserve | ✅ | ✅ | ✅ | OTLP/HTTP |
-| Prometheus | ✅ | ❌ | ❌ | Remote Write |
-| SigNoz | ✅ | ✅ | ✅ | OTLP/HTTP |
-| Splunk | ✅ | ✅ | ❌ | HEC |
-| Zipkin | ❌ | ❌ | ✅ | HTTP |
+| Integration   | Metrics | Logs | Traces | Protocol      |
+| ------------- | ------- | ---- | ------ | ------------- |
+| Coroot        | ✅      | ✅   | ✅     | OTLP/HTTP     |
+| Datadog       | ✅      | ✅   | ✅     | HTTP/API      |
+| Dynatrace     | ✅      | ✅   | ✅     | REST/OTLP     |
+| Elasticsearch | ✅      | ✅   | ❌     | Bulk API      |
+| HyperDX       | ✅      | ✅   | ✅     | OTLP/HTTP     |
+| IBM Instana   | ✅      | ✅   | ✅     | REST          |
+| InfluxDB      | ✅      | ❌   | ❌     | Line Protocol |
+| Jaeger        | ❌      | ❌   | ✅     | gRPC/Thrift   |
+| Kafka         | ✅      | ✅   | ✅     | Producer      |
+| CloudWatch    | ✅      | ✅   | ❌     | AWS SDK       |
+| Loki          | ❌      | ✅   | ❌     | Push API      |
+| ManageEngine  | ✅      | ✅   | ❌     | REST          |
+| Netdata       | ✅      | ❌   | ❌     | REST          |
+| New Relic     | ✅      | ✅   | ✅     | HTTP/API      |
+| OpenObserve   | ✅      | ✅   | ✅     | OTLP/HTTP     |
+| Prometheus    | ✅      | ❌   | ❌     | Remote Write  |
+| SigNoz        | ✅      | ✅   | ✅     | OTLP/HTTP     |
+| Splunk        | ✅      | ✅   | ❌     | HEC           |
+| Zipkin        | ❌      | ❌   | ✅     | HTTP          |
 
 ## Prometheus
 
@@ -127,7 +127,7 @@ integrations:
   datadog:
     enabled: true
     api_key: "${DATADOG_API_KEY}"
-    site: us1  # us1, us3, us5, eu1, ap1
+    site: us1 # us1, us3, us5, eu1, ap1
     tags:
       - "env:production"
       - "service:tfo-agent"
@@ -223,7 +223,7 @@ integrations:
     enabled: true
     api_key: "${MANAGEENGINE_API_KEY}"
     base_url: "https://opmanager.example.com:8060"
-    product: opmanager  # opmanager, site24x7, applications_manager
+    product: opmanager # opmanager, site24x7, applications_manager
     account_id: "${MANAGEENGINE_ACCOUNT_ID}"
     monitor_group: "TelemetryFlow"
     tls_skip_verify: false
@@ -236,11 +236,11 @@ integrations:
 
 ### Supported Products
 
-| Product                | Description                          |
-|------------------------|--------------------------------------|
-| `opmanager`            | ManageEngine OpManager (on-premise)  |
-| `site24x7`             | Site24x7 SaaS monitoring             |
-| `applications_manager` | Applications Manager APM             |
+| Product                | Description                         |
+| ---------------------- | ----------------------------------- |
+| `opmanager`            | ManageEngine OpManager (on-premise) |
+| `site24x7`             | Site24x7 SaaS monitoring            |
+| `applications_manager` | Applications Manager APM            |
 
 ## Splunk
 
@@ -397,7 +397,7 @@ integrations:
   jaeger:
     enabled: true
     endpoint: "http://jaeger:14268/api/traces"
-    protocol: grpc  # grpc, http/thrift
+    protocol: grpc # grpc, http/thrift
     service_name: "tfo-agent"
     batch_size: 100
 ```

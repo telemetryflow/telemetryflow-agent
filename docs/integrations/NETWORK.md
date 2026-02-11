@@ -1,6 +1,6 @@
 # Network & IoT Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../../CHANGELOG.md)
 
 This document covers network device and IoT messaging integrations.
 
@@ -69,7 +69,7 @@ sequenceDiagram
 integrations:
   cisco:
     enabled: true
-    api_type: dnac  # or meraki
+    api_type: dnac # or meraki
 
     # DNA Center configuration
     dnac:
@@ -97,21 +97,21 @@ integrations:
 
 #### DNA Center
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `cisco_dnac_device_up` | gauge | Device reachability (1=up) |
-| `cisco_dnac_device_uptime_seconds` | gauge | Device uptime |
-| `cisco_dnac_network_health_score` | gauge | Network health (0-100) |
-| `cisco_dnac_client_health_score` | gauge | Client health (0-100) |
-| `cisco_dnac_application_health_score` | gauge | App health (0-100) |
+| Metric                                | Type  | Description                |
+| ------------------------------------- | ----- | -------------------------- |
+| `cisco_dnac_device_up`                | gauge | Device reachability (1=up) |
+| `cisco_dnac_device_uptime_seconds`    | gauge | Device uptime              |
+| `cisco_dnac_network_health_score`     | gauge | Network health (0-100)     |
+| `cisco_dnac_client_health_score`      | gauge | Client health (0-100)      |
+| `cisco_dnac_application_health_score` | gauge | App health (0-100)         |
 
 #### Meraki
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `cisco_meraki_device_online` | gauge | Device online status |
-| `cisco_meraki_device_using_cellular` | gauge | Cellular failover active |
-| `cisco_meraki_organization_devices_total` | gauge | Total devices |
+| Metric                                    | Type  | Description              |
+| ----------------------------------------- | ----- | ------------------------ |
+| `cisco_meraki_device_online`              | gauge | Device online status     |
+| `cisco_meraki_device_using_cellular`      | gauge | Cellular failover active |
+| `cisco_meraki_organization_devices_total` | gauge | Total devices            |
 
 ---
 
@@ -144,7 +144,7 @@ sequenceDiagram
 integrations:
   snmp:
     enabled: true
-    version: v2c  # v1, v2c, v3
+    version: v2c # v1, v2c, v3
     community: "${SNMP_COMMUNITY:-public}"
     port: 161
     timeout: 10s
@@ -153,11 +153,11 @@ integrations:
     max_repetitions: 10
 
     # SNMPv3 settings
-    security_level: noAuthNoPriv  # noAuthNoPriv, authNoPriv, authPriv
+    security_level: noAuthNoPriv # noAuthNoPriv, authNoPriv, authPriv
     username: "${SNMP_USERNAME}"
-    auth_protocol: SHA  # MD5, SHA
+    auth_protocol: SHA # MD5, SHA
     auth_password: "${SNMP_AUTH_PASSWORD}"
-    priv_protocol: AES  # DES, AES
+    priv_protocol: AES # DES, AES
     priv_password: "${SNMP_PRIV_PASSWORD}"
 
     targets:
@@ -172,8 +172,8 @@ integrations:
         name: "Edge Router 1"
 
     walk_oids:
-      - "1.3.6.1.2.1.2.2"  # IF-MIB::ifTable
-      - "1.3.6.1.2.1.1"    # SNMPv2-MIB::system
+      - "1.3.6.1.2.1.2.2" # IF-MIB::ifTable
+      - "1.3.6.1.2.1.1" # SNMPv2-MIB::system
 
     get_oids:
       - oid: "1.3.6.1.2.1.1.3.0"
@@ -186,24 +186,24 @@ integrations:
 
 ### Default OIDs
 
-| OID | Name | Type |
-|-----|------|------|
-| 1.3.6.1.2.1.1.3.0 | sysUpTime | counter |
-| 1.3.6.1.2.1.1.5.0 | sysName | string |
-| 1.3.6.1.2.1.2.2.1.10 | ifInOctets | counter |
-| 1.3.6.1.2.1.2.2.1.16 | ifOutOctets | counter |
-| 1.3.6.1.4.1.2021.11.9.0 | ssCpuUser | gauge |
-| 1.3.6.1.4.1.2021.4.5.0 | memTotalReal | gauge |
+| OID                     | Name         | Type    |
+| ----------------------- | ------------ | ------- |
+| 1.3.6.1.2.1.1.3.0       | sysUpTime    | counter |
+| 1.3.6.1.2.1.1.5.0       | sysName      | string  |
+| 1.3.6.1.2.1.2.2.1.10    | ifInOctets   | counter |
+| 1.3.6.1.2.1.2.2.1.16    | ifOutOctets  | counter |
+| 1.3.6.1.4.1.2021.11.9.0 | ssCpuUser    | gauge   |
+| 1.3.6.1.4.1.2021.4.5.0  | memTotalReal | gauge   |
 
 ### Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `snmp_target_up` | gauge | Target reachability |
-| `snmp_sysuptime` | counter | System uptime ticks |
-| `snmp_ifinoctets` | counter | Interface bytes in |
+| Metric             | Type    | Description         |
+| ------------------ | ------- | ------------------- |
+| `snmp_target_up`   | gauge   | Target reachability |
+| `snmp_sysuptime`   | counter | System uptime ticks |
+| `snmp_ifinoctets`  | counter | Interface bytes in  |
 | `snmp_ifoutoctets` | counter | Interface bytes out |
-| `snmp_sspcuuser` | gauge | CPU user percentage |
+| `snmp_sspcuuser`   | gauge   | CPU user percentage |
 
 ---
 
@@ -249,7 +249,7 @@ integrations:
     traces_topic: "telemetryflow/traces"
     topic_prefix: ""
 
-    qos: 1  # 0, 1, or 2
+    qos: 1 # 0, 1, or 2
     retained: false
     clean_session: true
 
@@ -266,7 +266,7 @@ integrations:
       key_file: ""
       skip_verify: false
 
-    encoding: json  # json, protobuf
+    encoding: json # json, protobuf
     batch_size: 100
     flush_interval: 10s
 
@@ -292,6 +292,7 @@ telemetryflow/
 ### Message Format (JSON)
 
 **Metrics:**
+
 ```json
 {
   "timestamp": "2024-12-29T10:30:00Z",
@@ -305,6 +306,7 @@ telemetryflow/
 ```
 
 **Logs:**
+
 ```json
 {
   "timestamp": "2024-12-29T10:30:00Z",
@@ -317,25 +319,25 @@ telemetryflow/
 
 ### QoS Levels
 
-| QoS | Name | Guarantee |
-|-----|------|-----------|
-| 0 | At most once | Fire and forget |
-| 1 | At least once | Acknowledged delivery |
-| 2 | Exactly once | Two-phase commit |
+| QoS | Name          | Guarantee             |
+| --- | ------------- | --------------------- |
+| 0   | At most once  | Fire and forget       |
+| 1   | At least once | Acknowledged delivery |
+| 2   | Exactly once  | Two-phase commit      |
 
 ---
 
 ## Comparison
 
-| Feature | Cisco DNAC | Cisco Meraki | SNMP | MQTT |
-|---------|------------|--------------|------|------|
-| Protocol | REST API | REST API | UDP | TCP |
-| Auth | Token | API Key | Community/USM | User/Pass |
-| Direction | Pull | Pull | Pull | Push |
-| Metrics | ✅ | ✅ | ✅ | ✅ |
-| Logs | ❌ | ❌ | ❌ | ✅ |
-| Traces | ❌ | ❌ | ❌ | ✅ |
-| Real-time | ❌ | ❌ | ❌ | ✅ |
+| Feature   | Cisco DNAC | Cisco Meraki | SNMP          | MQTT      |
+| --------- | ---------- | ------------ | ------------- | --------- |
+| Protocol  | REST API   | REST API     | UDP           | TCP       |
+| Auth      | Token      | API Key      | Community/USM | User/Pass |
+| Direction | Pull       | Pull         | Pull          | Push      |
+| Metrics   | ✅         | ✅           | ✅            | ✅        |
+| Logs      | ❌         | ❌           | ❌            | ✅        |
+| Traces    | ❌         | ❌           | ❌            | ✅        |
+| Real-time | ❌         | ❌           | ❌            | ✅        |
 
 ---
 

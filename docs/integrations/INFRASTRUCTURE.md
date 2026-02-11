@@ -1,6 +1,6 @@
 # Infrastructure Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../../CHANGELOG.md)
 
 This document covers infrastructure platform integrations for virtualization and hybrid cloud environments.
 
@@ -74,7 +74,7 @@ integrations:
     # token_id: "${PROXMOX_TOKEN_ID}"
     # token_secret: "${PROXMOX_TOKEN_SECRET}"
     realm: "pam"
-    node: ""  # Empty for all nodes
+    node: "" # Empty for all nodes
     tls_skip_verify: false
     scrape_interval: 60s
     timeout: 30s
@@ -88,16 +88,16 @@ integrations:
 
 ### Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `proxmox_node_cpu_usage` | gauge | Node CPU usage percentage |
-| `proxmox_node_memory_used_bytes` | gauge | Node memory used |
-| `proxmox_node_uptime_seconds` | counter | Node uptime |
-| `proxmox_vm_cpu_usage` | gauge | VM CPU usage |
-| `proxmox_vm_memory_used_bytes` | gauge | VM memory used |
-| `proxmox_vm_status` | gauge | VM power state (1=running) |
-| `proxmox_storage_used_bytes` | gauge | Storage used |
-| `proxmox_storage_available_bytes` | gauge | Storage available |
+| Metric                            | Type    | Description                |
+| --------------------------------- | ------- | -------------------------- |
+| `proxmox_node_cpu_usage`          | gauge   | Node CPU usage percentage  |
+| `proxmox_node_memory_used_bytes`  | gauge   | Node memory used           |
+| `proxmox_node_uptime_seconds`     | counter | Node uptime                |
+| `proxmox_vm_cpu_usage`            | gauge   | VM CPU usage               |
+| `proxmox_vm_memory_used_bytes`    | gauge   | VM memory used             |
+| `proxmox_vm_status`               | gauge   | VM power state (1=running) |
+| `proxmox_storage_used_bytes`      | gauge   | Storage used               |
+| `proxmox_storage_available_bytes` | gauge   | Storage available          |
 
 ---
 
@@ -142,7 +142,7 @@ integrations:
     username: "${VMWARE_USERNAME}"
     password: "${VMWARE_PASSWORD}"
     tls_skip_verify: false
-    datacenter: ""  # Empty for all
+    datacenter: "" # Empty for all
     scrape_interval: 60s
     timeout: 30s
 
@@ -156,17 +156,17 @@ integrations:
 
 ### Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `vmware_vm_cpu_usage_percent` | gauge | VM CPU usage |
-| `vmware_vm_memory_used_mib` | gauge | VM memory used |
-| `vmware_vm_disk_read_kbps` | gauge | Disk read rate |
-| `vmware_vm_disk_write_kbps` | gauge | Disk write rate |
-| `vmware_vm_network_rx_kbps` | gauge | Network receive rate |
-| `vmware_vm_network_tx_kbps` | gauge | Network transmit rate |
-| `vmware_host_cpu_usage_percent` | gauge | Host CPU usage |
+| Metric                            | Type  | Description              |
+| --------------------------------- | ----- | ------------------------ |
+| `vmware_vm_cpu_usage_percent`     | gauge | VM CPU usage             |
+| `vmware_vm_memory_used_mib`       | gauge | VM memory used           |
+| `vmware_vm_disk_read_kbps`        | gauge | Disk read rate           |
+| `vmware_vm_disk_write_kbps`       | gauge | Disk write rate          |
+| `vmware_vm_network_rx_kbps`       | gauge | Network receive rate     |
+| `vmware_vm_network_tx_kbps`       | gauge | Network transmit rate    |
+| `vmware_host_cpu_usage_percent`   | gauge | Host CPU usage           |
 | `vmware_datastore_capacity_bytes` | gauge | Datastore total capacity |
-| `vmware_datastore_free_bytes` | gauge | Datastore free space |
+| `vmware_datastore_free_bytes`     | gauge | Datastore free space     |
 
 ---
 
@@ -225,17 +225,17 @@ integrations:
 
 ### Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `nutanix_cluster_cpu_usage_percent` | gauge | Cluster CPU usage |
+| Metric                                 | Type  | Description          |
+| -------------------------------------- | ----- | -------------------- |
+| `nutanix_cluster_cpu_usage_percent`    | gauge | Cluster CPU usage    |
 | `nutanix_cluster_memory_usage_percent` | gauge | Cluster memory usage |
-| `nutanix_cluster_storage_usage_bytes` | gauge | Storage used |
-| `nutanix_cluster_iops` | gauge | Cluster IOPS |
-| `nutanix_host_cpu_usage_percent` | gauge | Host CPU usage |
-| `nutanix_host_vms` | gauge | VMs on host |
-| `nutanix_vm_cpu_usage_percent` | gauge | VM CPU usage |
-| `nutanix_vm_memory_usage_percent` | gauge | VM memory usage |
-| `nutanix_alerts_active_total` | gauge | Active alerts count |
+| `nutanix_cluster_storage_usage_bytes`  | gauge | Storage used         |
+| `nutanix_cluster_iops`                 | gauge | Cluster IOPS         |
+| `nutanix_host_cpu_usage_percent`       | gauge | Host CPU usage       |
+| `nutanix_host_vms`                     | gauge | VMs on host          |
+| `nutanix_vm_cpu_usage_percent`         | gauge | VM CPU usage         |
+| `nutanix_vm_memory_usage_percent`      | gauge | VM memory usage      |
+| `nutanix_alerts_active_total`          | gauge | Active alerts count  |
 
 ---
 
@@ -291,27 +291,27 @@ integrations:
 
 ### Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
-| `azure_arc_machine_connected` | gauge | Machine connection status |
-| `azure_arc_machine_extensions` | gauge | Number of extensions |
-| `azure_arc_k8s_cluster_nodes` | gauge | Cluster node count |
-| `azure_arc_k8s_cluster_cores` | gauge | Cluster core count |
-| `azure_arc_sql_server_up` | gauge | SQL Server availability |
+| Metric                         | Type  | Description               |
+| ------------------------------ | ----- | ------------------------- |
+| `azure_arc_machine_connected`  | gauge | Machine connection status |
+| `azure_arc_machine_extensions` | gauge | Number of extensions      |
+| `azure_arc_k8s_cluster_nodes`  | gauge | Cluster node count        |
+| `azure_arc_k8s_cluster_cores`  | gauge | Cluster core count        |
+| `azure_arc_sql_server_up`      | gauge | SQL Server availability   |
 
 ---
 
 ## Comparison
 
-| Feature | Proxmox | VMware | Nutanix | Azure Arc |
-|---------|---------|--------|---------|-----------|
-| VMs | ✅ | ✅ | ✅ | ✅ |
-| Containers | ✅ (LXC) | ❌ | ❌ | ✅ (K8s) |
-| Hosts | ✅ | ✅ | ✅ | ✅ |
-| Storage | ✅ | ✅ | ✅ | ❌ |
-| Clusters | ✅ | ✅ | ✅ | ✅ |
-| Alerts | ❌ | ❌ | ✅ | ❌ |
-| Auth | Cookie/Token | Session | Basic | OAuth2/MI |
+| Feature    | Proxmox      | VMware  | Nutanix | Azure Arc |
+| ---------- | ------------ | ------- | ------- | --------- |
+| VMs        | ✅           | ✅      | ✅      | ✅        |
+| Containers | ✅ (LXC)     | ❌      | ❌      | ✅ (K8s)  |
+| Hosts      | ✅           | ✅      | ✅      | ✅        |
+| Storage    | ✅           | ✅      | ✅      | ❌        |
+| Clusters   | ✅           | ✅      | ✅      | ✅        |
+| Alerts     | ❌           | ❌      | ✅      | ❌        |
+| Auth       | Cookie/Token | Session | Basic   | OAuth2/MI |
 
 ---
 

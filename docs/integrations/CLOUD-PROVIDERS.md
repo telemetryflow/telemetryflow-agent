@@ -1,6 +1,6 @@
 # Cloud Provider Integrations
 
-[![Version](https://img.shields.io/badge/Version-1.1.2-orange.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../../CHANGELOG.md)
 
 This document covers cloud provider integrations for exporting telemetry data to major cloud platforms.
 
@@ -98,16 +98,16 @@ integrations:
 
 ### Authentication
 
-| Method | Description |
-|--------|-------------|
+| Method                          | Description                    |
+| ------------------------------- | ------------------------------ |
 | Application Default Credentials | Auto-detected from environment |
-| Service Account JSON | Explicit credential file |
-| Workload Identity | GKE/Cloud Run integration |
+| Service Account JSON            | Explicit credential file       |
+| Workload Identity               | GKE/Cloud Run integration      |
 
 ### Collected Metrics
 
-| Metric | Type | Description |
-|--------|------|-------------|
+| Metric                                  | Type   | Description   |
+| --------------------------------------- | ------ | ------------- |
 | `custom.googleapis.com/telemetryflow/*` | Custom | Agent metrics |
 
 ---
@@ -167,11 +167,11 @@ integrations:
 
 ### Authentication
 
-| Method | Description |
-|--------|-------------|
-| Service Principal | Client ID + Secret |
-| Managed Identity | Azure VM/AKS integration |
-| Certificate | Client ID + Certificate |
+| Method            | Description              |
+| ----------------- | ------------------------ |
+| Service Principal | Client ID + Secret       |
+| Managed Identity  | Azure VM/AKS integration |
+| Certificate       | Client ID + Certificate  |
 
 ---
 
@@ -235,13 +235,13 @@ Uses HMAC-SHA1 signature for API authentication with Access Key ID and Secret.
 
 ## Comparison
 
-| Feature | GCP | Azure | Alibaba |
-|---------|-----|-------|---------|
-| Metrics | Cloud Monitoring | Azure Monitor | CMS |
-| Logs | Cloud Logging | Log Analytics | SLS |
-| Traces | Cloud Trace | App Insights | ARMS |
-| Auth | ADC/SA | SP/MI | AK/SK |
-| Regions | Global | Global | China/International |
+| Feature | GCP              | Azure         | Alibaba             |
+| ------- | ---------------- | ------------- | ------------------- |
+| Metrics | Cloud Monitoring | Azure Monitor | CMS                 |
+| Logs    | Cloud Logging    | Log Analytics | SLS                 |
+| Traces  | Cloud Trace      | App Insights  | ARMS                |
+| Auth    | ADC/SA           | SP/MI         | AK/SK               |
+| Regions | Global           | Global        | China/International |
 
 ## Environment Variables
 
