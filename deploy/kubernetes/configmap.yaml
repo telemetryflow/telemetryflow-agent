@@ -1,0 +1,96 @@
+---
+# TFO-Agent ConfigMap
+# Kubernetes-enabled configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tfo-agent-config
+  namespace: telemetryflow
+  labels:
+    app.kubernetes.io/name: tfo-agent
+    app.kubernetes.io/component: monitoring
+data:
+  tfo-agent.yaml: |
+    telemetryflow:
+      api_key_id: ""
+      api_key_secret: ""
+      endpoint: "tfo-backend.telemetryflow.svc.cluster.local:4317"
+      protocol: grpc
+      tls:
+        enabled: false
+
+    agent:
+      name: "TFO-Agent (Kubernetes)"
+      tags:
+        environment: production
+        deployment: kubernetes
+
+    heartbeat:
+      interval: 60s
+      include_system_info: true
+
+    collectors:
+      system:
+        enabled: true
+        interval: 15s
+        cpu: true
+        memory: true
+        disk: true
+        network: true
+
+      kubernetes:
+        enabled: true
+        interval: 30s
+        kubeconfig: ""
+        context: ""
+        namespaces: []
+        exclude_namespaces:
+          - kube-system
+        nodes: true
+        pods: true
+        deployments: true
+        namespaces_collect: true
+        storage: true
+        services: true
+        workloads: true
+        metrics_api: true
+        sync_to_backend: true
+        sync_interval: 60s
+        cluster_name: ""
+        cluster_provider: ""
+
+    prometheus_server:
+      enabled: true
+      port: 8888
+      path: /metrics
+      include_go_metrics: true
+      include_process_metrics: true
+      metric_prefix: tfo
+      read_timeout: 10s
+      write_timeout: 10s
+
+    exporter:
+      otlp:
+        enabled: true
+        endpoint_version: v2
+        batch_size: 100
+        flush_interval: 10s
+        compression: gzip
+        metrics:
+          enabled: true
+        traces:
+          enabled: false
+        logs:
+          enabled: false
+
+    buffer:
+      enabled: true
+      max_size_mb: 100
+      path: /var/lib/tfo-agent/buffer
+      max_age: 24h
+      flush_interval: 5s
+
+    logging:
+      level: info
+      format: json

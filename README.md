@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.3-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
@@ -32,7 +32,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.1.3"
+    subgraph "TelemetryFlow Ecosystem v1.1.4"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.39.0]
         end
@@ -59,7 +59,7 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.3  | SDK v1.39.0        | Telemetry collection agent  |
+| **TFO-Agent**     | v1.1.4  | SDK v1.39.0        | Telemetry collection agent  |
 | **TFO-Go-SDK**    | v1.1.3  | SDK v1.39.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.1.3  | Collector v0.142.0 | Central telemetry collector |
 
@@ -96,6 +96,8 @@ graph LR
 - **LEGO Building Blocks**: Modular architecture for easy extensibility
 
 ## Quick Start
+
+> **🚀 New to TFO-Agent?** Check the [Quick Start Guide](docs/QUICK-START.md) for step-by-step setup with Docker, Kubernetes, or binary installation.
 
 ### From Source
 
@@ -137,11 +139,11 @@ docker-compose down
 ```bash
 # Build image
 docker build \
-  --build-arg VERSION=1.1.3 \
+  --build-arg VERSION=1.1.4 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.1.3 .
+  -t telemetryflow/telemetryflow-agent:1.1.4 .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -151,7 +153,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.1.3
+  telemetryflow/telemetryflow-agent:1.1.4
 ```
 
 ### OTEL Collector Ports
@@ -190,10 +192,13 @@ POST http://localhost:4318/v1/logs
 
 ## Configuration
 
+> **📋 Complete Configuration:** See [`configs/tfo-agent.default.yaml`](configs/tfo-agent.default.yaml) for a full configuration example showing Node Exporter, Kubernetes, and eBPF collectors integrated with TFO Platform.
+> **🔗 Integration Guide:** See [TFO Platform Integration Guide](docs/TFO-PLATFORM-INTEGRATION.md) for architecture diagrams, data flow, and production deployment examples.
+
 Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
 
 ```yaml
-# TelemetryFlow Platform Configuration (v1.1.3+)
+# TelemetryFlow Platform Configuration (v1.1.4+)
 telemetryflow:
   api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
   api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
@@ -282,7 +287,10 @@ tfo-agent/
 │   ├── agent/             # Core agent lifecycle
 │   ├── buffer/            # Disk-backed retry buffer
 │   ├── collector/         # Metric collectors
-│   │   └── system/        # System metrics collector
+│   │   ├── system/        # System metrics collector
+│   │   ├── kubernetes/    # Kubernetes metrics collector
+│   │   ├── nodeexporter/  # Node Exporter metrics collector
+│   │   └── ebpf/          # eBPF kernel-level metrics collector
 │   ├── config/            # Configuration management
 │   ├── exporter/          # OTLP data exporters
 │   └── version/           # Version and banner info
@@ -342,6 +350,20 @@ p.Start()
 | `system.disk.usage`         | gauge   | Disk usage percentage    |
 | `system.network.bytes_sent` | counter | Total bytes sent         |
 | `system.network.bytes_recv` | counter | Total bytes received     |
+
+### eBPF Metrics (Linux-only)
+
+The eBPF collector provides 28 kernel-level metrics across 7 categories:
+
+- **Syscall**: `ebpf.syscall.{count,latency_ns,errors}` with `pid`, `comm`, `syscall` labels
+- **Network**: `ebpf.tcp.{connections,bytes_sent,bytes_recv,rtt_ns,retransmits}`, `ebpf.udp.{packets_sent,packets_recv}`
+- **File I/O**: `ebpf.fileio.{operations,bytes,latency_ns}` with `operation` label
+- **Scheduler**: `ebpf.sched.{context_switches,runq_latency_ns,oncpu_ns,migrations}`
+- **Memory**: `ebpf.memory.{page_faults,major_faults,minor_faults}`
+- **TCP State**: `ebpf.tcp.state_transitions` with `old_state`, `new_state` labels
+- **Hubble**: `hubble.{flows,drops,policy_verdicts,http_requests,dns_queries,l7_errors}`
+
+See [eBPF Metrics Documentation](docs/integrations/eBPF/METRICS.md) for complete catalog.
 
 ## Development
 
@@ -419,6 +441,9 @@ make ci-test                 # Run with race detection (CI mode)
 | ------------------------- | --------------------------- | ---------- |
 | `application`             | CLI commands, configuration | 3          |
 | `domain/agent`            | Agent lifecycle management  | 2          |
+| `domain/ebpf`             | eBPF collector              | 4          |
+| `domain/kubernetes`       | Kubernetes collector        | 1          |
+| `domain/nodeexporter`     | Node Exporter collector     | 1          |
 | `domain/plugin`           | Plugin registry             | 1          |
 | `domain/telemetry`        | Telemetry collection        | 2          |
 | `infrastructure/api`      | API client                  | 1          |
@@ -583,18 +608,21 @@ See [Integration Documentation](docs/integrations/README.md) for detailed config
 
 ## Documentation
 
-| Document                                     | Description                               |
-| -------------------------------------------- | ----------------------------------------- |
-| [README](docs/README.md)                     | Documentation overview                    |
-| [ARCHITECTURE](docs/ARCHITECTURE.md)         | System architecture with Mermaid diagrams |
-| [INSTALLATION](docs/INSTALLATION.md)         | Installation guide for all platforms      |
-| [CONFIGURATION](docs/CONFIGURATION.md)       | Configuration options and examples        |
-| [COMMANDS](docs/COMMANDS.md)                 | CLI commands reference                    |
-| [DEVELOPMENT](docs/DEVELOPMENT.md)           | Development guide and coding standards    |
-| [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)   | Troubleshooting guide and common issues   |
-| [GITHUB-WORKFLOWS](docs/GITHUB-WORKFLOWS.md) | CI/CD workflows documentation             |
-| [INTEGRATIONS](docs/integrations/README.md)  | 3rd party integration guides              |
-| [CHANGELOG](CHANGELOG.md)                    | Version history and changes               |
+| Document                                            | Description                                                    |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| [README](docs/README.md)                            | Documentation overview                                         |
+| [ARCHITECTURE](docs/ARCHITECTURE.md)                | System architecture with Mermaid diagrams                      |
+| [INSTALLATION](docs/INSTALLATION.md)                | Installation guide for all platforms                           |
+| [CONFIGURATION](docs/CONFIGURATION.md)              | Configuration options and examples                             |
+| [COMMANDS](docs/COMMANDS.md)                        | CLI commands reference                                         |
+| [DEVELOPMENT](docs/DEVELOPMENT.md)                  | Development guide and coding standards                         |
+| [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)          | Troubleshooting guide and common issues                        |
+| [GITHUB-WORKFLOWS](docs/GITHUB-WORKFLOWS.md)        | CI/CD workflows documentation                                  |
+| [INTEGRATIONS](docs/integrations/README.md)         | 3rd party integration guides                                   |
+| [eBPF](docs/integrations/eBPF/README.md)            | eBPF kernel-level observability (28 metrics)                   |
+| [QUICK-START](docs/QUICK-START.md)                  | Quick start guide (Docker/K8s/Binary)                          |
+| [TFO-INTEGRATION](docs/TFO-PLATFORM-INTEGRATION.md) | TFO Platform integration guide (architecture, metrics catalog) |
+| [CHANGELOG](CHANGELOG.md)                           | Version history and changes                                    |
 
 ## License
 

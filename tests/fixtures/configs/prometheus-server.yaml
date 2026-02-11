@@ -1,0 +1,21 @@
+telemetryflow:
+  endpoint: "localhost:4317"
+  protocol: grpc
+
+collectors:
+  system:
+    enabled: true
+    interval: 15s
+
+  kubernetes:
+    enabled: false
+
+prometheus_server:
+  enabled: true
+  port: 9090
+  path: /metrics
+  include_go_metrics: false
+  include_process_metrics: false
+  metric_prefix: custom
+  read_timeout: 5s
+  write_timeout: 5s

@@ -1,0 +1,155 @@
+---
+# TFO-Agent DaemonSet
+# Runs one agent pod per node for comprehensive monitoring
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tfo-agent
+  namespace: telemetryflow
+  labels:
+    app.kubernetes.io/name: tfo-agent
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: telemetryflow
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tfo-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tfo-agent
+        app.kubernetes.io/component: monitoring
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8888"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: tfo-agent
+      terminationGracePeriodSeconds: 30
+
+      # Tolerate all taints to run on every node (including control-plane)
+      tolerations:
+        - operator: Exists
+
+      # Node affinity: prefer Linux nodes
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      containers:
+        - name: tfo-agent
+          image: telemetryflow/telemetryflow-agent:latest
+          imagePullPolicy: IfNotPresent
+
+          args:
+            - start
+            - --config
+            - /etc/tfo-agent/tfo-agent.yaml
+
+          ports:
+            - name: metrics
+              containerPort: 8888
+              protocol: TCP
+
+          env:
+            # Inject node name and pod info via Downward API
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # API credentials from secret
+            - name: TFAGENT_TELEMETRYFLOW_API_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tfo-agent-credentials
+                  key: api-key-id
+                  optional: true
+            - name: TFAGENT_TELEMETRYFLOW_API_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tfo-agent-credentials
+                  key: api-key-secret
+                  optional: true
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/tfo-agent
+              readOnly: true
+            - name: buffer
+              mountPath: /var/lib/tfo-agent/buffer
+            # Host filesystem for system metrics
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: root
+              mountPath: /host/root
+              readOnly: true
+              mountPropagation: HostToContainer
+
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: config
+          configMap:
+            name: tfo-agent-config
+        - name: buffer
+          emptyDir:
+            sizeLimit: 200Mi
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: root
+          hostPath:
+            path: /

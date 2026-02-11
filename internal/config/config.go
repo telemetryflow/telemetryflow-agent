@@ -7,22 +7,50 @@ import (
 
 // Config represents the complete agent configuration
 type Config struct {
-	TelemetryFlow TelemetryFlowConfig  `mapstructure:"telemetryflow"`
-	Agent         AgentConfig          `mapstructure:"agent"`
-	Heartbeat     HeartbeatConfig      `mapstructure:"heartbeat"`
-	Collector     CollectorConfig      `mapstructure:"collectors"`
-	Exporter      ExporterConfig       `mapstructure:"exporter"`
-	Buffer        BufferConfig         `mapstructure:"buffer"`
-	Logging       LoggingConfig        `mapstructure:"logging"`
-	Security      SecurityConfig       `mapstructure:"security"`
-	AutoUpdate    AutoUpdateConfig     `mapstructure:"auto_update"`
-	Retention     RetentionConfig      `mapstructure:"retention"`
-	Resources     ResourceLimitsConfig `mapstructure:"resources"`
-	Cache         CacheConfig          `mapstructure:"cache"`
-	Integrations  IntegrationsConfig   `mapstructure:"integrations"`
+	TelemetryFlow    TelemetryFlowConfig    `mapstructure:"telemetryflow"`
+	Agent            AgentConfig            `mapstructure:"agent"`
+	Heartbeat        HeartbeatConfig        `mapstructure:"heartbeat"`
+	Collector        CollectorConfig        `mapstructure:"collectors"`
+	Exporter         ExporterConfig         `mapstructure:"exporter"`
+	Buffer           BufferConfig           `mapstructure:"buffer"`
+	Logging          LoggingConfig          `mapstructure:"logging"`
+	Security         SecurityConfig         `mapstructure:"security"`
+	AutoUpdate       AutoUpdateConfig       `mapstructure:"auto_update"`
+	Retention        RetentionConfig        `mapstructure:"retention"`
+	Resources        ResourceLimitsConfig   `mapstructure:"resources"`
+	Cache            CacheConfig            `mapstructure:"cache"`
+	Integrations     IntegrationsConfig     `mapstructure:"integrations"`
+	PrometheusServer PrometheusServerConfig `mapstructure:"prometheus_server"`
 
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
+}
+
+// PrometheusServerConfig contains Prometheus /metrics endpoint settings
+type PrometheusServerConfig struct {
+	// Enabled enables the Prometheus /metrics HTTP endpoint
+	Enabled bool `mapstructure:"enabled"`
+
+	// Port is the HTTP port for the metrics server
+	Port int `mapstructure:"port"`
+
+	// Path is the URL path for the metrics endpoint
+	Path string `mapstructure:"path"`
+
+	// IncludeGoMetrics includes Go runtime metrics (goroutines, GC, memory)
+	IncludeGoMetrics bool `mapstructure:"include_go_metrics"`
+
+	// IncludeProcessMetrics includes process metrics (CPU, memory, fds)
+	IncludeProcessMetrics bool `mapstructure:"include_process_metrics"`
+
+	// MetricPrefix is the prefix for all metric names (e.g., "tfo")
+	MetricPrefix string `mapstructure:"metric_prefix"`
+
+	// ReadTimeout is the HTTP server read timeout
+	ReadTimeout time.Duration `mapstructure:"read_timeout"`
+
+	// WriteTimeout is the HTTP server write timeout
+	WriteTimeout time.Duration `mapstructure:"write_timeout"`
 }
 
 // TelemetryFlowConfig contains TelemetryFlow backend connection settings
@@ -161,6 +189,164 @@ type CollectorConfig struct {
 
 	// Process contains process collector settings
 	Process ProcessCollectorConfig `mapstructure:"process"`
+
+	// Kubernetes contains Kubernetes metrics collector settings
+	Kubernetes KubernetesCollectorConfig `mapstructure:"kubernetes"`
+
+	// NodeExporter contains node exporter metrics collector settings
+	NodeExporter NodeExporterConfig `mapstructure:"node_exporter"`
+
+	// EBPF contains eBPF kernel-level metrics collector settings
+	EBPF EBPFCollectorConfig `mapstructure:"ebpf"`
+}
+
+// EBPFCollectorConfig contains eBPF kernel-level metrics collector settings.
+// When enabled, provides deep kernel-level visibility using eBPF programs.
+// Linux-only — gracefully returns empty metrics on non-Linux platforms.
+type EBPFCollectorConfig struct {
+	// Enabled enables the eBPF collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval is the collection interval
+	Interval time.Duration `mapstructure:"interval"`
+
+	// CollectSyscalls enables syscall tracing (sys_enter/sys_exit)
+	CollectSyscalls bool `mapstructure:"collect_syscalls"`
+
+	// CollectNetwork enables TCP/UDP connection monitoring
+	CollectNetwork bool `mapstructure:"collect_network"`
+
+	// CollectFileIO enables VFS file I/O tracking
+	CollectFileIO bool `mapstructure:"collect_file_io"`
+
+	// CollectScheduler enables scheduler analysis (context switches, runqueue)
+	CollectScheduler bool `mapstructure:"collect_scheduler"`
+
+	// CollectMemory enables memory event tracking (page faults)
+	CollectMemory bool `mapstructure:"collect_memory"`
+
+	// CollectTCPEvents enables TCP state transition tracking
+	CollectTCPEvents bool `mapstructure:"collect_tcp_events"`
+
+	// ProcessFilter is a list of process names to monitor (empty = all)
+	ProcessFilter []string `mapstructure:"process_filter"`
+
+	// ExcludeProcesses is a list of process names to exclude
+	ExcludeProcesses []string `mapstructure:"exclude_processes"`
+
+	// SampleRate is the sampling percentage (1-100)
+	SampleRate int `mapstructure:"sample_rate"`
+
+	// RingBufferSize is the eBPF ring buffer size in bytes
+	RingBufferSize int `mapstructure:"ring_buffer_size"`
+
+	// PerfBufferSize is the perf buffer page count
+	PerfBufferSize int `mapstructure:"perf_buffer_size"`
+
+	// BTFPath is the path to BTF vmlinux file (empty = auto-detect)
+	BTFPath string `mapstructure:"btf_path"`
+
+	// PinPath is the BPF filesystem pin path for map persistence
+	PinPath string `mapstructure:"pin_path"`
+
+	// Labels are additional labels applied to all eBPF metrics
+	Labels map[string]string `mapstructure:"labels"`
+
+	// Cilium contains Cilium Hubble integration settings
+	Cilium CiliumCollectorConfig `mapstructure:"cilium"`
+}
+
+// CiliumCollectorConfig contains Cilium Hubble gRPC client settings.
+type CiliumCollectorConfig struct {
+	// Enabled enables Cilium Hubble integration
+	Enabled bool `mapstructure:"enabled"`
+
+	// HubbleAddress is the Hubble Relay gRPC address
+	HubbleAddress string `mapstructure:"hubble_address"`
+
+	// HubbleTLSEnabled enables TLS for Hubble connection
+	HubbleTLSEnabled bool `mapstructure:"hubble_tls_enabled"`
+
+	// HubbleTLSCertPath is the path to Hubble client cert
+	HubbleTLSCertPath string `mapstructure:"hubble_tls_cert"`
+
+	// HubbleTLSKeyPath is the path to Hubble client key
+	HubbleTLSKeyPath string `mapstructure:"hubble_tls_key"`
+
+	// HubbleTLSCAPath is the path to Hubble CA cert
+	HubbleTLSCAPath string `mapstructure:"hubble_tls_ca"`
+
+	// CollectFlows enables L3/L4 network flow collection
+	CollectFlows bool `mapstructure:"collect_flows"`
+
+	// CollectL7Flows enables L7 (HTTP/gRPC/DNS) flow collection
+	CollectL7Flows bool `mapstructure:"collect_l7_flows"`
+
+	// CollectDrops enables dropped packet collection
+	CollectDrops bool `mapstructure:"collect_drops"`
+
+	// CollectPolicies enables network policy verdict collection
+	CollectPolicies bool `mapstructure:"collect_policies"`
+}
+
+// KubernetesCollectorConfig contains Kubernetes metrics collector settings
+type KubernetesCollectorConfig struct {
+	// Enabled enables the Kubernetes collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval is the collection interval
+	Interval time.Duration `mapstructure:"interval"`
+
+	// Kubeconfig is the path to kubeconfig file (empty = in-cluster auto-detection)
+	Kubeconfig string `mapstructure:"kubeconfig"`
+
+	// Context is the kubeconfig context name (empty = current-context)
+	Context string `mapstructure:"context"`
+
+	// Namespaces is a list of namespaces to collect from (empty = all)
+	Namespaces []string `mapstructure:"namespaces"`
+
+	// ExcludeNamespaces is a list of namespaces to exclude
+	ExcludeNamespaces []string `mapstructure:"exclude_namespaces"`
+
+	// LabelSelector is a Kubernetes label selector to filter resources
+	LabelSelector string `mapstructure:"label_selector"`
+
+	// Nodes enables node metrics collection
+	Nodes bool `mapstructure:"nodes"`
+
+	// Pods enables pod metrics collection
+	Pods bool `mapstructure:"pods"`
+
+	// Deployments enables deployment metrics collection
+	Deployments bool `mapstructure:"deployments"`
+
+	// NamespacesCollect enables namespace metrics collection
+	NamespacesCollect bool `mapstructure:"namespaces_collect"`
+
+	// Storage enables PersistentVolume/PersistentVolumeClaim metrics
+	Storage bool `mapstructure:"storage"`
+
+	// Services enables service and endpoints metrics
+	Services bool `mapstructure:"services"`
+
+	// Workloads enables StatefulSet, DaemonSet, ReplicaSet, Job, CronJob metrics
+	Workloads bool `mapstructure:"workloads"`
+
+	// MetricsAPI enables fetching actual CPU/Memory usage from metrics-server
+	MetricsAPI bool `mapstructure:"metrics_api"`
+
+	// SyncToBackend enables syncing resource state to TFO backend
+	SyncToBackend bool `mapstructure:"sync_to_backend"`
+
+	// SyncInterval is how often to sync resource state to backend
+	SyncInterval time.Duration `mapstructure:"sync_interval"`
+
+	// ClusterName overrides auto-detected cluster name
+	ClusterName string `mapstructure:"cluster_name"`
+
+	// ClusterProvider is the Kubernetes provider (eks, gke, aks, k3s, self-managed)
+	ClusterProvider string `mapstructure:"cluster_provider"`
 }
 
 // SystemCollectorConfig contains system metrics collector settings
@@ -185,6 +371,76 @@ type SystemCollectorConfig struct {
 
 	// DiskPaths specifies disk paths to monitor (empty = all)
 	DiskPaths []string `mapstructure:"disk_paths"`
+}
+
+// NodeExporterConfig contains node exporter metrics collector settings.
+// When enabled, provides prometheus/node_exporter-equivalent metrics.
+type NodeExporterConfig struct {
+	// Enabled enables the node exporter collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval is the collection interval
+	Interval time.Duration `mapstructure:"interval"`
+
+	// CPU enables per-CPU-mode time metrics and CPU frequency
+	CPU bool `mapstructure:"cpu"`
+
+	// Memory enables detailed memory metrics (cached, buffers, slab, swap, etc.)
+	Memory bool `mapstructure:"memory"`
+
+	// DiskIO enables per-device disk I/O counters
+	DiskIO bool `mapstructure:"diskio"`
+
+	// Filesystem enables per-mountpoint filesystem usage and inodes
+	Filesystem bool `mapstructure:"filesystem"`
+
+	// Network enables per-interface network stats, TCP states, and ARP
+	Network bool `mapstructure:"network"`
+
+	// LoadAvg enables load average metrics (1m, 5m, 15m)
+	LoadAvg bool `mapstructure:"loadavg"`
+
+	// Thermal enables CPU/hardware temperature metrics
+	Thermal bool `mapstructure:"thermal"`
+
+	// Textfile enables reading custom *.prom files from TextfilePath
+	Textfile bool `mapstructure:"textfile"`
+
+	// Conntrack enables nf_conntrack metrics (Linux only)
+	Conntrack bool `mapstructure:"conntrack"`
+
+	// PSI enables Pressure Stall Information metrics (Linux only)
+	PSI bool `mapstructure:"psi"`
+
+	// VMStat enables /proc/vmstat metrics (Linux only)
+	VMStat bool `mapstructure:"vmstat"`
+
+	// Sockstat enables socket statistics (Linux only)
+	Sockstat bool `mapstructure:"sockstat"`
+
+	// Entropy enables entropy available metrics (Linux only)
+	Entropy bool `mapstructure:"entropy"`
+
+	// FileDesc enables file descriptor usage metrics (Linux only)
+	FileDesc bool `mapstructure:"filedesc"`
+
+	// Stat enables context switches, interrupts, forks metrics (Linux only)
+	Stat bool `mapstructure:"stat"`
+
+	// FilesystemMountExclude is a regex to exclude mount points
+	FilesystemMountExclude string `mapstructure:"filesystem_mount_exclude"`
+
+	// FilesystemTypeExclude is a regex to exclude filesystem types
+	FilesystemTypeExclude string `mapstructure:"filesystem_type_exclude"`
+
+	// NetworkDeviceExclude is a regex to exclude network interfaces
+	NetworkDeviceExclude string `mapstructure:"network_device_exclude"`
+
+	// DiskDeviceExclude is a regex to exclude disk devices
+	DiskDeviceExclude string `mapstructure:"disk_device_exclude"`
+
+	// TextfilePath is the directory to read *.prom files from
+	TextfilePath string `mapstructure:"textfile_path"`
 }
 
 // LogCollectorConfig contains log collector settings
@@ -1297,6 +1553,79 @@ func DefaultConfig() *Config {
 				Enabled:  false,
 				Interval: 30 * time.Second,
 			},
+			Kubernetes: KubernetesCollectorConfig{
+				Enabled:           false,
+				Interval:          30 * time.Second,
+				Nodes:             true,
+				Pods:              true,
+				Deployments:       true,
+				NamespacesCollect: true,
+				Storage:           true,
+				Services:          true,
+				Workloads:         true,
+				MetricsAPI:        true,
+				SyncToBackend:     true,
+				SyncInterval:      60 * time.Second,
+				ExcludeNamespaces: []string{"kube-system"},
+			},
+			NodeExporter: NodeExporterConfig{
+				Enabled:                false,
+				Interval:               15 * time.Second,
+				CPU:                    true,
+				Memory:                 true,
+				DiskIO:                 true,
+				Filesystem:             true,
+				Network:                true,
+				LoadAvg:                true,
+				Thermal:                true,
+				Textfile:               false,
+				Conntrack:              true,
+				PSI:                    true,
+				VMStat:                 true,
+				Sockstat:               true,
+				Entropy:                true,
+				FileDesc:               true,
+				Stat:                   true,
+				FilesystemMountExclude: `^/(dev|proc|sys|run)($|/)`,
+				FilesystemTypeExclude:  `^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs)$`,
+				NetworkDeviceExclude:   `^(veth|docker|br-|lo).*$`,
+				DiskDeviceExclude:      `^(ram|loop|fd|sr)\d+$`,
+				TextfilePath:           "/var/lib/tfo-agent/textfile",
+			},
+			EBPF: EBPFCollectorConfig{
+				Enabled:          false,
+				Interval:         15 * time.Second,
+				CollectSyscalls:  true,
+				CollectNetwork:   true,
+				CollectFileIO:    true,
+				CollectScheduler: false,
+				CollectMemory:    false,
+				CollectTCPEvents: true,
+				ProcessFilter:    []string{},
+				ExcludeProcesses: []string{"tfo-agent", "systemd"},
+				SampleRate:       100,
+				RingBufferSize:   262144, // 256KB
+				PerfBufferSize:   64,
+				PinPath:          "/sys/fs/bpf/tfo-agent",
+				Cilium: CiliumCollectorConfig{
+					Enabled:         false,
+					HubbleAddress:   "localhost:4245",
+					CollectFlows:    true,
+					CollectL7Flows:  false,
+					CollectDrops:    true,
+					CollectPolicies: true,
+				},
+			},
+		},
+		PrometheusServer: PrometheusServerConfig{
+			Enabled:               false,
+			Port:                  8888,
+			Path:                  "/metrics",
+			IncludeGoMetrics:      true,
+			IncludeProcessMetrics: true,
+			MetricPrefix:          "tfo",
+			ReadTimeout:           10 * time.Second,
+			WriteTimeout:          10 * time.Second,
 		},
 		Exporter: ExporterConfig{
 			OTLP: OTLPExporterConfig{

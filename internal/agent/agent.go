@@ -11,6 +11,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
@@ -24,9 +27,10 @@ type Agent struct {
 	logger *zap.Logger
 
 	// Components
-	client     *api.Client
-	heartbeat  *exporter.Heartbeat
-	collectors []collector.Collector
+	client           *api.Client
+	heartbeat        *exporter.Heartbeat
+	collectors       []collector.Collector
+	prometheusServer *exporter.PrometheusServer
 
 	// State
 	mu      sync.RWMutex
@@ -92,13 +96,63 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		collectors = append(collectors, sysCollector)
 	}
 
+	// Add Kubernetes collector if enabled
+	if cfg.Collector.Kubernetes.Enabled {
+		k8sCollector, err := kubernetes.NewKubernetesCollector(cfg.Collector.Kubernetes, logger)
+		if err != nil {
+			logger.Warn("Failed to create Kubernetes collector, skipping",
+				zap.Error(err),
+			)
+		} else {
+			collectors = append(collectors, k8sCollector)
+			logger.Info("Kubernetes collector enabled",
+				zap.String("cluster", cfg.Collector.Kubernetes.ClusterName),
+			)
+		}
+	}
+
+	// Add Node Exporter collector if enabled
+	if cfg.Collector.NodeExporter.Enabled {
+		neCollector := nodeexporter.NewNodeExporterCollector(cfg.Collector.NodeExporter, logger)
+		collectors = append(collectors, neCollector)
+		logger.Info("Node exporter collector enabled",
+			zap.Duration("interval", cfg.Collector.NodeExporter.Interval),
+		)
+	}
+
+	// Add eBPF collector if enabled
+	if cfg.Collector.EBPF.Enabled {
+		ebpfCol, err := ebpfcollector.NewEBPFCollector(cfg.Collector.EBPF, logger)
+		if err != nil {
+			logger.Warn("Failed to create eBPF collector, skipping",
+				zap.Error(err),
+			)
+		} else {
+			collectors = append(collectors, ebpfCol)
+			logger.Info("eBPF collector enabled",
+				zap.Duration("interval", cfg.Collector.EBPF.Interval),
+			)
+		}
+	}
+
+	// Create Prometheus metrics server if enabled
+	var promServer *exporter.PrometheusServer
+	if cfg.PrometheusServer.Enabled {
+		promServer = exporter.NewPrometheusServer(cfg.PrometheusServer, logger)
+		logger.Info("Prometheus metrics server enabled",
+			zap.Int("port", cfg.PrometheusServer.Port),
+			zap.String("path", cfg.PrometheusServer.Path),
+		)
+	}
+
 	return &Agent{
-		id:         agentID,
-		config:     cfg,
-		logger:     logger,
-		client:     client,
-		heartbeat:  heartbeat,
-		collectors: collectors,
+		id:               agentID,
+		config:           cfg,
+		logger:           logger,
+		client:           client,
+		heartbeat:        heartbeat,
+		collectors:       collectors,
+		prometheusServer: promServer,
 	}, nil
 }
 
@@ -131,7 +185,18 @@ func (a *Agent) Run(ctx context.Context) error {
 	)
 
 	// Create error channel for component errors
-	errChan := make(chan error, 1+len(a.collectors))
+	// Buffer: heartbeat + collectors + prometheus server
+	chanSize := 2 + len(a.collectors)
+	errChan := make(chan error, chanSize)
+
+	// Start Prometheus metrics server
+	if a.prometheusServer != nil {
+		go func() {
+			if err := a.prometheusServer.Start(ctx); err != nil && err != context.Canceled {
+				errChan <- fmt.Errorf("prometheus server error: %w", err)
+			}
+		}()
+	}
 
 	// Start heartbeat
 	go func() {
@@ -170,6 +235,19 @@ func (a *Agent) shutdown() error {
 	var wg sync.WaitGroup
 	var errs []error
 	var errMu sync.Mutex
+
+	// Stop Prometheus server
+	if a.prometheusServer != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := a.prometheusServer.Stop(); err != nil {
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("prometheus server stop: %w", err))
+				errMu.Unlock()
+			}
+		}()
+	}
 
 	// Stop heartbeat
 	wg.Add(1)

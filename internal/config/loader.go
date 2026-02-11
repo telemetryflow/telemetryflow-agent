@@ -141,6 +141,70 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("collectors.process.enabled", defaults.Collector.Process.Enabled)
 	v.SetDefault("collectors.process.interval", defaults.Collector.Process.Interval)
 
+	// Kubernetes collector
+	v.SetDefault("collectors.kubernetes.enabled", defaults.Collector.Kubernetes.Enabled)
+	v.SetDefault("collectors.kubernetes.interval", defaults.Collector.Kubernetes.Interval)
+	v.SetDefault("collectors.kubernetes.nodes", defaults.Collector.Kubernetes.Nodes)
+	v.SetDefault("collectors.kubernetes.pods", defaults.Collector.Kubernetes.Pods)
+	v.SetDefault("collectors.kubernetes.deployments", defaults.Collector.Kubernetes.Deployments)
+	v.SetDefault("collectors.kubernetes.namespaces_collect", defaults.Collector.Kubernetes.NamespacesCollect)
+	v.SetDefault("collectors.kubernetes.storage", defaults.Collector.Kubernetes.Storage)
+	v.SetDefault("collectors.kubernetes.services", defaults.Collector.Kubernetes.Services)
+	v.SetDefault("collectors.kubernetes.workloads", defaults.Collector.Kubernetes.Workloads)
+	v.SetDefault("collectors.kubernetes.metrics_api", defaults.Collector.Kubernetes.MetricsAPI)
+	v.SetDefault("collectors.kubernetes.sync_to_backend", defaults.Collector.Kubernetes.SyncToBackend)
+	v.SetDefault("collectors.kubernetes.sync_interval", defaults.Collector.Kubernetes.SyncInterval)
+
+	// Node Exporter collector
+	v.SetDefault("collectors.node_exporter.enabled", defaults.Collector.NodeExporter.Enabled)
+	v.SetDefault("collectors.node_exporter.interval", defaults.Collector.NodeExporter.Interval)
+	v.SetDefault("collectors.node_exporter.cpu", defaults.Collector.NodeExporter.CPU)
+	v.SetDefault("collectors.node_exporter.memory", defaults.Collector.NodeExporter.Memory)
+	v.SetDefault("collectors.node_exporter.diskio", defaults.Collector.NodeExporter.DiskIO)
+	v.SetDefault("collectors.node_exporter.filesystem", defaults.Collector.NodeExporter.Filesystem)
+	v.SetDefault("collectors.node_exporter.network", defaults.Collector.NodeExporter.Network)
+	v.SetDefault("collectors.node_exporter.loadavg", defaults.Collector.NodeExporter.LoadAvg)
+	v.SetDefault("collectors.node_exporter.thermal", defaults.Collector.NodeExporter.Thermal)
+	v.SetDefault("collectors.node_exporter.textfile", defaults.Collector.NodeExporter.Textfile)
+	v.SetDefault("collectors.node_exporter.conntrack", defaults.Collector.NodeExporter.Conntrack)
+	v.SetDefault("collectors.node_exporter.psi", defaults.Collector.NodeExporter.PSI)
+	v.SetDefault("collectors.node_exporter.vmstat", defaults.Collector.NodeExporter.VMStat)
+	v.SetDefault("collectors.node_exporter.sockstat", defaults.Collector.NodeExporter.Sockstat)
+	v.SetDefault("collectors.node_exporter.entropy", defaults.Collector.NodeExporter.Entropy)
+	v.SetDefault("collectors.node_exporter.filedesc", defaults.Collector.NodeExporter.FileDesc)
+	v.SetDefault("collectors.node_exporter.stat", defaults.Collector.NodeExporter.Stat)
+	v.SetDefault("collectors.node_exporter.filesystem_mount_exclude", defaults.Collector.NodeExporter.FilesystemMountExclude)
+	v.SetDefault("collectors.node_exporter.filesystem_type_exclude", defaults.Collector.NodeExporter.FilesystemTypeExclude)
+	v.SetDefault("collectors.node_exporter.network_device_exclude", defaults.Collector.NodeExporter.NetworkDeviceExclude)
+	v.SetDefault("collectors.node_exporter.disk_device_exclude", defaults.Collector.NodeExporter.DiskDeviceExclude)
+	v.SetDefault("collectors.node_exporter.textfile_path", defaults.Collector.NodeExporter.TextfilePath)
+
+	// eBPF collector
+	v.SetDefault("collectors.ebpf.enabled", defaults.Collector.EBPF.Enabled)
+	v.SetDefault("collectors.ebpf.interval", defaults.Collector.EBPF.Interval)
+	v.SetDefault("collectors.ebpf.collect_syscalls", defaults.Collector.EBPF.CollectSyscalls)
+	v.SetDefault("collectors.ebpf.collect_network", defaults.Collector.EBPF.CollectNetwork)
+	v.SetDefault("collectors.ebpf.collect_file_io", defaults.Collector.EBPF.CollectFileIO)
+	v.SetDefault("collectors.ebpf.collect_scheduler", defaults.Collector.EBPF.CollectScheduler)
+	v.SetDefault("collectors.ebpf.collect_memory", defaults.Collector.EBPF.CollectMemory)
+	v.SetDefault("collectors.ebpf.collect_tcp_events", defaults.Collector.EBPF.CollectTCPEvents)
+	v.SetDefault("collectors.ebpf.sample_rate", defaults.Collector.EBPF.SampleRate)
+	v.SetDefault("collectors.ebpf.ring_buffer_size", defaults.Collector.EBPF.RingBufferSize)
+	v.SetDefault("collectors.ebpf.perf_buffer_size", defaults.Collector.EBPF.PerfBufferSize)
+	v.SetDefault("collectors.ebpf.pin_path", defaults.Collector.EBPF.PinPath)
+	v.SetDefault("collectors.ebpf.cilium.enabled", defaults.Collector.EBPF.Cilium.Enabled)
+	v.SetDefault("collectors.ebpf.cilium.hubble_address", defaults.Collector.EBPF.Cilium.HubbleAddress)
+
+	// Prometheus server
+	v.SetDefault("prometheus_server.enabled", defaults.PrometheusServer.Enabled)
+	v.SetDefault("prometheus_server.port", defaults.PrometheusServer.Port)
+	v.SetDefault("prometheus_server.path", defaults.PrometheusServer.Path)
+	v.SetDefault("prometheus_server.include_go_metrics", defaults.PrometheusServer.IncludeGoMetrics)
+	v.SetDefault("prometheus_server.include_process_metrics", defaults.PrometheusServer.IncludeProcessMetrics)
+	v.SetDefault("prometheus_server.metric_prefix", defaults.PrometheusServer.MetricPrefix)
+	v.SetDefault("prometheus_server.read_timeout", defaults.PrometheusServer.ReadTimeout)
+	v.SetDefault("prometheus_server.write_timeout", defaults.PrometheusServer.WriteTimeout)
+
 	// Exporter
 	v.SetDefault("exporter.otlp.enabled", defaults.Exporter.OTLP.Enabled)
 	v.SetDefault("exporter.otlp.batch_size", defaults.Exporter.OTLP.BatchSize)
@@ -178,6 +242,26 @@ func (l *Loader) bindEnvVars(v *viper.Viper) {
 		"logging.level":      "TELEMETRYFLOW_LOG_LEVEL",
 		"logging.format":     "TELEMETRYFLOW_LOG_FORMAT",
 		"buffer.path":        "TELEMETRYFLOW_BUFFER_PATH",
+
+		// Kubernetes collector
+		"collectors.kubernetes.enabled":          "TELEMETRYFLOW_K8S_ENABLED",
+		"collectors.kubernetes.kubeconfig":       "TELEMETRYFLOW_K8S_KUBECONFIG",
+		"collectors.kubernetes.namespaces":       "TELEMETRYFLOW_K8S_NAMESPACES",
+		"collectors.kubernetes.cluster_name":     "TELEMETRYFLOW_K8S_CLUSTER_NAME",
+		"collectors.kubernetes.cluster_provider": "TELEMETRYFLOW_K8S_CLUSTER_PROVIDER",
+
+		// Node Exporter collector
+		"collectors.node_exporter.enabled":       "TELEMETRYFLOW_NODE_EXPORTER_ENABLED",
+		"collectors.node_exporter.textfile_path": "TELEMETRYFLOW_NODE_EXPORTER_TEXTFILE_PATH",
+
+		// eBPF collector
+		"collectors.ebpf.enabled":  "TELEMETRYFLOW_EBPF_ENABLED",
+		"collectors.ebpf.btf_path": "TELEMETRYFLOW_EBPF_BTF_PATH",
+		"collectors.ebpf.pin_path": "TELEMETRYFLOW_EBPF_PIN_PATH",
+
+		// Prometheus server
+		"prometheus_server.enabled": "TELEMETRYFLOW_PROMETHEUS_ENABLED",
+		"prometheus_server.port":    "TELEMETRYFLOW_PROMETHEUS_PORT",
 	}
 
 	for key, env := range envBindings {

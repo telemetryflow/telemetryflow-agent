@@ -1,0 +1,74 @@
+---
+# TFO-Agent RBAC Configuration
+# Provides read-only access to Kubernetes resources for metrics collection
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tfo-agent
+  namespace: telemetryflow
+  labels:
+    app.kubernetes.io/name: tfo-agent
+    app.kubernetes.io/component: monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tfo-agent
+  labels:
+    app.kubernetes.io/name: tfo-agent
+    app.kubernetes.io/component: monitoring
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - pods
+      - services
+      - endpoints
+      - namespaces
+      - persistentvolumes
+      - persistentvolumeclaims
+      - resourcequotas
+    verbs: ["get", "list", "watch"]
+
+  # Apps resources
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - statefulsets
+      - daemonsets
+      - replicasets
+    verbs: ["get", "list", "watch"]
+
+  # Batch resources
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+
+  # Metrics-server resources
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - nodes
+      - pods
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tfo-agent
+  labels:
+    app.kubernetes.io/name: tfo-agent
+    app.kubernetes.io/component: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tfo-agent
+subjects:
+  - kind: ServiceAccount
+    name: tfo-agent
+    namespace: telemetryflow

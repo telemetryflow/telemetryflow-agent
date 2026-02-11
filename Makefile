@@ -69,6 +69,8 @@ NC := \033[0m
 .PHONY: all build build-all build-linux build-darwin build-windows clean \
 	test test-unit test-integration test-e2e test-all test-coverage test-script test-short bench \
 	test-run test-list test-verbose test-race \
+	test-kubernetes test-prometheus test-nodeexporter test-ebpf \
+	generate-ebpf build-ebpf \
 	run run-debug dev dev-watch \
 	deps deps-update deps-verify tidy verify \
 	lint lint-fix fmt fmt-check vet staticcheck check \
@@ -78,6 +80,7 @@ NC := \033[0m
 	security govulncheck coverage-merge coverage-report \
 	test-unit-ci test-integration-ci test-e2e-ci \
 	docker docker-build docker-push docker-run \
+	deploy-k8s undeploy-k8s \
 	release-check docs godoc \
 	version help info integrations
 
@@ -122,6 +125,11 @@ help:
 	@echo "  make test-verbose     - Run tests with verbose output"
 	@echo "  make test-race        - Run tests with race detection"
 	@echo "  make bench            - Run benchmarks"
+	@echo "  make test-ebpf        - Run eBPF collector tests"
+	@echo ""
+	@echo "$(YELLOW)eBPF:$(NC)"
+	@echo "  make generate-ebpf    - Generate eBPF bytecode (requires clang)"
+	@echo "  make build-ebpf       - Build Linux binary with eBPF support"
 	@echo ""
 	@echo "$(YELLOW)Code Quality:$(NC)"
 	@echo "  make lint             - Run linters"
@@ -608,6 +616,64 @@ release-check:
 	@echo "$(BLUE)3. Building...$(NC)"
 	@$(MAKE) build
 	@echo "$(GREEN)Release checks passed$(NC)"
+
+# =============================================================================
+# Documentation Targets
+# =============================================================================
+
+# =============================================================================
+# Kubernetes & Prometheus Targets
+# =============================================================================
+
+## Run Kubernetes collector tests
+test-kubernetes:
+	@echo "$(GREEN)Running Kubernetes collector tests...$(NC)"
+	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-kubernetes.out ./tests/unit/domain/kubernetes/...
+
+## Run Prometheus exporter tests
+test-prometheus:
+	@echo "$(GREEN)Running Prometheus exporter tests...$(NC)"
+	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-prometheus.out ./tests/unit/infrastructure/exporter/...
+
+## Run Node Exporter collector tests
+test-nodeexporter:
+	@echo "$(GREEN)Running Node Exporter collector tests...$(NC)"
+	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-nodeexporter.out ./tests/unit/domain/nodeexporter/...
+
+## Run eBPF collector tests
+test-ebpf:
+	@echo "$(GREEN)Running eBPF collector tests...$(NC)"
+	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-ebpf.out ./tests/unit/domain/ebpf/...
+
+## Generate eBPF bytecode from BPF C sources (requires clang + Linux headers)
+generate-ebpf:
+	@echo "$(GREEN)Generating eBPF bytecode via bpf2go...$(NC)"
+	@which clang > /dev/null || (echo "$(RED)clang not found. Install with: apt install clang llvm$(NC)" && exit 1)
+	@$(GOCMD) generate ./internal/collector/ebpf/...
+	@echo "$(GREEN)eBPF generation complete$(NC)"
+
+## Build for Linux with eBPF support
+build-ebpf:
+	@echo "$(GREEN)Building $(BINARY_NAME) for Linux (eBPF-enabled)...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	@GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64-ebpf ./cmd/tfo-agent
+	@echo "$(GREEN)eBPF-enabled Linux build complete$(NC)"
+
+## Deploy TFO-Agent to Kubernetes
+deploy-k8s:
+	@echo "$(GREEN)Deploying TFO-Agent to Kubernetes...$(NC)"
+	@kubectl apply -f deploy/kubernetes/rbac.yaml
+	@kubectl apply -f deploy/kubernetes/configmap.yaml
+	@kubectl apply -f deploy/kubernetes/daemonset.yaml
+	@echo "$(GREEN)TFO-Agent deployed. Check status with: kubectl -n telemetryflow get pods$(NC)"
+
+## Remove TFO-Agent from Kubernetes
+undeploy-k8s:
+	@echo "$(YELLOW)Removing TFO-Agent from Kubernetes...$(NC)"
+	@kubectl delete -f deploy/kubernetes/daemonset.yaml --ignore-not-found
+	@kubectl delete -f deploy/kubernetes/configmap.yaml --ignore-not-found
+	@kubectl delete -f deploy/kubernetes/rbac.yaml --ignore-not-found
+	@echo "$(GREEN)TFO-Agent removed$(NC)"
 
 # =============================================================================
 # Documentation Targets

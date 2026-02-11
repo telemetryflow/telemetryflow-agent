@@ -1,0 +1,291 @@
+# ============================================================================
+# TelemetryFlow Agent - Default Configuration for TFO Platform Integration
+# ============================================================================
+#
+# This configuration demonstrates proven integration between:
+# - TFO-Agent (collectors: Node Exporter, Kubernetes, eBPF)
+# - TFO-Collector (OTLP receiver)
+# - TFO Platform (backend)
+#
+# Version: 1.1.4
+# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+# ============================================================================
+
+# ─── TelemetryFlow Platform Configuration ────────────────────────────────────
+telemetryflow:
+  # API key credentials (obtain from TFO Platform)
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+
+  # TFO-Collector endpoint (OTLP receiver)
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
+  protocol: grpc  # grpc or http
+
+  # TLS configuration
+  tls:
+    enabled: false
+    skip_verify: false  # Set to true for self-signed certificates (dev only)
+
+  # Retry configuration
+  retry:
+    enabled: true
+    max_attempts: 3
+    initial_interval: 1s
+    max_interval: 30s
+
+# ─── Agent Configuration ──────────────────────────────────────────────────────
+agent:
+  # Agent identification
+  name: "${TELEMETRYFLOW_AGENT_NAME:-TFO-Agent}"
+  hostname: ""  # Auto-detected if empty
+
+  # Agent tags (for grouping and filtering in TFO Platform)
+  tags:
+    environment: "${TELEMETRYFLOW_ENVIRONMENT:-production}"
+    region: "${TELEMETRYFLOW_REGION:-us-east-1}"
+    cluster: "${TELEMETRYFLOW_CLUSTER:-main}"
+    datacenter: "${TELEMETRYFLOW_DATACENTER:-dc1}"
+
+# ─── Heartbeat Configuration ──────────────────────────────────────────────────
+heartbeat:
+  enabled: true
+  interval: 60s
+  timeout: 10s
+  include_system_info: true
+
+# ─── Collector Configuration ──────────────────────────────────────────────────
+collectors:
+  # System Metrics (Basic Host Metrics)
+  system:
+    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+    process: true
+    load_average: true
+
+  # Logs Collection
+  logs:
+    enabled: false
+    paths:
+      - /var/log/app/*.log
+    follow: true
+
+  # Process Metrics
+  process:
+    enabled: false
+    interval: 30s
+    include_cmdline: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Node Exporter - Linux System Metrics (Prometheus-compatible)
+  # ──────────────────────────────────────────────────────────────────────────
+  node_exporter:
+    enabled: true
+    interval: 15s
+
+    # Sub-collectors (individually togglable)
+    cpu: true                # CPU frequency, thermal, usage
+    memory: true             # Memory usage, swap, buffers
+    disk_io: true            # Disk I/O statistics
+    filesystem: true         # Filesystem usage and mounts
+    network: true            # Network interface statistics
+    load_avg: true           # System load average (1m, 5m, 15m)
+    thermal: true            # CPU/GPU temperature sensors
+    textfile: false          # Custom metrics from .prom files
+    conntrack: true          # Connection tracking statistics
+    psi: true                # Pressure Stall Information (PSI)
+    vmstat: true             # Virtual memory statistics
+    sockstat: true           # Socket statistics
+    entropy: true            # Kernel entropy pool
+    file_desc: true          # File descriptor usage
+    stat: true               # /proc/stat metrics
+
+    # Exclusion patterns (regex)
+    filesystem_mount_exclude: '^/(dev|proc|sys|run)($|/)'
+    filesystem_type_exclude: '^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs)$'
+    network_device_exclude: '^(veth|docker|br-|lo).*$'
+    disk_device_exclude: '^(ram|loop|fd|sr)\d+$'
+
+    # Textfile collector path (optional)
+    textfile_path: ""
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Kubernetes Metrics (K8s API Server)
+  # ──────────────────────────────────────────────────────────────────────────
+  kubernetes:
+    enabled: false  # Enable if running in Kubernetes
+    interval: 30s
+
+    # Kubernetes API configuration
+    kubeconfig_path: ""  # Empty = use in-cluster config
+    api_server: ""       # Empty = auto-detect from kubeconfig/in-cluster
+
+    # Collected resource types
+    collect_pods: true
+    collect_nodes: true
+    collect_deployments: true
+    collect_services: true
+    collect_events: true
+    collect_namespaces: true
+
+    # Namespace filtering
+    namespace_filter: []       # Empty = all namespaces
+    exclude_namespaces:        # System namespaces to exclude
+      - kube-system
+      - kube-public
+      - kube-node-lease
+
+    # Label filtering
+    pod_label_filter: {}
+    node_label_filter: {}
+
+    # TLS configuration for API server
+    tls:
+      enabled: true
+      skip_verify: false       # Set to true for self-signed certs (dev only)
+      cert_file: ""
+      key_file: ""
+      ca_file: ""
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # eBPF Collector - Kernel-Level Observability (Linux-only)
+  # ──────────────────────────────────────────────────────────────────────────
+  ebpf:
+    enabled: false  # Enable for kernel-level metrics (Linux only)
+    interval: 15s
+
+    # Sub-collectors (28 metrics total)
+    collect_syscalls: true     # Syscall tracing (count, latency, errors)
+    collect_network: true      # TCP/UDP connection monitoring
+    collect_file_io: true      # VFS file I/O tracking
+    collect_scheduler: false   # Scheduler analysis (context switches)
+    collect_memory: false      # Memory page fault tracking
+    collect_tcp_events: true   # TCP state transitions
+
+    # Process filtering
+    process_filter: []         # Include only these processes (regex)
+    exclude_processes:         # Exclude these processes
+      - tfo-agent
+      - systemd
+      - kworker
+      - rcu_sched
+
+    # Performance tuning
+    sample_rate: 100           # 1-100 (percentage of events to sample)
+    ring_buffer_size: 262144   # 256 KB
+    perf_buffer_size: 64       # Pages
+
+    # BPF runtime
+    btf_path: ""               # Empty = auto-detect from /sys/kernel/btf/vmlinux
+    pin_path: /sys/fs/bpf/tfo-agent
+
+    # Additional labels
+    labels: {}
+
+    # Cilium Hubble Integration (optional)
+    cilium:
+      enabled: false
+      hubble_address: "localhost:4245"
+      hubble_tls_enabled: false
+      hubble_tls_cert: ""
+      hubble_tls_key: ""
+      hubble_tls_ca: ""
+      collect_flows: true      # L3/L4 network flows
+      collect_l7_flows: false  # HTTP/gRPC/DNS flows
+      collect_drops: true      # Dropped packets
+      collect_policies: true   # Network policy verdicts
+
+# ─── Exporter Configuration ───────────────────────────────────────────────────
+exporter:
+  # OTLP Exporter (to TFO-Collector)
+  otlp:
+    enabled: true
+    batch_size: 100
+    flush_interval: 10s
+    compression: gzip
+
+  # Prometheus Remote Write (optional, for Prometheus integration)
+  prometheus:
+    enabled: false
+    endpoint: "http://prometheus:9090/api/v1/write"
+    interval: 15s
+
+# ─── Buffer Configuration ─────────────────────────────────────────────────────
+buffer:
+  enabled: true
+  path: "/var/lib/tfo-agent/buffer"
+  max_size_mb: 100
+  max_age: 24h
+  flush_interval: 5s
+
+# ─── Logging Configuration ────────────────────────────────────────────────────
+logging:
+  level: "${TELEMETRYFLOW_LOG_LEVEL:-info}"  # debug, info, warn, error
+  format: json  # json or console
+  output: stdout
+
+# ============================================================================
+# Integration Guide
+# ============================================================================
+#
+# 1. TFO-Agent → TFO-Collector (OTLP gRPC)
+#    - endpoint: localhost:4317 (gRPC) or localhost:4318 (HTTP)
+#    - protocol: grpc or http
+#    - TFO-Collector receives on /v1 (OTEL community) and /v2 (TFO enhanced)
+#
+# 2. Node Exporter Metrics (Prometheus-compatible)
+#    - 100+ system metrics: CPU, memory, disk, network, load
+#    - Exported via OTLP to TFO-Collector
+#    - Available in TFO Platform dashboards
+#
+# 3. Kubernetes Metrics (K8s API Server)
+#    - Pod, Node, Deployment, Service metrics
+#    - Requires RBAC permissions (ClusterRole + ServiceAccount)
+#    - Auto-detects in-cluster config when running in K8s
+#
+# 4. eBPF Metrics (Linux-only, kernel-level)
+#    - 28 kernel-level metrics across 7 categories
+#    - Requires CAP_BPF + CAP_PERFMON capabilities
+#    - Optional Cilium Hubble integration for network observability
+#
+# 5. TFO Platform Backend
+#    - Heartbeat: agent registration and health monitoring
+#    - API Key: authentication via api_key_id + api_key_secret
+#    - Tags: grouping and filtering in TFO Platform UI
+#
+# ============================================================================
+# Quick Start Commands
+# ============================================================================
+#
+# # Start TFO-Agent with default config
+# tfo-agent start --config configs/tfo-agent.default.yaml
+#
+# # Validate configuration
+# tfo-agent config validate --config configs/tfo-agent.default.yaml
+#
+# # Run in Kubernetes (DaemonSet)
+# kubectl apply -f deploy/kubernetes/
+#
+# # Run with Docker Compose
+# docker-compose up -d
+#
+# # Enable eBPF collector (Linux with capabilities)
+# sudo setcap cap_bpf,cap_perfmon+ep /usr/local/bin/tfo-agent
+# TELEMETRYFLOW_EBPF_ENABLED=true tfo-agent start
+#
+# ============================================================================
+# Environment Variables (Override Config)
+# ============================================================================
+#
+# TELEMETRYFLOW_API_KEY_ID         - TFO Platform API key ID
+# TELEMETRYFLOW_API_KEY_SECRET     - TFO Platform API key secret
+# TELEMETRYFLOW_ENDPOINT           - TFO-Collector endpoint (default: localhost:4317)
+# TELEMETRYFLOW_ENVIRONMENT        - Environment tag (default: production)
+# TELEMETRYFLOW_AGENT_NAME         - Agent name (default: TFO-Agent)
+# TELEMETRYFLOW_LOG_LEVEL          - Log level (default: info)
+# TELEMETRYFLOW_EBPF_ENABLED       - Enable eBPF collector (default: false)
+#
+# ============================================================================

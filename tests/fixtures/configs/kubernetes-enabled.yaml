@@ -1,0 +1,35 @@
+telemetryflow:
+  endpoint: "localhost:4317"
+  protocol: grpc
+
+agent:
+  name: "test-agent"
+
+collectors:
+  system:
+    enabled: true
+    interval: 15s
+
+  kubernetes:
+    enabled: true
+    interval: 30s
+    nodes: true
+    pods: true
+    deployments: true
+    namespaces_collect: true
+    storage: true
+    services: true
+    workloads: true
+    metrics_api: true
+    sync_to_backend: true
+    sync_interval: 60s
+    cluster_name: "test-cluster"
+    cluster_provider: "self-managed"
+    exclude_namespaces:
+      - kube-system
+
+prometheus_server:
+  enabled: true
+  port: 8888
+  path: /metrics
+  metric_prefix: tfo

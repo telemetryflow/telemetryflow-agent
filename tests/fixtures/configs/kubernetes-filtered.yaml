@@ -1,0 +1,21 @@
+telemetryflow:
+  endpoint: "localhost:4317"
+  protocol: grpc
+
+collectors:
+  kubernetes:
+    enabled: true
+    interval: 30s
+    namespaces:
+      - production
+      - staging
+    exclude_namespaces: []
+    label_selector: "app=myapp"
+    nodes: true
+    pods: true
+    deployments: true
+    storage: false
+    services: false
+    workloads: false
+    metrics_api: false
+    cluster_name: "filtered-cluster"
