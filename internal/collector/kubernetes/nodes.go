@@ -96,6 +96,17 @@ func collectNodes(
 			)
 		}
 
+		// Extract node IPs from Status.Addresses
+		var internalIP, externalIP string
+		for _, addr := range node.Status.Addresses {
+			switch addr.Type {
+			case corev1.NodeInternalIP:
+				internalIP = addr.Address
+			case corev1.NodeExternalIP:
+				externalIP = addr.Address
+			}
+		}
+
 		// --- State ---
 		state := NodeState{
 			Name:              node.Name,
@@ -113,6 +124,8 @@ func collectNodes(
 			PodsCapacity:      podsCap,
 			PodsCount:         int64(podsCount),
 			Conditions:        conditions,
+			InternalIP:        internalIP,
+			ExternalIP:        externalIP,
 		}
 
 		// Metrics-server usage

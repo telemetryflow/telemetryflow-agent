@@ -67,12 +67,20 @@ agent:
   description: "TelemetryFlow Agent - Community Enterprise Observability Platform"
   # Agent version (auto-populated at build time)
   version: ""
-  # Custom tags for labeling and filtering
+  # Custom tags for labeling and filtering (sent with heartbeat)
   tags:
     environment: "${TELEMETRYFLOW_ENVIRONMENT:-production}"
     datacenter: "default"
+    # provider: "docker"
+    # region: "ap-southeast-3"
+    # cluster: "telemetryflow"
     # team: platform
     # region: us-west-2
+    # instance_type: "container"
+  # Custom labels attached to all metrics (key-value pairs)
+  labels: {}
+    # key1: "value1"
+    # key2: "value2"
 
 # =============================================================================
 # Heartbeat Settings
@@ -86,109 +94,57 @@ heartbeat:
   include_system_info: true
 
 # =============================================================================
-# Collectors - Data Collection Configuration
+# Collectors - Data Collection Configuration (Alphabetical Order)
 # =============================================================================
 collectors:
-  # System metrics collector
-  system:
-    enabled: true
-    interval: 15s
-    cpu: true
-    memory: true
-    disk: true
-    network: true
-    # Specific disk paths to monitor (empty = all)
-    disk_paths: []
-
-  # Log collector
-  logs:
-    enabled: false
-    paths: []
-    # - /var/log/syslog
-    # - /var/log/messages
-    include_patterns: []
-    exclude_patterns: []
-
-  # Process monitoring
-  process:
-    enabled: false
-    interval: 30s
-    processes: []
-    # - nginx
-    # - postgres
-    # - redis
-
   # ===========================================================================
-  # Kubernetes Metrics Collector (kube-state-metrics replacement)
+  # cAdvisor Collector (Prometheus scraper)
   # ===========================================================================
-  # Collects Kubernetes resource state metrics using k8s.io/client-go.
-  # Replaces kube-state-metrics + Prometheus Agent for K8s monitoring.
-  # Requires RBAC (ClusterRole with read-only access). See deploy/kubernetes/.
-  kubernetes:
-    # Enable Kubernetes metrics collection
-    enabled: false
-    # Collection interval (heavier than system metrics, use 30s+)
-    interval: 30s
-    # Kubeconfig path (empty = in-cluster auto-detection via ServiceAccount)
-    kubeconfig: ""
-    # Kubeconfig context name (empty = current-context)
-    context: ""
-    # Namespace filtering (empty = all namespaces)
-    namespaces: []
-    # Namespaces to exclude from collection
-    exclude_namespaces:
-      - kube-system
-    # Kubernetes label selector (empty = all resources)
-    label_selector: ""
-    # Resource collectors (individually toggleable)
-    nodes: true
-    pods: true
-    deployments: true
-    namespaces_collect: true
-    storage: true # PersistentVolume + PersistentVolumeClaim
-    services: true # Service + Endpoints
-    workloads: true # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
-    # Fetch actual CPU/Memory usage from metrics-server
-    metrics_api: true
-    # Sync resource state to TFO backend (PostgreSQL entities)
-    sync_to_backend: true
-    sync_interval: 60s
-    # Cluster metadata (auto-detected if empty)
-    cluster_name: ""
-    cluster_provider: "" # eks, gke, aks, k3s, self-managed, etc.
-
-  # ===========================================================================
-  # Node Exporter Collector (prometheus/node_exporter replacement)
-  # ===========================================================================
-  # Collects detailed system metrics equivalent to Prometheus node_exporter.
-  # Disabled by default — enable to replace standalone node_exporter.
-  # All metrics use "node.*" prefix (→ tfo_node_* in Prometheus format).
-  node_exporter:
+  # Scrapes container metrics from a running cAdvisor instance's Prometheus
+  # /metrics endpoint. Use this when cAdvisor is already running separately.
+  # For direct Docker API access without cAdvisor, use the `docker` collector.
+  cadvisor:
     enabled: false
     interval: 15s
-    # Sub-collector toggles (all enabled when node_exporter is enabled)
-    cpu: true # Per-CPU-mode time (user, system, idle, etc.)
-    memory: true # Detailed memory (cached, buffers, slab, swap)
-    diskio: true # Per-device disk I/O counters
-    filesystem: true # Per-mountpoint usage + inodes
-    network: true # Per-interface stats + TCP states + ARP
-    loadavg: true # Load averages (1m, 5m, 15m)
-    thermal: true # CPU/hardware temperatures
-    textfile: false # Custom *.prom file collector
-    # Linux-only (gracefully no-op on macOS/Windows)
-    conntrack: true # nf_conntrack count/max
-    psi: true # Pressure Stall Information
-    vmstat: true # /proc/vmstat page I/O
-    sockstat: true # Socket statistics by protocol
-    entropy: true # Available entropy
-    filedesc: true # File descriptor usage
-    stat: true # Context switches, interrupts, forks
-    # Filtering (regex patterns)
-    filesystem_mount_exclude: "^/(dev|proc|sys|run)($|/)"
-    filesystem_type_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs)$"
-    network_device_exclude: "^(veth|docker|br-|lo).*$"
-    disk_device_exclude: "^(ram|loop|fd|sr)\\d+$"
-    textfile_path: /var/lib/tfo-agent/textfile
+    # cAdvisor base URL
+    endpoint: "http://localhost:8080"
+    # Prometheus metrics path
+    metrics_path: /metrics
+    # HTTP scrape timeout
+    timeout: 10s
+    # Optional: only collect specific metric names (empty = all container_*/machine_*)
+    metric_names: []
+    # - container_cpu_usage_seconds_total
+    # - container_memory_usage_bytes
+    # - container_network_receive_bytes_total
+    # - container_network_transmit_bytes_total
+    # - container_fs_usage_bytes
+    # - machine_cpu_cores
+    # - machine_memory_bytes
+
+  # ===========================================================================
+  # Docker Container Metrics Collector (cAdvisor replacement)
+  # ===========================================================================
+  # Discovers and monitors all containers on the host via the Docker Engine API.
+  # Provides per-container CPU, memory, network, disk I/O, and PID metrics.
+  # Requires access to the Docker socket (/var/run/docker.sock).
+  docker:
+    enabled: false
+    interval: 15s
+    # Docker daemon socket path
+    socket_path: /var/run/docker.sock
+    # Sub-collector toggles
+    cpu: true         # CPU usage %, user/kernel time, throttling
+    memory: true      # Usage, limit, working set, RSS, cache
+    network: true     # Per-interface rx/tx bytes, packets, errors, drops
+    diskio: true      # Read/write bytes and operations
+    pids: true        # Current PID count per container
+    # Include stopped/exited containers in state summary metrics
+    include_stopped: true
+    # Container name filtering (regex patterns, empty = all)
+    include_containers: []
+    exclude_containers: []
+    # - "^k8s_POD_.*"  # Exclude Kubernetes pause containers
 
   # ===========================================================================
   # eBPF Collector (Linux kernel-level observability)
@@ -233,6 +189,110 @@ collectors:
       collect_l7_flows: false
       collect_drops: true
       collect_policies: true
+
+  # ===========================================================================
+  # Kubernetes Metrics Collector (kube-state-metrics replacement)
+  # ===========================================================================
+  # Collects Kubernetes resource state metrics using k8s.io/client-go.
+  # Replaces kube-state-metrics + Prometheus Agent for K8s monitoring.
+  # Requires RBAC (ClusterRole with read-only access). See deploy/kubernetes/.
+  kubernetes:
+    # Enable Kubernetes metrics collection
+    enabled: false
+    # Collection interval (heavier than system metrics, use 30s+)
+    interval: 30s
+    # Kubeconfig path (empty = in-cluster auto-detection via ServiceAccount)
+    kubeconfig: ""
+    # Kubeconfig context name (empty = current-context)
+    context: ""
+    # Namespace filtering (empty = all namespaces)
+    namespaces: []
+    # Namespaces to exclude from collection
+    exclude_namespaces:
+      - kube-system
+    # Kubernetes label selector (empty = all resources)
+    label_selector: ""
+    # Resource collectors (individually toggleable)
+    nodes: true
+    pods: true
+    deployments: true
+    namespaces_collect: true
+    storage: true # PersistentVolume + PersistentVolumeClaim
+    services: true # Service + Endpoints
+    workloads: true # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
+    events: true # Kubernetes Events (Normal/Warning)
+    resource_counts: true # Secrets, ConfigMaps, Ingresses count
+    network: true         # Network bytes per namespace (Kubelet Summary API)
+    # Fetch actual CPU/Memory usage from metrics-server
+    metrics_api: true
+    # Sync resource state to TFO backend (PostgreSQL entities)
+    sync_to_backend: true
+    sync_interval: 60s
+    # Cluster metadata (auto-detected if empty)
+    cluster_name: ""
+    cluster_provider: "" # eks, gke, aks, k3s, self-managed, etc.
+
+  # Log collector
+  logs:
+    enabled: false
+    paths: []
+    # - /var/log/syslog
+    # - /var/log/messages
+    include_patterns: []
+    exclude_patterns: []
+
+  # ===========================================================================
+  # Node Exporter Collector (prometheus/node_exporter replacement)
+  # ===========================================================================
+  # Collects detailed system metrics equivalent to Prometheus node_exporter.
+  # Disabled by default — enable to replace standalone node_exporter.
+  # All metrics use "node.*" prefix (→ tfo_node_* in Prometheus format).
+  node_exporter:
+    enabled: false
+    interval: 15s
+    # Sub-collector toggles (all enabled when node_exporter is enabled)
+    cpu: true # Per-CPU-mode time (user, system, idle, etc.)
+    memory: true # Detailed memory (cached, buffers, slab, swap)
+    diskio: true # Per-device disk I/O counters
+    filesystem: true # Per-mountpoint usage + inodes
+    network: true # Per-interface stats + TCP states + ARP
+    loadavg: true # Load averages (1m, 5m, 15m)
+    thermal: true # CPU/hardware temperatures
+    textfile: false # Custom *.prom file collector
+    # Linux-only (gracefully no-op on macOS/Windows)
+    conntrack: true # nf_conntrack count/max
+    psi: true # Pressure Stall Information
+    vmstat: true # /proc/vmstat page I/O
+    sockstat: true # Socket statistics by protocol
+    entropy: true # Available entropy
+    filedesc: true # File descriptor usage
+    stat: true # Context switches, interrupts, forks
+    # Filtering (regex patterns)
+    filesystem_mount_exclude: "^/(dev|proc|sys|run)($|/)"
+    filesystem_type_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs)$"
+    network_device_exclude: "^(veth|docker|br-|lo).*$"
+    disk_device_exclude: "^(ram|loop|fd|sr)\\d+$"
+    textfile_path: /var/lib/tfo-agent/textfile
+
+  # Process monitoring
+  process:
+    enabled: false
+    interval: 30s
+    processes: []
+    # - nginx
+    # - postgres
+    # - redis
+
+  # System metrics collector
+  system:
+    enabled: true
+    interval: 15s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+    # Specific disk paths to monitor (empty = all)
+    disk_paths: []
 
 # =============================================================================
 # Prometheus Metrics Endpoint
@@ -557,7 +617,7 @@ cache:
   preload_on_start: true
 
 # =============================================================================
-# 3rd Party Integrations (Alphabetically Sorted)
+# 3rd Party Integrations (Alphabetically Ordered)
 # =============================================================================
 # Export telemetry data to external monitoring systems
 # All integrations are disabled by default - enable as needed

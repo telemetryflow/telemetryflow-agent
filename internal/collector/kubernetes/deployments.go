@@ -57,6 +57,9 @@ func collectDeployments(
 			collector.NewMetric("k8s.deployment.replicas.unavailable", float64(dep.Status.UnavailableReplicas), collector.MetricTypeGauge).
 				WithLabels(labels).
 				WithDescription("Unavailable replica count"),
+			collector.NewMetric("k8s.deployment.replicas.updated", float64(dep.Status.UpdatedReplicas), collector.MetricTypeGauge).
+				WithLabels(labels).
+				WithDescription("Updated replica count"),
 		)
 
 		// Condition metrics
@@ -79,6 +82,37 @@ func collectDeployments(
 			)
 		}
 
+		// Strategy
+		var strategy *DeploymentStrategy
+		if dep.Spec.Strategy.Type != "" {
+			strategy = &DeploymentStrategy{
+				Type: string(dep.Spec.Strategy.Type),
+			}
+			if dep.Spec.Strategy.RollingUpdate != nil {
+				if dep.Spec.Strategy.RollingUpdate.MaxUnavailable != nil {
+					strategy.MaxUnavailable = dep.Spec.Strategy.RollingUpdate.MaxUnavailable.String()
+				}
+				if dep.Spec.Strategy.RollingUpdate.MaxSurge != nil {
+					strategy.MaxSurge = dep.Spec.Strategy.RollingUpdate.MaxSurge.String()
+				}
+			}
+		}
+
+		// Container summaries from pod template
+		var containers []DeploymentContainer
+		for _, c := range dep.Spec.Template.Spec.Containers {
+			containers = append(containers, DeploymentContainer{
+				Name:  c.Name,
+				Image: c.Image,
+			})
+		}
+
+		// Selector
+		var selector map[string]string
+		if dep.Spec.Selector != nil {
+			selector = dep.Spec.Selector.MatchLabels
+		}
+
 		states = append(states, DeploymentState{
 			Name:                dep.Name,
 			Namespace:           dep.Namespace,
@@ -86,8 +120,14 @@ func collectDeployments(
 			ReadyReplicas:       dep.Status.ReadyReplicas,
 			AvailableReplicas:   dep.Status.AvailableReplicas,
 			UnavailableReplicas: dep.Status.UnavailableReplicas,
+			UpdatedReplicas:     dep.Status.UpdatedReplicas,
 			Labels:              dep.Labels,
 			Conditions:          conditions,
+			Strategy:            strategy,
+			Containers:          containers,
+			Selector:            selector,
+			Generation:          dep.Generation,
+			ObservedGeneration:  dep.Status.ObservedGeneration,
 		})
 	}
 

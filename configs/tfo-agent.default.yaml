@@ -42,9 +42,9 @@ agent:
   # Agent tags (for grouping and filtering in TFO Platform)
   tags:
     environment: "${TELEMETRYFLOW_ENVIRONMENT:-production}"
-    region: "${TELEMETRYFLOW_REGION:-us-east-1}"
-    cluster: "${TELEMETRYFLOW_CLUSTER:-main}"
-    datacenter: "${TELEMETRYFLOW_DATACENTER:-dc1}"
+    region: "${TELEMETRYFLOW_REGION:-ap-southeast-3}"
+    cluster: "${TELEMETRYFLOW_CLUSTER:-telemetryflow}"
+    datacenter: "${TELEMETRYFLOW_DATACENTER:-dc01}"
 
 # ─── Heartbeat Configuration ──────────────────────────────────────────────────
 heartbeat:

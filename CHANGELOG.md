@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.5-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,44 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.5] - 2026-02-19
+
+### Added
+
+- **Docker Container Metrics Collector**: Native Docker Engine API collector replacing cAdvisor dependency
+  - Uses Docker SDK (`github.com/docker/docker`) with `ContainerStatsOneShot` for per-container metrics
+  - **CPU**: `container.cpu.usage_percent`, `container.cpu.usage_total`, `container.cpu.user`, `container.cpu.kernel`, `container.cpu.online_cpus`, `container.cpu.throttled_periods`, `container.cpu.throttled_time`
+  - **Memory**: `container.memory.usage`, `container.memory.working_set` (usage - inactive_file), `container.memory.limit`, `container.memory.max_usage`, `container.memory.rss`, `container.memory.cache`, `container.memory.usage_percent`
+  - **Network**: Per-interface `container.network.{rx,tx}_{bytes,packets,errors,dropped}`
+  - **Disk I/O**: `container.diskio.{read,write}_{bytes,ops}`
+  - **PIDs**: `container.pids.current`
+  - **State Summary**: `container.state.{running,stopped,paused,restarting,total}`
+  - Container filtering with regex include/exclude patterns
+  - Labels per metric: `container_id`, `container_name`, `image`, `status`
+  - CPU delta tracking for accurate percentage calculation
+- **cAdvisor Prometheus Scraper Collector**: Scrapes container metrics from cAdvisor's `/metrics` endpoint
+  - Parses Prometheus text format using `prometheus/common/expfmt`
+  - Collects `container_*` and `machine_*` metric families by default
+  - Supports all Prometheus types: counter, gauge, histogram, summary, untyped
+  - Optional `metric_names` allowlist for selective collection
+  - Custom labels injection from config
+  - Configurable endpoint, metrics path, timeout, and interval
+- **Tags and Labels Propagation**: Agent tags and custom labels now included in heartbeat and OTLP exports
+  - `tags` and `labels` fields added to heartbeat payload
+  - Tags/labels exported as OTEL resource attributes
+
+### Fixed
+
+- **CPU Usage on macOS**: Removed `omitempty` from float64 fields in `SystemInfoPayload` that caused valid 0.0 values (CPU idle, iowait, steal, etc.) to be dropped from JSON serialization, resulting in "NaN %" display in dashboard
+
+### Changed
+
+- **Alphabetical Ordering**: All collectors in `config.go`, `agent.go`, and `tfo-agent.yaml` are now sorted alphabetically (cAdvisor → Docker → eBPF → Kubernetes → Logs → Node Exporter → Process → System)
+
+### Dependencies
+
+- Added `github.com/docker/docker v27.5.1+incompatible` for Docker Engine API
 
 ## [1.1.4] - 2026-02-11
 
@@ -316,6 +354,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                               |
 | ------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                       |
 | 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability        |
 | 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls               |
 | 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine) |

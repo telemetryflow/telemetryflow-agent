@@ -67,6 +67,9 @@ func TestCollectDeploymentReplicaCounts(t *testing.T) {
 		if m.Name == "k8s.deployment.replicas.unavailable" && m.Labels["deployment"] == "app" {
 			assert.Equal(t, 0.0, m.Value, "app deployment should have 0 unavailable replicas")
 		}
+		if m.Name == "k8s.deployment.replicas.updated" && m.Labels["deployment"] == "app" {
+			assert.Equal(t, 3.0, m.Value, "app deployment should have 3 updated replicas")
+		}
 	}
 }
 
@@ -95,4 +98,49 @@ func TestCollectDeploymentExcludeNamespace(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, replicaMetrics, "only 1 deployment should remain after excluding monitoring")
+}
+
+func TestCollectDeploymentEnrichedFields(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:     true,
+			Deployments: true,
+			ClusterName: "test-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	_, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	state := collector.LastClusterState()
+	require.NotNil(t, state)
+	require.NotEmpty(t, state.Deployments)
+
+	for _, dep := range state.Deployments {
+		// Strategy
+		require.NotNil(t, dep.Strategy, "deployment %s should have strategy", dep.Name)
+		assert.Equal(t, "RollingUpdate", dep.Strategy.Type)
+		assert.Equal(t, "25%", dep.Strategy.MaxUnavailable)
+		assert.Equal(t, "25%", dep.Strategy.MaxSurge)
+
+		// Containers
+		require.NotEmpty(t, dep.Containers, "deployment %s should have containers", dep.Name)
+		assert.Equal(t, "main", dep.Containers[0].Name)
+		assert.Contains(t, dep.Containers[0].Image, ":latest")
+
+		// Selector
+		require.NotEmpty(t, dep.Selector, "deployment %s should have selector", dep.Name)
+		assert.Contains(t, dep.Selector, "app")
+
+		// Generation
+		assert.Equal(t, int64(3), dep.Generation)
+		assert.Equal(t, int64(3), dep.ObservedGeneration)
+
+		// UpdatedReplicas
+		assert.Equal(t, dep.Replicas, dep.UpdatedReplicas)
+	}
 }

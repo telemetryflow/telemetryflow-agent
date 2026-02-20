@@ -49,6 +49,12 @@ type HeartbeatConfig struct {
 	// IncludeSystemInfo includes system metrics in heartbeat
 	IncludeSystemInfo bool
 
+	// Tags are agent-level tags to include in heartbeat
+	Tags map[string]string
+
+	// Labels are agent-level labels to include in heartbeat
+	Labels map[string]string
+
 	// Client is the API client (implements HeartbeatClient interface)
 	Client HeartbeatClient
 
@@ -189,7 +195,7 @@ func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
 		if err != nil {
 			h.logger.Debug("Failed to collect system info", zap.Error(err))
 		} else {
-			sysInfo = mapSystemInfoToPayload(info)
+			sysInfo = mapSystemInfoToPayload(info, h.config.Tags, h.config.Labels)
 		}
 	}
 
@@ -212,7 +218,7 @@ func (h *Heartbeat) SendNow(ctx context.Context) error {
 }
 
 // mapSystemInfoToPayload converts collector.SystemInfo to api.SystemInfoPayload
-func mapSystemInfoToPayload(info *collector.SystemInfo) *api.SystemInfoPayload {
+func mapSystemInfoToPayload(info *collector.SystemInfo, tags, labels map[string]string) *api.SystemInfoPayload {
 	if info == nil {
 		return nil
 	}
@@ -369,6 +375,14 @@ func mapSystemInfoToPayload(info *collector.SystemInfo) *api.SystemInfoPayload {
 		AgentUptime:        info.AgentUptime,
 		CollectionTime:     info.CollectionTime,
 		CollectionDuration: info.CollectionDuration,
+	}
+
+	// Map agent tags and labels
+	if len(tags) > 0 {
+		payload.Tags = tags
+	}
+	if len(labels) > 0 {
+		payload.Labels = labels
 	}
 
 	// Map CPU per-core info

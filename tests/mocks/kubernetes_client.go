@@ -4,8 +4,10 @@ package mocks
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -29,6 +31,21 @@ func NewFakeClientset() *fake.Clientset {
 		fakePVC("default", "pvc-data-1", "10Gi", "standard", corev1.ClaimBound),
 		fakeStatefulSet("default", "redis", 3, 3, 3),
 		fakeDaemonSet("monitoring", "node-exporter", 3, 3, 3),
+		// Events
+		fakeEvent("default", "app-scheduled", "Normal", "Scheduled", "Pod", "app-abc123"),
+		fakeEvent("default", "app-warning", "Warning", "FailedScheduling", "Pod", "app-def456"),
+		fakeEvent("monitoring", "prometheus-started", "Normal", "Started", "Pod", "prometheus-0"),
+		// Secrets
+		fakeSecret("default", "app-secret"),
+		fakeSecret("default", "tls-secret"),
+		fakeSecret("monitoring", "prometheus-secret"),
+		// ConfigMaps
+		fakeConfigMap("default", "app-config"),
+		fakeConfigMap("monitoring", "prometheus-config"),
+		// Ingresses
+		fakeIngress("default", "app-ingress"),
+		// ResourceQuotas
+		fakeResourceQuota("default", "default-quota"),
 	)
 }
 
@@ -70,6 +87,10 @@ func fakeNode(name string, ready bool, cpu, memory string) *corev1.Node {
 				OSImage:                 "Ubuntu 22.04 LTS",
 				Architecture:            "amd64",
 			},
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: corev1.NodeExternalIP, Address: "203.0.113.1"},
+			},
 		},
 	}
 }
@@ -88,7 +109,7 @@ func fakePod(namespace, name, node string, phase corev1.PodPhase, cpuReq, memReq
 			Containers: []corev1.Container{
 				{
 					Name:  "main",
-					Image: "app:latest",
+					Image: name + ":latest",
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse(cpuReq),
@@ -121,17 +142,37 @@ func fakePod(namespace, name, node string, phase corev1.PodPhase, cpuReq, memReq
 func fakeDeployment(namespace, name string, replicas, ready, available, unavailable int32) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:       name,
+			Namespace:  namespace,
+			Generation: 3,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": name},
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"},
+					MaxSurge:       &intstr.IntOrString{Type: intstr.String, StrVal: "25%"},
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "main", Image: name + ":latest"},
+					},
+				},
+			},
 		},
 		Status: appsv1.DeploymentStatus{
 			Replicas:            replicas,
 			ReadyReplicas:       ready,
 			AvailableReplicas:   available,
 			UnavailableReplicas: unavailable,
+			UpdatedReplicas:     replicas,
+			ObservedGeneration:  3,
 		},
 	}
 }
@@ -157,6 +198,7 @@ func fakeService(namespace, name string, svcType corev1.ServiceType) *corev1.Ser
 }
 
 func fakePV(name, capacity, storageClass string, phase corev1.PersistentVolumePhase) *corev1.PersistentVolume {
+	fsMode := corev1.PersistentVolumeFilesystem
 	return &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: corev1.PersistentVolumeSpec{
@@ -164,12 +206,20 @@ func fakePV(name, capacity, storageClass string, phase corev1.PersistentVolumePh
 			Capacity: corev1.ResourceList{
 				corev1.ResourceStorage: resource.MustParse(capacity),
 			},
+			AccessModes:                   []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			VolumeMode:                    &fsMode,
+			ClaimRef: &corev1.ObjectReference{
+				Name:      "pvc-data-1",
+				Namespace: "default",
+			},
 		},
 		Status: corev1.PersistentVolumeStatus{Phase: phase},
 	}
 }
 
 func fakePVC(namespace, name, capacity, storageClass string, phase corev1.PersistentVolumeClaimPhase) *corev1.PersistentVolumeClaim {
+	fsMode := corev1.PersistentVolumeFilesystem
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -177,6 +227,9 @@ func fakePVC(namespace, name, capacity, storageClass string, phase corev1.Persis
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: &storageClass,
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			VolumeName:       "pv-data-1",
+			VolumeMode:       &fsMode,
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(capacity),
@@ -219,6 +272,88 @@ func fakeDaemonSet(namespace, name string, desired, current, ready int32) *appsv
 			DesiredNumberScheduled: desired,
 			CurrentNumberScheduled: current,
 			NumberReady:            ready,
+		},
+	}
+}
+
+func fakeEvent(namespace, name, evType, reason, kind, involvedName string) *corev1.Event {
+	return &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Type:   evType,
+		Reason: reason,
+		InvolvedObject: corev1.ObjectReference{
+			Kind: kind,
+			Name: involvedName,
+		},
+		Source:         corev1.EventSource{Component: "kubelet"},
+		Count:          1,
+		Message:        reason + " event for " + involvedName,
+		FirstTimestamp: metav1.Now(),
+		LastTimestamp:  metav1.Now(),
+	}
+}
+
+func fakeSecret(namespace, name string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+}
+
+func fakeConfigMap(namespace, name string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string]string{"key": "value"},
+	}
+}
+
+func fakeIngress(namespace, name string) *networkingv1.Ingress {
+	return &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{Host: "example.com"},
+			},
+		},
+	}
+}
+
+func fakeResourceQuota(namespace, name string) *corev1.ResourceQuota {
+	return &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.ResourceQuotaSpec{
+			Hard: corev1.ResourceList{
+				corev1.ResourceRequestsCPU:    resource.MustParse("4"),
+				corev1.ResourceRequestsMemory: resource.MustParse("8Gi"),
+				corev1.ResourcePods:           resource.MustParse("20"),
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceRequestsCPU:    resource.MustParse("4"),
+				corev1.ResourceRequestsMemory: resource.MustParse("8Gi"),
+				corev1.ResourcePods:           resource.MustParse("20"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourceRequestsCPU:    resource.MustParse("1"),
+				corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+				corev1.ResourcePods:           resource.MustParse("5"),
+			},
 		},
 	}
 }

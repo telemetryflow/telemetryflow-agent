@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
+	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
@@ -75,25 +77,54 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		Interval:          cfg.Heartbeat.Interval,
 		Timeout:           cfg.Heartbeat.Timeout,
 		IncludeSystemInfo: cfg.Heartbeat.IncludeSystemInfo,
+		Tags:              cfg.Agent.Tags,
+		Labels:            cfg.Agent.Labels,
 		Client:            client,
 		Logger:            logger,
 	})
 
-	// Create collectors
+	// Create collectors (alphabetical order)
 	var collectors []collector.Collector
 
-	// Add system collector if enabled
-	if cfg.Collector.System.Enabled {
-		sysCollector := system.NewHostCollector(system.HostCollectorConfig{
-			Interval:    cfg.Collector.System.Interval,
-			CollectCPU:  cfg.Collector.System.CPU,
-			CollectMem:  cfg.Collector.System.Memory,
-			CollectDisk: cfg.Collector.System.Disk,
-			CollectNet:  cfg.Collector.System.Network,
-			DiskPaths:   cfg.Collector.System.DiskPaths,
-			Logger:      logger,
-		})
-		collectors = append(collectors, sysCollector)
+	// Add cAdvisor collector if enabled
+	if cfg.Collector.CAdvisor.Enabled {
+		cadvisorCol := cadvisorcollector.NewCAdvisorCollector(cfg.Collector.CAdvisor, logger)
+		collectors = append(collectors, cadvisorCol)
+		logger.Info("cAdvisor collector enabled",
+			zap.Duration("interval", cfg.Collector.CAdvisor.Interval),
+			zap.String("endpoint", cfg.Collector.CAdvisor.Endpoint),
+		)
+	}
+
+	// Add Docker collector if enabled
+	if cfg.Collector.Docker.Enabled {
+		dockerCol, err := dockercollector.NewDockerCollector(cfg.Collector.Docker, logger)
+		if err != nil {
+			logger.Warn("Failed to create Docker collector, skipping",
+				zap.Error(err),
+			)
+		} else {
+			collectors = append(collectors, dockerCol)
+			logger.Info("Docker collector enabled",
+				zap.Duration("interval", cfg.Collector.Docker.Interval),
+				zap.String("socket", cfg.Collector.Docker.SocketPath),
+			)
+		}
+	}
+
+	// Add eBPF collector if enabled
+	if cfg.Collector.EBPF.Enabled {
+		ebpfCol, err := ebpfcollector.NewEBPFCollector(cfg.Collector.EBPF, logger)
+		if err != nil {
+			logger.Warn("Failed to create eBPF collector, skipping",
+				zap.Error(err),
+			)
+		} else {
+			collectors = append(collectors, ebpfCol)
+			logger.Info("eBPF collector enabled",
+				zap.Duration("interval", cfg.Collector.EBPF.Interval),
+			)
+		}
 	}
 
 	// Add Kubernetes collector if enabled
@@ -120,19 +151,18 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		)
 	}
 
-	// Add eBPF collector if enabled
-	if cfg.Collector.EBPF.Enabled {
-		ebpfCol, err := ebpfcollector.NewEBPFCollector(cfg.Collector.EBPF, logger)
-		if err != nil {
-			logger.Warn("Failed to create eBPF collector, skipping",
-				zap.Error(err),
-			)
-		} else {
-			collectors = append(collectors, ebpfCol)
-			logger.Info("eBPF collector enabled",
-				zap.Duration("interval", cfg.Collector.EBPF.Interval),
-			)
-		}
+	// Add system collector if enabled
+	if cfg.Collector.System.Enabled {
+		sysCollector := system.NewHostCollector(system.HostCollectorConfig{
+			Interval:    cfg.Collector.System.Interval,
+			CollectCPU:  cfg.Collector.System.CPU,
+			CollectMem:  cfg.Collector.System.Memory,
+			CollectDisk: cfg.Collector.System.Disk,
+			CollectNet:  cfg.Collector.System.Network,
+			DiskPaths:   cfg.Collector.System.DiskPaths,
+			Logger:      logger,
+		})
+		collectors = append(collectors, sysCollector)
 	}
 
 	// Create Prometheus metrics server if enabled

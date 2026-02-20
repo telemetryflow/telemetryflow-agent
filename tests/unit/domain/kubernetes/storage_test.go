@@ -74,3 +74,62 @@ func TestCollectStoragePVCapacity(t *testing.T) {
 		}
 	}
 }
+
+func TestCollectStorageEnrichedPVFields(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:     true,
+			Storage:     true,
+			ClusterName: "test-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	_, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	state := collector.LastClusterState()
+	require.NotNil(t, state)
+	require.NotEmpty(t, state.PVs)
+
+	pv := state.PVs[0]
+	assert.Equal(t, "pv-data-1", pv.Name)
+	assert.Equal(t, []string{"ReadWriteOnce"}, pv.AccessModes)
+	assert.Equal(t, "Retain", pv.ReclaimPolicy)
+	assert.Equal(t, "Filesystem", pv.VolumeMode)
+	require.NotNil(t, pv.ClaimRef)
+	assert.Equal(t, "pvc-data-1", pv.ClaimRef.Name)
+	assert.Equal(t, "default", pv.ClaimRef.Namespace)
+}
+
+func TestCollectStorageEnrichedPVCFields(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:     true,
+			Storage:     true,
+			ClusterName: "test-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	_, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	state := collector.LastClusterState()
+	require.NotNil(t, state)
+	require.NotEmpty(t, state.PVCs)
+
+	pvc := state.PVCs[0]
+	assert.Equal(t, "pvc-data-1", pvc.Name)
+	assert.Equal(t, []string{"ReadWriteOnce"}, pvc.AccessModes)
+	assert.Equal(t, "pv-data-1", pvc.VolumeName)
+	assert.Equal(t, "Filesystem", pvc.VolumeMode)
+	require.NotNil(t, pvc.Resources)
+	assert.Contains(t, pvc.Resources.Requests, "storage")
+}

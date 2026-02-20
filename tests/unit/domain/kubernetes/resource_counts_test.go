@@ -1,0 +1,120 @@
+package kubernetes_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+
+	k8scollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
+	"github.com/telemetryflow/telemetryflow-agent/internal/config"
+	"github.com/telemetryflow/telemetryflow-agent/tests/mocks"
+)
+
+func TestCollectResourceCounts(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:        true,
+			ResourceCounts: true,
+			ClusterName:    "test-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	metrics, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	metricNames := make(map[string]bool)
+	for _, m := range metrics {
+		metricNames[m.Name] = true
+	}
+
+	assert.True(t, metricNames["k8s.secret.count"], "expected k8s.secret.count metric")
+	assert.True(t, metricNames["k8s.configmap.count"], "expected k8s.configmap.count metric")
+	assert.True(t, metricNames["k8s.ingress.count"], "expected k8s.ingress.count metric")
+}
+
+func TestCollectResourceCountsState(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:        true,
+			ResourceCounts: true,
+			ClusterName:    "test-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	_, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	state := collector.LastClusterState()
+	require.NotNil(t, state)
+	require.NotNil(t, state.ResourceCounts)
+
+	// Secrets: 2 in default + 1 in monitoring = 3 total
+	assert.Equal(t, 2, state.ResourceCounts.Secrets["default"])
+	assert.Equal(t, 1, state.ResourceCounts.Secrets["monitoring"])
+
+	// ConfigMaps: 1 in default + 1 in monitoring
+	assert.Equal(t, 1, state.ResourceCounts.ConfigMaps["default"])
+	assert.Equal(t, 1, state.ResourceCounts.ConfigMaps["monitoring"])
+
+	// Ingresses: 1 in default
+	assert.Equal(t, 1, state.ResourceCounts.Ingresses["default"])
+}
+
+func TestCollectResourceCountsNamespaceFilter(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:           true,
+			ResourceCounts:    true,
+			ClusterName:       "test-cluster",
+			ExcludeNamespaces: []string{"monitoring"},
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	metrics, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	for _, m := range metrics {
+		if ns, ok := m.Labels["namespace"]; ok {
+			assert.NotEqual(t, "monitoring", ns,
+				"monitoring namespace should be excluded from %s", m.Name)
+		}
+	}
+
+	state := collector.LastClusterState()
+	require.NotNil(t, state.ResourceCounts)
+	_, hasMonitoring := state.ResourceCounts.Secrets["monitoring"]
+	assert.False(t, hasMonitoring, "monitoring namespace should be excluded from secrets count")
+}
+
+func TestCollectResourceCountsEmpty(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewEmptyClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:        true,
+			ResourceCounts: true,
+			ClusterName:    "empty-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	metrics, err := collector.Collect(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, metrics, "empty cluster should produce no resource count metrics")
+}

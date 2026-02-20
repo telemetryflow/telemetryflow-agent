@@ -28,9 +28,9 @@ func NewLoader() *Loader {
 	}
 }
 
-// WithConfigPaths adds additional config search paths
+// WithConfigPaths replaces the default config search paths
 func (l *Loader) WithConfigPaths(paths ...string) *Loader {
-	l.configPaths = append(l.configPaths, paths...)
+	l.configPaths = paths
 	return l
 }
 
@@ -112,6 +112,17 @@ func (l *Loader) LoadFromFile(path string) (*Config, error) {
 // setDefaults sets default values in viper
 func (l *Loader) setDefaults(v *viper.Viper) {
 	defaults := DefaultConfig()
+
+	// TelemetryFlow
+	v.SetDefault("telemetryflow.endpoint", defaults.TelemetryFlow.Endpoint)
+	v.SetDefault("telemetryflow.protocol", defaults.TelemetryFlow.Protocol)
+	v.SetDefault("telemetryflow.timeout", defaults.TelemetryFlow.Timeout)
+	v.SetDefault("telemetryflow.tls.enabled", defaults.TelemetryFlow.TLS.Enabled)
+	v.SetDefault("telemetryflow.tls.skip_verify", defaults.TelemetryFlow.TLS.SkipVerify)
+	v.SetDefault("telemetryflow.retry.enabled", defaults.TelemetryFlow.Retry.Enabled)
+	v.SetDefault("telemetryflow.retry.max_attempts", defaults.TelemetryFlow.Retry.MaxAttempts)
+	v.SetDefault("telemetryflow.retry.initial_interval", defaults.TelemetryFlow.Retry.InitialInterval)
+	v.SetDefault("telemetryflow.retry.max_interval", defaults.TelemetryFlow.Retry.MaxInterval)
 
 	// Agent
 	v.SetDefault("agent.id", defaults.Agent.ID)
@@ -231,6 +242,13 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 func (l *Loader) bindEnvVars(v *viper.Viper) {
 	// Critical env vars that need explicit binding
 	envBindings := map[string]string{
+		// TelemetryFlow
+		"telemetryflow.endpoint":       "TELEMETRYFLOW_ENDPOINT",
+		"telemetryflow.protocol":       "TELEMETRYFLOW_PROTOCOL",
+		"telemetryflow.api_key_id":     "TELEMETRYFLOW_API_KEY_ID",
+		"telemetryflow.api_key_secret": "TELEMETRYFLOW_API_KEY_SECRET",
+
+		// Agent
 		"agent.id":           "TELEMETRYFLOW_ID",
 		"agent.hostname":     "TELEMETRYFLOW_HOSTNAME",
 		"api.endpoint":       "TELEMETRYFLOW_API_ENDPOINT",

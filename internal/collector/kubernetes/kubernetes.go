@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 
@@ -32,6 +33,10 @@ type KubernetesCollector struct {
 
 	// Last collected cluster state (for sync to backend)
 	lastState *ClusterState
+
+	// kubeletFetcher retrieves /stats/summary from each node's kubelet.
+	// nil means network collection is skipped (e.g. in unit tests).
+	kubeletFetcher KubeletStatsFetcher
 }
 
 // NewKubernetesCollector creates a new Kubernetes collector.
@@ -64,10 +69,11 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 	}
 
 	return &KubernetesCollector{
-		cfg:           conf,
-		logger:        logger.Named(collectorName),
-		clientset:     cs,
-		metricsClient: mc,
+		cfg:            conf,
+		logger:         logger.Named(collectorName),
+		clientset:      cs,
+		metricsClient:  mc,
+		kubeletFetcher: newKubeletStatsFetcher(cs),
 	}, nil
 }
 
@@ -231,6 +237,54 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 	}
 
+	// --- Events ---
+	if k.cfg.Events {
+		metrics, events, err := collectEvents(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect event metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, metrics...)
+			state.Events = events
+		}
+	}
+
+	// --- Resource Counts ---
+	if k.cfg.ResourceCounts {
+		metrics, counts, err := collectResourceCounts(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect resource count metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, metrics...)
+			state.ResourceCounts = counts
+		}
+	}
+
+	// --- Network (Kubelet Summary API) ---
+	if k.cfg.Network {
+		// Gather node names from already-collected state, or list them
+		var nodeNames []string
+		if len(state.Nodes) > 0 {
+			for _, n := range state.Nodes {
+				nodeNames = append(nodeNames, n.Name)
+			}
+		} else {
+			nodeList, err := k.clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			if err == nil {
+				for i := range nodeList.Items {
+					nodeNames = append(nodeNames, nodeList.Items[i].Name)
+				}
+			}
+		}
+
+		metrics, netStats, err := collectNetwork(ctx, k.kubeletFetcher, nodeNames, k.cfg, k.cfg.ClusterName, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect network metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, metrics...)
+			state.NetworkStats = netStats
+		}
+	}
+
 	// Store state for backend sync
 	k.mu.Lock()
 	k.lastState = state
@@ -250,6 +304,11 @@ func (k *KubernetesCollector) LastClusterState() *ClusterState {
 	k.mu.RLock()
 	defer k.mu.RUnlock()
 	return k.lastState
+}
+
+// SetKubeletFetcher replaces the kubelet stats fetcher (used in tests).
+func (k *KubernetesCollector) SetKubeletFetcher(f KubeletStatsFetcher) {
+	k.kubeletFetcher = f
 }
 
 // NewKubernetesCollectorForTest creates a KubernetesCollector with injected dependencies
@@ -293,23 +352,83 @@ func detectClusterName() string {
 	return "unknown"
 }
 
-// detectClusterProvider attempts to detect the Kubernetes provider from environment.
+// detectClusterProvider attempts to detect the Kubernetes provider from environment
+// variables and filesystem heuristics. Returns a value matching K8sProviderEnum
+// on the platform backend (eks, gke, aks, ack, cce, k3s, kind, minikube,
+// rancher, openshift, okd, microshift, kubesphere, self-managed).
 func detectClusterProvider() string {
-	// EKS
+	// === Managed Cloud Providers ===
+
+	// EKS (Amazon Elastic Kubernetes Service)
 	if os.Getenv("AWS_REGION") != "" || os.Getenv("EKS_CLUSTER_NAME") != "" {
 		return "eks"
 	}
-	// GKE
+	// GKE (Google Kubernetes Engine)
 	if os.Getenv("GOOGLE_CLOUD_PROJECT") != "" || os.Getenv("GKE_CLUSTER_NAME") != "" {
 		return "gke"
 	}
-	// AKS
+	// AKS (Azure Kubernetes Service)
 	if os.Getenv("AKS_CLUSTER_NAME") != "" || os.Getenv("AZURE_SUBSCRIPTION_ID") != "" {
 		return "aks"
 	}
-	// k3s
+	// ACK (Alibaba Cloud Kubernetes Service)
+	if os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID") != "" || os.Getenv("ACK_CLUSTER_ID") != "" {
+		return "ack"
+	}
+	// CCE (Huawei Cloud Container Engine)
+	if os.Getenv("HUAWEICLOUD_SDK_TYPE") != "" || os.Getenv("CCE_CLUSTER_ID") != "" {
+		return "cce"
+	}
+
+	// === OpenShift Variants (check MicroShift first — it's a subset of OpenShift) ===
+
+	// MicroShift
+	if _, err := os.Stat("/var/lib/microshift"); err == nil {
+		return "microshift"
+	}
+	// OpenShift
+	if os.Getenv("OPENSHIFT_BUILD_NAMESPACE") != "" || os.Getenv("OPENSHIFT_DEPLOYMENT_NAME") != "" {
+		return "openshift"
+	}
+	if _, err := os.Stat("/etc/openshift"); err == nil {
+		return "openshift"
+	}
+	// OKD (Origin Kubernetes Distribution — community OpenShift)
+	if os.Getenv("OKD_CLUSTER") != "" {
+		return "okd"
+	}
+	if _, err := os.Stat("/etc/okd"); err == nil {
+		return "okd"
+	}
+
+	// === Lightweight / Local Distributions ===
+
+	// k3s (check before Rancher — k3s lives under /var/lib/rancher/k3s)
 	if _, err := os.Stat("/var/lib/rancher/k3s"); err == nil {
 		return "k3s"
 	}
+	// Rancher (RKE / RKE2)
+	if os.Getenv("CATTLE_CLUSTER_AGENT_PORT") != "" || os.Getenv("CATTLE_SERVER") != "" {
+		return "rancher"
+	}
+	if _, err := os.Stat("/var/lib/rancher/rke2"); err == nil {
+		return "rancher"
+	}
+	// minikube
+	if os.Getenv("MINIKUBE_ACTIVE_DOCKERD") != "" || os.Getenv("MINIKUBE_HOME") != "" {
+		return "minikube"
+	}
+	// KIND (Kubernetes IN Docker)
+	if os.Getenv("KIND_CLUSTER_NAME") != "" {
+		return "kind"
+	}
+
+	// === Platform Distributions ===
+
+	// KubeSphere
+	if os.Getenv("KUBESPHERE_NAMESPACE") != "" {
+		return "kubesphere"
+	}
+
 	return "self-managed"
 }

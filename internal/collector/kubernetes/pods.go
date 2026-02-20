@@ -96,6 +96,7 @@ func collectPods(
 
 			cs := ContainerState{
 				Name:          container.Name,
+				Image:         container.Image,
 				CPURequest:    cpuReq,
 				CPULimit:      cpuLim,
 				MemoryRequest: memReq,

@@ -105,3 +105,8 @@ func phaseToFloat(phase corev1.PodPhase) float64 {
 		return 5
 	}
 }
+
+// parseResourceQuantity parses a Kubernetes quantity string (e.g. "500m", "2Gi").
+func parseResourceQuantity(s string) (resource.Quantity, error) {
+	return resource.ParseQuantity(s)
+}

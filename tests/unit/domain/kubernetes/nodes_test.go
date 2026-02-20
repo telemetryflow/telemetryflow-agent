@@ -133,3 +133,32 @@ func TestCollectNodesEmpty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, metrics, "empty cluster should produce no metrics")
 }
+
+func TestCollectNodesIPAddresses(t *testing.T) {
+	logger := zap.NewNop()
+	cs := mocks.NewFakeClientset()
+
+	collector := k8scollector.NewKubernetesCollectorForTest(
+		config.KubernetesCollectorConfig{
+			Enabled:     true,
+			Nodes:       true,
+			ClusterName: "test-cluster",
+		}, cs, nil, logger,
+	)
+
+	ctx := context.Background()
+	_, err := collector.Collect(ctx)
+	require.NoError(t, err)
+
+	state := collector.LastClusterState()
+	require.NotNil(t, state)
+	require.NotEmpty(t, state.Nodes)
+
+	// All fake nodes have InternalIP=10.0.0.1 and ExternalIP=203.0.113.1
+	for _, node := range state.Nodes {
+		assert.Equal(t, "10.0.0.1", node.InternalIP,
+			"node %s should have InternalIP", node.Name)
+		assert.Equal(t, "203.0.113.1", node.ExternalIP,
+			"node %s should have ExternalIP", node.Name)
+	}
+}

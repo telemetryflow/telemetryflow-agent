@@ -82,6 +82,7 @@ services:
       - ./configs/tfo-agent.yaml:/etc/tfo-agent/tfo-agent.yaml:ro
       - tfo-agent-buffer:/var/lib/tfo-agent
       - tfo-agent-logs:/var/log/tfo-agent
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker collector
 
     # Health check
     healthcheck:

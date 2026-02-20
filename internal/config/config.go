@@ -115,8 +115,11 @@ type AgentConfig struct {
 	// Version is the agent version (auto-populated at build time)
 	Version string `mapstructure:"version"`
 
-	// Tags are custom key-value labels for the agent
+	// Tags are custom key-value tags for the agent (sent with heartbeat)
 	Tags map[string]string `mapstructure:"tags"`
+
+	// Labels are custom key-value labels for the agent (attached to metrics)
+	Labels map[string]string `mapstructure:"labels"`
 }
 
 // APIConfig contains backend API connection settings
@@ -179,25 +182,98 @@ type HeartbeatConfig struct {
 	IncludeSystemInfo bool `mapstructure:"include_system_info"`
 }
 
-// CollectorConfig contains all collector settings
+// CollectorConfig contains all collector settings (alphabetical order)
 type CollectorConfig struct {
-	// System contains system metrics collector settings
-	System SystemCollectorConfig `mapstructure:"system"`
+	// CAdvisor contains cAdvisor Prometheus scraper collector settings
+	CAdvisor CAdvisorCollectorConfig `mapstructure:"cadvisor"`
 
-	// Logs contains log collector settings
-	Logs LogCollectorConfig `mapstructure:"logs"`
+	// Docker contains Docker container metrics collector settings
+	Docker DockerCollectorConfig `mapstructure:"docker"`
 
-	// Process contains process collector settings
-	Process ProcessCollectorConfig `mapstructure:"process"`
+	// EBPF contains eBPF kernel-level metrics collector settings
+	EBPF EBPFCollectorConfig `mapstructure:"ebpf"`
 
 	// Kubernetes contains Kubernetes metrics collector settings
 	Kubernetes KubernetesCollectorConfig `mapstructure:"kubernetes"`
 
+	// Logs contains log collector settings
+	Logs LogCollectorConfig `mapstructure:"logs"`
+
 	// NodeExporter contains node exporter metrics collector settings
 	NodeExporter NodeExporterConfig `mapstructure:"node_exporter"`
 
-	// EBPF contains eBPF kernel-level metrics collector settings
-	EBPF EBPFCollectorConfig `mapstructure:"ebpf"`
+	// Process contains process collector settings
+	Process ProcessCollectorConfig `mapstructure:"process"`
+
+	// System contains system metrics collector settings
+	System SystemCollectorConfig `mapstructure:"system"`
+}
+
+// CAdvisorCollectorConfig contains cAdvisor Prometheus scraper collector settings.
+// When enabled, scrapes container metrics from a running cAdvisor instance's
+// Prometheus /metrics endpoint.
+type CAdvisorCollectorConfig struct {
+	// Enabled enables the cAdvisor collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval is the scrape interval
+	Interval time.Duration `mapstructure:"interval"`
+
+	// Endpoint is the cAdvisor base URL (e.g., http://localhost:8080)
+	Endpoint string `mapstructure:"endpoint"`
+
+	// MetricsPath is the Prometheus metrics path (default: /metrics)
+	MetricsPath string `mapstructure:"metrics_path"`
+
+	// Timeout is the HTTP scrape timeout
+	Timeout time.Duration `mapstructure:"timeout"`
+
+	// MetricNames is an optional allowlist of metric names to collect (empty = all container_*/machine_*)
+	MetricNames []string `mapstructure:"metric_names"`
+
+	// Labels are additional labels applied to all cAdvisor metrics
+	Labels map[string]string `mapstructure:"labels"`
+}
+
+// DockerCollectorConfig contains Docker container metrics collector settings.
+// When enabled, discovers and monitors all containers on the host via the
+// Docker Engine API, providing per-container CPU, memory, network, and I/O metrics.
+type DockerCollectorConfig struct {
+	// Enabled enables the Docker collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval is the collection interval
+	Interval time.Duration `mapstructure:"interval"`
+
+	// SocketPath is the Docker daemon socket path
+	SocketPath string `mapstructure:"socket_path"`
+
+	// CollectCPU enables per-container CPU metrics
+	CollectCPU bool `mapstructure:"cpu"`
+
+	// CollectMemory enables per-container memory metrics
+	CollectMemory bool `mapstructure:"memory"`
+
+	// CollectNetwork enables per-container network metrics
+	CollectNetwork bool `mapstructure:"network"`
+
+	// CollectDiskIO enables per-container block I/O metrics
+	CollectDiskIO bool `mapstructure:"diskio"`
+
+	// CollectPIDs enables per-container PID count
+	CollectPIDs bool `mapstructure:"pids"`
+
+	// IncludeStopped includes stopped/exited containers in state metrics
+	IncludeStopped bool `mapstructure:"include_stopped"`
+
+	// IncludeContainers is a list of regex patterns to include (empty = all)
+	IncludeContainers []string `mapstructure:"include_containers"`
+
+	// ExcludeContainers is a list of regex patterns to exclude
+	ExcludeContainers []string `mapstructure:"exclude_containers"`
+
+	// Labels are additional labels applied to all Docker metrics
+	Labels map[string]string `mapstructure:"labels"`
 }
 
 // EBPFCollectorConfig contains eBPF kernel-level metrics collector settings.
@@ -332,6 +408,15 @@ type KubernetesCollectorConfig struct {
 
 	// Workloads enables StatefulSet, DaemonSet, ReplicaSet, Job, CronJob metrics
 	Workloads bool `mapstructure:"workloads"`
+
+	// Events enables Kubernetes event collection
+	Events bool `mapstructure:"events"`
+
+	// ResourceCounts enables counting Secrets, ConfigMaps, Ingresses
+	ResourceCounts bool `mapstructure:"resource_counts"`
+
+	// Network enables network-by-namespace metrics via Kubelet Summary API
+	Network bool `mapstructure:"network"`
 
 	// MetricsAPI enables fetching actual CPU/Memory usage from metrics-server
 	MetricsAPI bool `mapstructure:"metrics_api"`
@@ -1519,6 +1604,7 @@ func DefaultConfig() *Config {
 			Tags: map[string]string{
 				"environment": "production",
 			},
+			Labels: map[string]string{},
 		},
 		// Deprecated: Use TelemetryFlow instead
 		API: APIConfig{
@@ -1537,21 +1623,50 @@ func DefaultConfig() *Config {
 			IncludeSystemInfo: true,
 		},
 		Collector: CollectorConfig{
-			System: SystemCollectorConfig{
-				Enabled:  true,
-				Interval: 15 * time.Second,
-				CPU:      true,
-				Memory:   true,
-				Disk:     true,
-				Network:  true,
+			CAdvisor: CAdvisorCollectorConfig{
+				Enabled:     false,
+				Interval:    15 * time.Second,
+				Endpoint:    "http://localhost:8080",
+				MetricsPath: "/metrics",
+				Timeout:     10 * time.Second,
+				MetricNames: []string{},
 			},
-			Logs: LogCollectorConfig{
-				Enabled: false,
-				Paths:   []string{},
+			Docker: DockerCollectorConfig{
+				Enabled:           false,
+				Interval:          15 * time.Second,
+				SocketPath:        "/var/run/docker.sock",
+				CollectCPU:        true,
+				CollectMemory:     true,
+				CollectNetwork:    true,
+				CollectDiskIO:     true,
+				CollectPIDs:       true,
+				IncludeStopped:    true,
+				IncludeContainers: []string{},
+				ExcludeContainers: []string{},
 			},
-			Process: ProcessCollectorConfig{
-				Enabled:  false,
-				Interval: 30 * time.Second,
+			EBPF: EBPFCollectorConfig{
+				Enabled:          false,
+				Interval:         15 * time.Second,
+				CollectSyscalls:  true,
+				CollectNetwork:   true,
+				CollectFileIO:    true,
+				CollectScheduler: false,
+				CollectMemory:    false,
+				CollectTCPEvents: true,
+				ProcessFilter:    []string{},
+				ExcludeProcesses: []string{"tfo-agent", "systemd"},
+				SampleRate:       100,
+				RingBufferSize:   262144, // 256KB
+				PerfBufferSize:   64,
+				PinPath:          "/sys/fs/bpf/tfo-agent",
+				Cilium: CiliumCollectorConfig{
+					Enabled:         false,
+					HubbleAddress:   "localhost:4245",
+					CollectFlows:    true,
+					CollectL7Flows:  false,
+					CollectDrops:    true,
+					CollectPolicies: true,
+				},
 			},
 			Kubernetes: KubernetesCollectorConfig{
 				Enabled:           false,
@@ -1563,10 +1678,17 @@ func DefaultConfig() *Config {
 				Storage:           true,
 				Services:          true,
 				Workloads:         true,
+				Events:            true,
+				ResourceCounts:    true,
+				Network:           true,
 				MetricsAPI:        true,
 				SyncToBackend:     true,
 				SyncInterval:      60 * time.Second,
 				ExcludeNamespaces: []string{"kube-system"},
+			},
+			Logs: LogCollectorConfig{
+				Enabled: false,
+				Paths:   []string{},
 			},
 			NodeExporter: NodeExporterConfig{
 				Enabled:                false,
@@ -1592,29 +1714,17 @@ func DefaultConfig() *Config {
 				DiskDeviceExclude:      `^(ram|loop|fd|sr)\d+$`,
 				TextfilePath:           "/var/lib/tfo-agent/textfile",
 			},
-			EBPF: EBPFCollectorConfig{
-				Enabled:          false,
-				Interval:         15 * time.Second,
-				CollectSyscalls:  true,
-				CollectNetwork:   true,
-				CollectFileIO:    true,
-				CollectScheduler: false,
-				CollectMemory:    false,
-				CollectTCPEvents: true,
-				ProcessFilter:    []string{},
-				ExcludeProcesses: []string{"tfo-agent", "systemd"},
-				SampleRate:       100,
-				RingBufferSize:   262144, // 256KB
-				PerfBufferSize:   64,
-				PinPath:          "/sys/fs/bpf/tfo-agent",
-				Cilium: CiliumCollectorConfig{
-					Enabled:         false,
-					HubbleAddress:   "localhost:4245",
-					CollectFlows:    true,
-					CollectL7Flows:  false,
-					CollectDrops:    true,
-					CollectPolicies: true,
-				},
+			Process: ProcessCollectorConfig{
+				Enabled:  false,
+				Interval: 30 * time.Second,
+			},
+			System: SystemCollectorConfig{
+				Enabled:  true,
+				Interval: 15 * time.Second,
+				CPU:      true,
+				Memory:   true,
+				Disk:     true,
+				Network:  true,
 			},
 		},
 		PrometheusServer: PrometheusServerConfig{

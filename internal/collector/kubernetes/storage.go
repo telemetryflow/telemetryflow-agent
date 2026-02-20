@@ -46,11 +46,39 @@ func collectStorage(
 				WithDescription("PersistentVolume capacity in bytes"),
 		)
 
+		// Access modes
+		var accessModes []string
+		for _, m := range pv.Spec.AccessModes {
+			accessModes = append(accessModes, string(m))
+		}
+
+		// Reclaim policy
+		reclaimPolicy := string(pv.Spec.PersistentVolumeReclaimPolicy)
+
+		// Volume mode
+		volumeMode := "Filesystem"
+		if pv.Spec.VolumeMode != nil {
+			volumeMode = string(*pv.Spec.VolumeMode)
+		}
+
+		// Claim ref
+		var claimRef *PVClaimRef
+		if pv.Spec.ClaimRef != nil {
+			claimRef = &PVClaimRef{
+				Name:      pv.Spec.ClaimRef.Name,
+				Namespace: pv.Spec.ClaimRef.Namespace,
+			}
+		}
+
 		pvStates = append(pvStates, PVState{
-			Name:         pv.Name,
-			StorageClass: storageClass,
-			Capacity:     capacity,
-			Phase:        phase,
+			Name:          pv.Name,
+			StorageClass:  storageClass,
+			Capacity:      capacity,
+			Phase:         phase,
+			AccessModes:   accessModes,
+			ReclaimPolicy: reclaimPolicy,
+			VolumeMode:    volumeMode,
+			ClaimRef:      claimRef,
 		})
 	}
 
@@ -95,12 +123,46 @@ func collectStorage(
 				WithDescription("PersistentVolumeClaim capacity in bytes"),
 		)
 
+		// Access modes
+		var pvcAccessModes []string
+		for _, m := range pvc.Spec.AccessModes {
+			pvcAccessModes = append(pvcAccessModes, string(m))
+		}
+
+		// Volume mode
+		pvcVolumeMode := "Filesystem"
+		if pvc.Spec.VolumeMode != nil {
+			pvcVolumeMode = string(*pvc.Spec.VolumeMode)
+		}
+
+		// Resources
+		var pvcResources *PVCResources
+		if len(pvc.Spec.Resources.Requests) > 0 || len(pvc.Spec.Resources.Limits) > 0 {
+			pvcResources = &PVCResources{}
+			if len(pvc.Spec.Resources.Requests) > 0 {
+				pvcResources.Requests = make(map[string]string)
+				for k, v := range pvc.Spec.Resources.Requests {
+					pvcResources.Requests[string(k)] = v.String()
+				}
+			}
+			if len(pvc.Spec.Resources.Limits) > 0 {
+				pvcResources.Limits = make(map[string]string)
+				for k, v := range pvc.Spec.Resources.Limits {
+					pvcResources.Limits[string(k)] = v.String()
+				}
+			}
+		}
+
 		pvcStates = append(pvcStates, PVCState{
 			Name:         pvc.Name,
 			Namespace:    pvc.Namespace,
 			StorageClass: storageClass,
 			Capacity:     capacity,
 			Phase:        phase,
+			AccessModes:  pvcAccessModes,
+			VolumeName:   pvc.Spec.VolumeName,
+			VolumeMode:   pvcVolumeMode,
+			Resources:    pvcResources,
 		})
 	}
 

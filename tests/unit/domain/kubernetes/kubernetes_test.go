@@ -25,6 +25,8 @@ func testConfig() config.KubernetesCollectorConfig {
 		Storage:           true,
 		Services:          true,
 		Workloads:         true,
+		Events:            true,
+		ResourceCounts:    true,
 		MetricsAPI:        false, // No metrics-server in tests
 		SyncToBackend:     false,
 		SyncInterval:      60 * time.Second,
@@ -82,10 +84,10 @@ func TestKubernetesCollectorCollect(t *testing.T) {
 	metrics, err := collector.Collect(ctx)
 	require.NoError(t, err)
 
-	// Should have metrics from nodes, pods, deployments, namespaces, storage, services, workloads
+	// Should have metrics from all enabled collectors
 	assert.NotEmpty(t, metrics, "expected metrics from collection")
 
-	// Check some expected metric names exist
+	// Check expected metric names exist
 	metricNames := make(map[string]bool)
 	for _, m := range metrics {
 		metricNames[m.Name] = true
@@ -95,14 +97,23 @@ func TestKubernetesCollectorCollect(t *testing.T) {
 	assert.True(t, metricNames["k8s.node.status"], "expected k8s.node.status metric")
 	assert.True(t, metricNames["k8s.node.cpu.capacity"], "expected k8s.node.cpu.capacity metric")
 
-	// Pod metrics (kube-system excluded, so pods from default and monitoring)
+	// Pod metrics (kube-system excluded)
 	assert.True(t, metricNames["k8s.pod.phase"], "expected k8s.pod.phase metric")
 
 	// Deployment metrics
 	assert.True(t, metricNames["k8s.deployment.replicas"], "expected k8s.deployment.replicas metric")
+	assert.True(t, metricNames["k8s.deployment.replicas.updated"], "expected k8s.deployment.replicas.updated metric")
 
 	// Namespace metrics
 	assert.True(t, metricNames["k8s.namespace.phase"], "expected k8s.namespace.phase metric")
+
+	// Namespace quota metrics
+	assert.True(t, metricNames["k8s.namespace.quota.cpu.used"], "expected k8s.namespace.quota.cpu.used metric")
+	assert.True(t, metricNames["k8s.namespace.quota.cpu.hard"], "expected k8s.namespace.quota.cpu.hard metric")
+	assert.True(t, metricNames["k8s.namespace.quota.memory.used"], "expected k8s.namespace.quota.memory.used metric")
+	assert.True(t, metricNames["k8s.namespace.quota.memory.hard"], "expected k8s.namespace.quota.memory.hard metric")
+	assert.True(t, metricNames["k8s.namespace.quota.pods.used"], "expected k8s.namespace.quota.pods.used metric")
+	assert.True(t, metricNames["k8s.namespace.quota.pods.hard"], "expected k8s.namespace.quota.pods.hard metric")
 
 	// Storage metrics
 	assert.True(t, metricNames["k8s.pv.capacity_bytes"], "expected k8s.pv.capacity_bytes metric")
@@ -114,6 +125,14 @@ func TestKubernetesCollectorCollect(t *testing.T) {
 	// Workload metrics
 	assert.True(t, metricNames["k8s.statefulset.replicas"], "expected k8s.statefulset.replicas metric")
 	assert.True(t, metricNames["k8s.daemonset.desired"], "expected k8s.daemonset.desired metric")
+
+	// Event metrics
+	assert.True(t, metricNames["k8s.event.count"], "expected k8s.event.count metric")
+
+	// Resource count metrics
+	assert.True(t, metricNames["k8s.secret.count"], "expected k8s.secret.count metric")
+	assert.True(t, metricNames["k8s.configmap.count"], "expected k8s.configmap.count metric")
+	assert.True(t, metricNames["k8s.ingress.count"], "expected k8s.ingress.count metric")
 }
 
 func TestKubernetesCollectorLastClusterState(t *testing.T) {
@@ -133,6 +152,11 @@ func TestKubernetesCollectorLastClusterState(t *testing.T) {
 	assert.NotEmpty(t, state.Nodes)
 	assert.NotEmpty(t, state.Pods)
 	assert.NotEmpty(t, state.Deployments)
+	assert.NotEmpty(t, state.Events)
+	assert.NotNil(t, state.ResourceCounts)
+	assert.NotEmpty(t, state.ResourceCounts.Secrets)
+	assert.NotEmpty(t, state.ResourceCounts.ConfigMaps)
+	assert.NotEmpty(t, state.ResourceCounts.Ingresses)
 }
 
 func TestKubernetesCollectorNamespaceExclusion(t *testing.T) {

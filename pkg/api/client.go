@@ -356,7 +356,7 @@ type SystemInfoPayload struct {
 	// ==========================================================================
 	// CPU Information
 	// ==========================================================================
-	CPUCores          int     `json:"cpuCores,omitempty"`
+	CPUCores          int     `json:"cpuCores"`
 	CPULogicalCores   int     `json:"cpuLogicalCores,omitempty"`
 	CPUPhysicalCores  int     `json:"cpuPhysicalCores,omitempty"`
 	CPUModel          string  `json:"cpuModel,omitempty"`
@@ -364,7 +364,7 @@ type SystemInfoPayload struct {
 	CPUFamily         string  `json:"cpuFamily,omitempty"`
 	CPUMhz            float64 `json:"cpuMhz,omitempty"`
 	CPUCacheSize      int32   `json:"cpuCacheSize,omitempty"`
-	CPUUsage          float64 `json:"cpuUsage,omitempty"`
+	CPUUsage          float64 `json:"cpuUsage"`
 	CPUUserPercent    float64 `json:"cpuUserPercent,omitempty"`
 	CPUSystemPercent  float64 `json:"cpuSystemPercent,omitempty"`
 	CPUIdlePercent    float64 `json:"cpuIdlePercent,omitempty"`
@@ -384,11 +384,11 @@ type SystemInfoPayload struct {
 	// ==========================================================================
 	// Memory Information
 	// ==========================================================================
-	MemoryTotal       uint64  `json:"memoryTotal,omitempty"`
-	MemoryUsed        uint64  `json:"memoryUsed,omitempty"`
-	MemoryAvailable   uint64  `json:"memoryAvailable,omitempty"`
+	MemoryTotal       uint64  `json:"memoryTotal"`
+	MemoryUsed        uint64  `json:"memoryUsed"`
+	MemoryAvailable   uint64  `json:"memoryAvailable"`
 	MemoryFree        uint64  `json:"memoryFree,omitempty"`
-	MemoryUsage       float64 `json:"memoryUsage,omitempty"`
+	MemoryUsage       float64 `json:"memoryUsage"`
 	MemoryCached      uint64  `json:"memoryCached,omitempty"`
 	MemoryBuffers     uint64  `json:"memoryBuffers,omitempty"`
 	MemoryActive      uint64  `json:"memoryActive,omitempty"`
@@ -413,10 +413,10 @@ type SystemInfoPayload struct {
 	// ==========================================================================
 	// Disk Information
 	// ==========================================================================
-	DiskTotal        uint64  `json:"diskTotal,omitempty"`
-	DiskUsed         uint64  `json:"diskUsed,omitempty"`
-	DiskAvailable    uint64  `json:"diskAvailable,omitempty"`
-	DiskUsage        float64 `json:"diskUsage,omitempty"`
+	DiskTotal        uint64  `json:"diskTotal"`
+	DiskUsed         uint64  `json:"diskUsed"`
+	DiskAvailable    uint64  `json:"diskAvailable"`
+	DiskUsage        float64 `json:"diskUsage"`
 	DiskInodes       uint64  `json:"diskInodes,omitempty"`
 	DiskInodesFree   uint64  `json:"diskInodesFree,omitempty"`
 	DiskInodesUsed   uint64  `json:"diskInodesUsed,omitempty"`
@@ -516,6 +516,12 @@ type SystemInfoPayload struct {
 	AgentUptime        uint64 `json:"agentUptime,omitempty"`
 	CollectionTime     int64  `json:"collectionTime,omitempty"`
 	CollectionDuration int64  `json:"collectionDuration,omitempty"`
+
+	// ==========================================================================
+	// Agent Tags & Labels
+	// ==========================================================================
+	Tags   map[string]string `json:"tags,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // CPUCoreInfoPayload contains per-core CPU information for API payload

@@ -72,6 +72,10 @@ type OTLPExporterConfig struct {
 	Environment string
 	Version     string
 
+	// Agent tags and labels (added as resource attributes)
+	Tags   map[string]string
+	Labels map[string]string
+
 	// Connection settings
 	Endpoint string
 	Protocol string // "grpc" or "http"
@@ -425,6 +429,18 @@ func (e *OTLPExporter) createResource(ctx context.Context) (*resource.Resource, 
 		attribute.String("deployment.environment", e.config.Environment),
 	}
 
+	// Add all agent tags as resource attributes
+	for k, v := range e.config.Tags {
+		if k != "environment" { // environment already added above
+			attrs = append(attrs, attribute.String("telemetryflow.tag."+k, v))
+		}
+	}
+
+	// Add all agent labels as resource attributes
+	for k, v := range e.config.Labels {
+		attrs = append(attrs, attribute.String("telemetryflow.label."+k, v))
+	}
+
 	return resource.New(ctx,
 		resource.WithAttributes(attrs...),
 		resource.WithHost(),
@@ -655,6 +671,8 @@ func NewOTLPExporterFromConfig(cfg *config.Config, logger *zap.Logger) *OTLPExpo
 		Hostname:    cfg.Agent.Hostname,
 		Environment: cfg.Agent.Tags["environment"],
 		Version:     cfg.Agent.Version,
+		Tags:        cfg.Agent.Tags,
+		Labels:      cfg.Agent.Labels,
 
 		// Connection settings
 		Endpoint:     cfg.GetEffectiveEndpoint(),
