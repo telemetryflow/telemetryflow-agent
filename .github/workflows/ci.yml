@@ -58,7 +58,7 @@ on:
         default: false
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.25'
   PRODUCT_NAME: TelemetryFlow Agent
   BINARY_NAME: tfo-agent
 

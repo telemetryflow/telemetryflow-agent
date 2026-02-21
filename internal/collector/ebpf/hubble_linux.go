@@ -1,3 +1,5 @@
+//go:build linux
+
 package ebpf
 
 import (
@@ -80,10 +82,39 @@ func (h *hubbleClient) close() {
 	defer h.mu.Unlock()
 
 	if h.conn != nil {
-		h.conn.Close()
+		_ = h.conn.Close()
 		h.conn = nil
 		h.logger.Debug("Hubble connection closed")
 	}
+}
+
+// buildTLSConfig constructs TLS credentials from configured cert/key/CA paths.
+func (h *hubbleClient) buildTLSConfig() (*tls.Config, error) {
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+
+	if h.cfg.HubbleTLSCertPath != "" && h.cfg.HubbleTLSKeyPath != "" {
+		cert, err := tls.LoadX509KeyPair(h.cfg.HubbleTLSCertPath, h.cfg.HubbleTLSKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("load client cert: %w", err)
+		}
+		tlsCfg.Certificates = []tls.Certificate{cert}
+	}
+
+	if h.cfg.HubbleTLSCAPath != "" {
+		caCert, err := os.ReadFile(h.cfg.HubbleTLSCAPath)
+		if err != nil {
+			return nil, fmt.Errorf("read CA cert: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA cert")
+		}
+		tlsCfg.RootCAs = pool
+	}
+
+	return tlsCfg, nil
 }
 
 // collectMetrics returns current counters as collector.Metric slices and resets.
@@ -95,7 +126,6 @@ func (h *hubbleClient) collectMetrics() []collector.Metric {
 	httpRequests := h.httpRequests
 	dnsQueries := h.dnsQueries
 	l7Errors := h.l7Errors
-	// Reset counters after read
 	h.flows = 0
 	h.drops = 0
 	h.policyVerdicts = 0
@@ -112,21 +142,18 @@ func (h *hubbleClient) collectMetrics() []collector.Metric {
 				WithLabel("source", "hubble"),
 		)
 	}
-
 	if h.cfg.CollectDrops {
 		metrics = append(metrics,
 			collector.NewMetric("hubble.drops", float64(drops), collector.MetricTypeCounter).
 				WithLabel("source", "hubble"),
 		)
 	}
-
 	if h.cfg.CollectPolicies {
 		metrics = append(metrics,
 			collector.NewMetric("hubble.policy_verdicts", float64(policyVerdicts), collector.MetricTypeCounter).
 				WithLabel("source", "hubble"),
 		)
 	}
-
 	if h.cfg.CollectL7Flows {
 		metrics = append(metrics,
 			collector.NewMetric("hubble.http_requests", float64(httpRequests), collector.MetricTypeCounter).
@@ -148,47 +175,13 @@ func (h *hubbleClient) isConnected() bool {
 	return h.conn != nil
 }
 
-// buildTLSConfig constructs TLS credentials from configured cert/key/CA paths.
-func (h *hubbleClient) buildTLSConfig() (*tls.Config, error) {
-	tlsCfg := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
-
-	// Load client certificate if provided
-	if h.cfg.HubbleTLSCertPath != "" && h.cfg.HubbleTLSKeyPath != "" {
-		cert, err := tls.LoadX509KeyPair(h.cfg.HubbleTLSCertPath, h.cfg.HubbleTLSKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("load client cert: %w", err)
-		}
-		tlsCfg.Certificates = []tls.Certificate{cert}
-	}
-
-	// Load CA certificate if provided
-	if h.cfg.HubbleTLSCAPath != "" {
-		caCert, err := os.ReadFile(h.cfg.HubbleTLSCAPath)
-		if err != nil {
-			return nil, fmt.Errorf("read CA cert: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to parse CA cert")
-		}
-		tlsCfg.RootCAs = pool
-	}
-
-	return tlsCfg, nil
-}
-
 // recordFlow increments the appropriate counters based on flow type.
-// This is called from the Hubble flow observer goroutine.
-//
-//nolint:unused // Skeleton for future Hubble flow parsing implementation
+// Called from the Hubble flow observer goroutine (future implementation).
 func (h *hubbleClient) recordFlow(isL7 bool, isDrop bool, isPolicyVerdict bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	h.flows++
-
 	if isDrop {
 		h.drops++
 	}
@@ -201,8 +194,7 @@ func (h *hubbleClient) recordFlow(isL7 bool, isDrop bool, isPolicyVerdict bool) 
 }
 
 // recordDNS increments the DNS query counter.
-//
-//nolint:unused // Skeleton for future Hubble flow parsing implementation
+// Called from the Hubble flow observer goroutine (future implementation).
 func (h *hubbleClient) recordDNS() {
 	h.mu.Lock()
 	h.dnsQueries++

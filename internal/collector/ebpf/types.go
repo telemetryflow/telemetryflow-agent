@@ -1,3 +1,5 @@
+//go:build linux
+
 package ebpf
 
 // Go equivalents of BPF map key/value structs from bpf/headers/common.h.

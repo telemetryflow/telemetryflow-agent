@@ -61,7 +61,7 @@ services:
   otel-collector:
     platform: linux/amd64
     # =============================================================================
-    # TelemetryFlow Collector (TFO-Collector) - Custom TFO format with OTLP support (v1.1.2+)
+    # TelemetryFlow Collector (TFO-Collector) - Custom TFO format with OTLP support (v1.1.4+)
     image: telemetryflow/telemetryflow-collector:${TFO_VERSION:-latest}
     command: ["--config=/etc/tfo-collector/tfo-collector.yaml"]
     # =============================================================================

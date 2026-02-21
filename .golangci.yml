@@ -1,6 +1,8 @@
 # GolangCI-Lint Configuration
 # TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 
+version: "2"
+
 run:
   timeout: 5m
   tests: true
@@ -17,18 +19,8 @@ linters:
 issues:
   exclude-dirs:
     - vendor
-  exclude-files:
-    - internal/collector/ebpf/types.go
-    - internal/collector/ebpf/helpers.go
-    - internal/collector/ebpf/hubble.go
+    - internal/collector/ebpf
   exclude-rules:
-    - path: internal/collector/ebpf/config.go
+    - path: "tests/mocks/"
       linters:
-        - unused
-      text: "shouldIncludeProcess"
-
-linters-settings:
-  staticcheck:
-    checks:
-      - "all"
-      - "-SA1019"
+        - staticcheck

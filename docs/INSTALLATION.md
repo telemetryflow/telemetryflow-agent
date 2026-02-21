@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Go 1.24 or later (for building from source)
+- Go 1.25 or later (for building from source)
 - Make (for build automation)
 - Docker (optional, for containerized deployment)
 

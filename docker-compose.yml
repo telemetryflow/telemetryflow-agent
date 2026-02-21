@@ -2,7 +2,7 @@
 # TelemetryFlow Agent - Docker Compose
 # =============================================================================
 #
-# TelemetryFlow Agent v1.1.3 (Based on OpenTelemetry SDK 1.39.0)
+# TelemetryFlow Agent v1.1.6 (Based on OpenTelemetry SDK 1.40.0)
 # Community Enterprise Observability Platform (CEOP)
 # Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
 #
@@ -30,12 +30,12 @@
 services:
   tfo-agent:
     container_name: ${CONTAINER_NAME:-tfo-agent}
-    image: ${IMAGE_NAME:-telemetryflow/telemetryflow-agent}:${IMAGE_TAG:-1.1.4}
+    image: ${IMAGE_NAME:-telemetryflow/telemetryflow-agent}:${IMAGE_TAG:-1.1.6}
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        VERSION: ${VERSION:-1.1.3}
+        VERSION: ${VERSION:-1.1.6}
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         GIT_BRANCH: ${GIT_BRANCH:-main}
         BUILD_TIME: ${BUILD_TIME:-unknown}

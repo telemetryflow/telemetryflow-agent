@@ -38,7 +38,7 @@ graph LR
         end
 
         subgraph "Processing"
-            COLLECTOR[TFO-Collector<br/>OTEL v0.142.0]
+            COLLECTOR[TFO-Collector<br/>OTEL v0.146.1]
         end
     end
 
@@ -57,7 +57,7 @@ graph LR
 | ----------------- | ------- | ------------------ | --------------------------- |
 | **TFO-Agent**     | v1.1.4  | SDK v1.39.0        | Telemetry collection agent  |
 | **TFO-Go-SDK**    | v1.1.3  | SDK v1.39.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.3  | Collector v0.142.0 | Central telemetry collector |
+| **TFO-Collector** | v1.1.3  | Collector v0.146.1 | Central telemetry collector |
 
 This alignment ensures:
 

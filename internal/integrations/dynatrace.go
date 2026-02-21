@@ -212,13 +212,13 @@ func (d *DynatraceExporter) ExportMetrics(ctx context.Context, metrics []Metric)
 
 		// Add dimensions from tags
 		for k, v := range m.Tags {
-			buf.WriteString(fmt.Sprintf(",%s=%s", k, v))
+			fmt.Fprintf(&buf, ",%s=%s", k, v)
 		}
 		for k, v := range d.config.Tags {
-			buf.WriteString(fmt.Sprintf(",%s=%s", k, v))
+			fmt.Fprintf(&buf, ",%s=%s", k, v)
 		}
 
-		buf.WriteString(fmt.Sprintf(" gauge,%f %d\n", m.Value, m.Timestamp.UnixMilli()))
+		fmt.Fprintf(&buf, " gauge,%f %d\n", m.Value, m.Timestamp.UnixMilli())
 	}
 
 	result, err := d.sendRequest(ctx, "POST", d.config.MetricsEndpoint, buf.Bytes(), "text/plain; charset=utf-8")

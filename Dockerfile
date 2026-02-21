@@ -24,7 +24,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder
 # -----------------------------------------------------------------------------
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Build arguments
 ARG VERSION=1.1.5
@@ -62,7 +62,7 @@ RUN /tfo-agent version
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
 # -----------------------------------------------------------------------------
-FROM alpine:3.21
+FROM alpine:3.23
 
 # =============================================================================
 # TelemetryFlow Metadata Labels (OCI Image Spec)
@@ -76,7 +76,7 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.documentation="https://docs.telemetryflow.id" \
     org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-platform" \
     org.opencontainers.image.licenses="Apache-2.0" \
-    org.opencontainers.image.base.name="alpine:3.21" \
+    org.opencontainers.image.base.name="alpine:3.23" \
     # TelemetryFlow specific labels
     io.telemetryflow.product="TelemetryFlow Agent" \
     io.telemetryflow.component="tfo-agent" \

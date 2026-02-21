@@ -522,7 +522,7 @@ graph LR
     end
 
     subgraph "Runtime"
-        GO[Go 1.24+]
+        GO[Go 1.25+]
         GRPC[gRPC v1.77.0]
     end
 

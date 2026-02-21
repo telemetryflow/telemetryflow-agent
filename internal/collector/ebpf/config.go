@@ -77,29 +77,6 @@ func (cc *collectorConfig) validate() error {
 	return nil
 }
 
-// shouldIncludeProcess returns true if a process name should be traced.
-func (cc *collectorConfig) shouldIncludeProcess(comm string) bool {
-	// Check exclusion list first
-	for _, re := range cc.excludeProcessRe {
-		if re.MatchString(comm) {
-			return false
-		}
-	}
-
-	// If no inclusion filter, include everything
-	if len(cc.processFilterRe) == 0 {
-		return true
-	}
-
-	// Check inclusion list
-	for _, re := range cc.processFilterRe {
-		if re.MatchString(comm) {
-			return true
-		}
-	}
-	return false
-}
-
 // hasAnySubCollector returns true if at least one sub-collector is enabled.
 func (cc *collectorConfig) hasAnySubCollector() bool {
 	return cc.raw.CollectSyscalls ||

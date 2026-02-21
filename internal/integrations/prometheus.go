@@ -306,7 +306,7 @@ func (p *PrometheusExporter) buildPrometheusPayload(metrics []Metric) []byte {
 		sort.Strings(labels)
 		timestamp := m.Timestamp.UnixMilli()
 
-		buf.WriteString(fmt.Sprintf("{%s} %f %d\n", strings.Join(labels, ","), m.Value, timestamp))
+		fmt.Fprintf(&buf, "{%s} %f %d\n", strings.Join(labels, ","), m.Value, timestamp)
 	}
 
 	return buf.Bytes()

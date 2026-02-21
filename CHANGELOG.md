@@ -7,10 +7,10 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.5-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.6-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.39.0-blueviolet)](https://opentelemetry.io/)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
 </div>
@@ -23,6 +23,24 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.6] - 2026-02-21
+
+### Changed
+
+- **Go Version**: Upgraded to Go 1.25.7 (via gvm), updated `golangci-lint` to v2.10.1 for compatibility
+- **OpenTelemetry SDK**: Bumped to v1.40.0
+
+### Fixed
+
+- **Lint — proper build tags (no `//nolint`)**: All eBPF/Hubble code that is Linux-only now carries explicit `//go:build linux` / `//go:build !linux` constraints instead of suppression comments
+  - `internal/collector/ebpf/types.go` — added `//go:build linux` (BPF map structs)
+  - `internal/collector/ebpf/helpers.go` — added `//go:build linux` (syscall/TCP state name maps)
+  - `internal/collector/ebpf/config.go` — removed `shouldIncludeProcess`; moved to new `config_linux.go`
+  - `internal/collector/ebpf/hubble_linux.go` — full `hubbleClient` implementation (linux-only)
+  - `internal/collector/ebpf/hubble_other.go` — minimal stub for non-Linux builds
+- **errcheck**: All unchecked `Close()` / `Body.Close()` calls wrapped with `_ =` or `defer func() { _ = ... }()` across cadvisor, docker, ebpf collectors and prometheus server test
+- **staticcheck**: Replaced deprecated `fake.NewSimpleClientset` with `fake.NewClientset` in `tests/mocks/kubernetes_client.go`
 
 ## [1.1.5] - 2026-02-19
 

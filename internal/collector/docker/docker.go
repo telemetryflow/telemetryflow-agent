@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	dockertypes "github.com/docker/docker/api/types"
-	containertypes "github.com/docker/docker/api/types/container"
-	dockerclient "github.com/docker/docker/client"
+	containertypes "github.com/moby/moby/api/types/container"
+	dockerclient "github.com/moby/moby/client"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -28,13 +27,11 @@ const collectorName = "docker"
 type DockerCollector struct {
 	cfg    *collectorConfig
 	logger *zap.Logger
+	client dockerclient.APIClient
 
 	mu       sync.RWMutex
 	running  bool
 	stopChan chan struct{}
-
-	// Docker SDK client
-	client dockerclient.APIClient
 }
 
 // NewDockerCollector creates a new Docker container metrics collector.
@@ -52,9 +49,8 @@ func NewDockerCollector(cfg config.DockerCollectorConfig, logger *zap.Logger) (*
 	// Create Docker client
 	opts := []dockerclient.Opt{
 		dockerclient.WithHost("unix://" + cfg.SocketPath),
-		dockerclient.WithAPIVersionNegotiation(),
 	}
-	cli, err := dockerclient.NewClientWithOpts(opts...)
+	cli, err := dockerclient.New(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("docker collector: failed to create client: %w", err)
 	}
@@ -62,8 +58,8 @@ func NewDockerCollector(cfg config.DockerCollectorConfig, logger *zap.Logger) (*
 	// Validate connectivity with a ping
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err := cli.Ping(ctx); err != nil {
-		cli.Close()
+	if _, err := cli.Ping(ctx, dockerclient.PingOptions{}); err != nil {
+		_ = cli.Close()
 		return nil, fmt.Errorf("docker collector: daemon unreachable at %s: %w", cfg.SocketPath, err)
 	}
 
@@ -141,7 +137,7 @@ func (d *DockerCollector) Stop() error {
 	d.running = false
 
 	if d.client != nil {
-		d.client.Close()
+		_ = d.client.Close()
 	}
 
 	d.logger.Info("Docker collector stopped")
@@ -157,11 +153,13 @@ func (d *DockerCollector) IsRunning() bool {
 
 // Collect performs a single collection cycle across all containers.
 func (d *DockerCollector) Collect(ctx context.Context) ([]collector.Metric, error) {
-	listOpts := containertypes.ListOptions{All: d.cfg.raw.IncludeStopped}
-	containers, err := d.client.ContainerList(ctx, listOpts)
+	listOpts := dockerclient.ContainerListOptions{All: d.cfg.raw.IncludeStopped}
+	result, err := d.client.ContainerList(ctx, listOpts)
 	if err != nil {
 		return nil, fmt.Errorf("docker: container list: %w", err)
 	}
+
+	containers := result.Items
 
 	var allMetrics []collector.Metric
 
@@ -197,7 +195,7 @@ func (d *DockerCollector) Collect(ctx context.Context) ([]collector.Metric, erro
 }
 
 // collectStateSummary counts containers by state.
-func (d *DockerCollector) collectStateSummary(containers []dockertypes.Container) []collector.Metric {
+func (d *DockerCollector) collectStateSummary(containers []containertypes.Summary) []collector.Metric {
 	var running, stopped, paused, restarting int
 	for _, ctr := range containers {
 		switch ctr.State {

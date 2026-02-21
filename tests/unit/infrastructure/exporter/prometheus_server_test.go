@@ -66,7 +66,7 @@ func TestPrometheusServerMetricsEndpoint(t *testing.T) {
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", cfg.Port))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -92,7 +92,7 @@ func TestPrometheusServerReadyEndpoint(t *testing.T) {
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/ready", cfg.Port))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -126,7 +126,7 @@ func TestPrometheusServerUpdateMetrics(t *testing.T) {
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", cfg.Port))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -156,7 +156,7 @@ func TestPrometheusServerRootRedirect(t *testing.T) {
 
 	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/", cfg.Port))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusMovedPermanently, resp.StatusCode)
 	assert.Equal(t, "/metrics", resp.Header.Get("Location"))

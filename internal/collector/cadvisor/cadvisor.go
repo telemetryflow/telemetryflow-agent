@@ -147,7 +147,7 @@ func (c *CAdvisorCollector) Collect(ctx context.Context) ([]collector.Metric, er
 	if err != nil {
 		return nil, fmt.Errorf("cadvisor: scrape %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))

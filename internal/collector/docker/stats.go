@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"strings"
 
-	dockertypes "github.com/docker/docker/api/types"
-	containertypes "github.com/docker/docker/api/types/container"
+	containertypes "github.com/moby/moby/api/types/container"
+	dockerclient "github.com/moby/moby/client"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
 // collectContainerStats fetches stats for a single running container and
 // returns all enabled metric categories.
-func (d *DockerCollector) collectContainerStats(ctx context.Context, ctr dockertypes.Container) ([]collector.Metric, error) {
-	resp, err := d.client.ContainerStatsOneShot(ctx, ctr.ID)
+func (d *DockerCollector) collectContainerStats(ctx context.Context, ctr containertypes.Summary) ([]collector.Metric, error) {
+	resp, err := d.client.ContainerStats(ctx, ctr.ID, dockerclient.ContainerStatsOptions{Stream: false})
 	if err != nil {
 		return nil, fmt.Errorf("stats one-shot: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var stats containertypes.StatsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
@@ -31,7 +31,7 @@ func (d *DockerCollector) collectContainerStats(ctx context.Context, ctr dockert
 	if len(shortID) > 12 {
 		shortID = shortID[:12]
 	}
-	labels := containerLabels(shortID, name, ctr.Image, ctr.State)
+	labels := containerLabels(shortID, name, ctr.Image, string(ctr.State))
 
 	var metrics []collector.Metric
 

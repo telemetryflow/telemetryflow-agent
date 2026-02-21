@@ -13,7 +13,7 @@ import (
 
 // NewFakeClientset creates a fake Kubernetes clientset with sample resources.
 func NewFakeClientset() *fake.Clientset {
-	return fake.NewSimpleClientset(
+	return fake.NewClientset(
 		fakeNode("worker-1", true, "4", "8Gi"),
 		fakeNode("worker-2", true, "8", "16Gi"),
 		fakeNode("worker-3", false, "4", "8Gi"),
@@ -51,7 +51,7 @@ func NewFakeClientset() *fake.Clientset {
 
 // NewEmptyClientset returns an empty fake clientset (no resources).
 func NewEmptyClientset() *fake.Clientset {
-	return fake.NewSimpleClientset()
+	return fake.NewClientset()
 }
 
 func fakeNode(name string, ready bool, cpu, memory string) *corev1.Node {
