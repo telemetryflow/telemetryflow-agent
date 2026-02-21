@@ -27,7 +27,7 @@
 FROM golang:1.25-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.1.5
+ARG VERSION=1.1.6
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
@@ -69,7 +69,7 @@ FROM alpine:3.23
 # =============================================================================
 LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
-    org.opencontainers.image.version="1.1.5" \
+    org.opencontainers.image.version="1.1.6" \
     org.opencontainers.image.vendor="TelemetryFlow" \
     org.opencontainers.image.authors="DevOpsCorner Indonesia <support@devopscorner.id>" \
     org.opencontainers.image.url="https://telemetryflow.id" \

@@ -4,10 +4,10 @@ This document describes the GitHub Actions workflows available for TelemetryFlow
 
 ## Overview
 
-| Workflow | File | Purpose |
-|----------|------|---------|
-| Release | `release.yml` | Build and release binaries for all platforms |
-| Docker Build | `docker.yml` | Build and publish Docker images |
+| Workflow     | File          | Purpose                                      |
+| ------------ | ------------- | -------------------------------------------- |
+| Release      | `release.yml` | Build and release binaries for all platforms |
+| Docker Build | `docker.yml`  | Build and publish Docker images              |
 
 ---
 
@@ -19,18 +19,18 @@ Builds and releases TelemetryFlow Agent for multiple platforms with native packa
 
 ### Triggers
 
-| Trigger | Description |
-|---------|-------------|
+| Trigger           | Description                                      |
+| ----------------- | ------------------------------------------------ |
 | Push tag `v*.*.*` | Automatically triggered on semantic version tags |
-| Manual dispatch | Run manually with custom version |
+| Manual dispatch   | Run manually with custom version                 |
 
 ### Supported Platforms
 
-| Platform | Architecture | Package Format |
-|----------|--------------|----------------|
-| Linux | amd64, arm64 | RPM, DEB, tar.gz |
-| Windows | amd64 | ZIP (with installer) |
-| macOS | amd64 (Intel), arm64 (Apple Silicon) | DMG, tar.gz |
+| Platform | Architecture                         | Package Format       |
+| -------- | ------------------------------------ | -------------------- |
+| Linux    | amd64, arm64                         | RPM, DEB, tar.gz     |
+| Windows  | amd64                                | ZIP (with installer) |
+| macOS    | amd64 (Intel), arm64 (Apple Silicon) | DMG, tar.gz          |
 
 ### Manual Trigger
 
@@ -38,11 +38,11 @@ Builds and releases TelemetryFlow Agent for multiple platforms with native packa
 workflow_dispatch:
   inputs:
     version:
-      description: 'Version to release (e.g., 1.0.0)'
+      description: "Version to release (e.g., 1.0.0)"
       required: true
-      default: '1.0.0'
+      default: "1.0.0"
     prerelease:
-      description: 'Mark as pre-release'
+      description: "Mark as pre-release"
       required: false
       type: boolean
       default: false
@@ -87,12 +87,12 @@ Builds and publishes multi-platform Docker images with semantic versioning.
 
 ### Triggers
 
-| Trigger | Description |
-|---------|-------------|
+| Trigger                 | Description                 |
+| ----------------------- | --------------------------- |
 | Push to `main`/`master` | Build and push `latest` tag |
-| Push tag `v*.*.*` | Build and push version tags |
-| Pull request | Build only (no push) |
-| Manual dispatch | Run with custom options |
+| Push tag `v*.*.*`       | Build and push version tags |
+| Pull request            | Build only (no push)        |
+| Manual dispatch         | Run with custom options     |
 
 ### Path Filters
 
@@ -107,20 +107,20 @@ The workflow only runs when relevant files change:
 
 ### Registries
 
-| Registry | Image |
-|----------|-------|
+| Registry                  | Image                                 |
+| ------------------------- | ------------------------------------- |
 | GitHub Container Registry | `ghcr.io/{owner}/telemetryflow-agent` |
-| Docker Hub | `telemetryflow/telemetryflow-agent` |
+| Docker Hub                | `telemetryflow/telemetryflow-agent`   |
 
 ### Image Tags
 
-| Tag Pattern | Description | Example |
-|-------------|-------------|---------|
-| `{version}` | Full semantic version | `1.0.0` |
-| `{major}.{minor}` | Major.minor version | `1.0` |
-| `{major}` | Major version only | `1` |
-| `latest` | Latest from main branch | `latest` |
-| `sha-{commit}` | Git commit SHA | `sha-abc1234` |
+| Tag Pattern       | Description             | Example       |
+| ----------------- | ----------------------- | ------------- |
+| `{version}`       | Full semantic version   | `1.0.0`       |
+| `{major}.{minor}` | Major.minor version     | `1.0`         |
+| `{major}`         | Major version only      | `1`           |
+| `latest`          | Latest from main branch | `latest`      |
+| `sha-{commit}`    | Git commit SHA          | `sha-abc1234` |
 
 ### Platforms
 
@@ -133,15 +133,15 @@ The workflow only runs when relevant files change:
 workflow_dispatch:
   inputs:
     version:
-      description: 'Version tag (e.g., 1.0.0)'
+      description: "Version tag (e.g., 1.0.0)"
       required: false
     push:
-      description: 'Push images to registry'
+      description: "Push images to registry"
       type: boolean
       default: true
     platforms:
-      description: 'Target platforms'
-      default: 'linux/amd64,linux/arm64'
+      description: "Target platforms"
+      default: "linux/amd64,linux/arm64"
 ```
 
 ### Usage
@@ -191,15 +191,15 @@ docker pull telemetryflow/telemetryflow-agent:1.0.0
 
 ### Required Secrets
 
-| Secret | Description | Required For |
-|--------|-------------|--------------|
-| `GITHUB_TOKEN` | Auto-provided by GitHub | All workflows |
+| Secret            | Description             | Required For    |
+| ----------------- | ----------------------- | --------------- |
+| `GITHUB_TOKEN`    | Auto-provided by GitHub | All workflows   |
 | `DOCKERHUB_TOKEN` | Docker Hub access token | Docker Hub push |
 
 ### Required Variables
 
-| Variable | Description | Required For |
-|----------|-------------|--------------|
+| Variable             | Description         | Required For    |
+| -------------------- | ------------------- | --------------- |
 | `DOCKERHUB_USERNAME` | Docker Hub username | Docker Hub push |
 
 ### Setting Up Docker Hub (Optional)
@@ -214,11 +214,11 @@ docker pull telemetryflow/telemetryflow-agent:1.0.0
 
 Both workflows inject build information into the binary:
 
-| Variable | Description |
-|----------|-------------|
-| `VERSION` | Semantic version |
-| `GIT_COMMIT` | Short commit SHA |
-| `GIT_BRANCH` | Git branch name |
+| Variable     | Description         |
+| ------------ | ------------------- |
+| `VERSION`    | Semantic version    |
+| `GIT_COMMIT` | Short commit SHA    |
+| `GIT_BRANCH` | Git branch name     |
 | `BUILD_TIME` | UTC build timestamp |
 
 Access via CLI:
@@ -334,6 +334,7 @@ flowchart TD
 **Cause**: Missing Docker Hub credentials
 
 **Solution**:
+
 ```
 1. Create Docker Hub access token
 2. Add DOCKERHUB_TOKEN secret

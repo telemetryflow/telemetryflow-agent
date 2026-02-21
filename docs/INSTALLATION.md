@@ -1,7 +1,7 @@
 # TelemetryFlow Agent Installation Guide
 
-- **Version:** 1.1.4
-- **OTEL SDK Version:** 1.39.0
+- **Version:** 1.1.6
+- **OTEL SDK Version:** 1.40.0
 - **Last Updated:** January 2026
 
 ---
@@ -33,7 +33,7 @@ make build
 **Expected Output:**
 
 ```
-TelemetryFlow Agent v1.1.2 (OTEL SDK 1.39.0)
+TelemetryFlow Agent v1.1.6 (OTEL SDK 1.40.0)
 
   Build Information
   ─────────────────────────────────────────────
@@ -82,8 +82,8 @@ docker-compose down
 
 | Variable                       | Description                      | Default                             |
 | ------------------------------ | -------------------------------- | ----------------------------------- |
-| `VERSION`                      | Build version                    | `1.1.2`                             |
-| `OTEL_SDK_VERSION`             | OpenTelemetry SDK version        | `1.39.0`                            |
+| `VERSION`                      | Build version                    | `1.1.6`                             |
+| `OTEL_SDK_VERSION`             | OpenTelemetry SDK version        | `1.40.0`                            |
 | `IMAGE_NAME`                   | Docker image name                | `telemetryflow/telemetryflow-agent` |
 | `OTLP_GRPC_PORT`               | OTLP gRPC port                   | `4317`                              |
 | `OTLP_HTTP_PORT`               | OTLP HTTP port                   | `4318`                              |

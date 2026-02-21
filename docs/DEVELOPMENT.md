@@ -1,9 +1,9 @@
 # TelemetryFlow Agent Development Guide
 
-- **Version:** 1.1.2
+- **Version:** 1.1.6
 - **Last Updated:** January 2026
-- **Go Version:** 1.24+
-- **OTEL SDK Version:** 1.39.0
+- **Go Version:** 1.25+
+- **OTEL SDK Version:** 1.40.0
 
 ---
 
@@ -17,20 +17,20 @@ This guide covers development setup, coding standards, testing practices, and co
 
 ### Required Tools
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Go | 1.24+ | Primary language |
-| Make | 3.81+ | Build automation |
-| Docker | 20.10+ | Container builds |
-| golangci-lint | 1.62+ | Code linting |
-| Git | 2.30+ | Version control |
+| Tool          | Version | Purpose          |
+| ------------- | ------- | ---------------- |
+| Go            | 1.24+   | Primary language |
+| Make          | 3.81+   | Build automation |
+| Docker        | 20.10+  | Container builds |
+| golangci-lint | 1.62+   | Code linting     |
+| Git           | 2.30+   | Version control  |
 
 ### Optional Tools
 
-| Tool | Purpose |
-|------|---------|
-| gvm | Go version manager |
-| pre-commit | Git hooks |
+| Tool       | Purpose            |
+| ---------- | ------------------ |
+| gvm        | Go version manager |
+| pre-commit | Git hooks          |
 | goreleaser | Release automation |
 
 ---
@@ -248,17 +248,17 @@ make test-list                                       # List available test packa
 
 ### Test Script Options
 
-| Option            | Description                               |
-| ----------------- | ----------------------------------------- |
-| `-h, --help`      | Show help message                         |
-| `-l, --list`      | List all available test packages          |
-| `-q, --quiet`     | Quiet mode (no verbose output)            |
-| `-c, --coverage`  | Generate coverage report                  |
-| `-r, --race`      | Enable race detector                      |
-| `-s, --short`     | Run in short mode (skip long tests)       |
-| `-t, --timeout`   | Set test timeout (default: 5m)            |
-| `-n, --count`     | Run tests N times (default: 1)            |
-| `--ci`            | CI mode (race + coverage + 10m timeout)   |
+| Option           | Description                             |
+| ---------------- | --------------------------------------- |
+| `-h, --help`     | Show help message                       |
+| `-l, --list`     | List all available test packages        |
+| `-q, --quiet`    | Quiet mode (no verbose output)          |
+| `-c, --coverage` | Generate coverage report                |
+| `-r, --race`     | Enable race detector                    |
+| `-s, --short`    | Run in short mode (skip long tests)     |
+| `-t, --timeout`  | Set test timeout (default: 5m)          |
+| `-n, --count`    | Run tests N times (default: 1)          |
+| `--ci`           | CI mode (race + coverage + 10m timeout) |
 
 ### Test Script Examples
 
@@ -314,18 +314,18 @@ tests/
 
 Run `make test-list` or `./scripts/test-specific.sh -l` to see all available packages:
 
-| Package                     | Description                        | Files |
-| --------------------------- | ---------------------------------- | ----- |
-| `application`               | CLI commands and configuration     | 3     |
-| `domain/agent`              | Agent lifecycle management         | 2     |
-| `domain/plugin`             | Plugin registry system             | 1     |
-| `domain/telemetry`          | Telemetry collection               | 2     |
-| `infrastructure/api`        | Backend API client                 | 1     |
-| `infrastructure/buffer`     | Disk-backed retry buffer           | 1     |
-| `infrastructure/config`     | Configuration loader               | 1     |
-| `infrastructure/exporter`   | OTLP exporters (gRPC/HTTP)         | 3     |
-| `integrations`              | 3rd party integrations             | 36    |
-| `presentation/banner`       | ASCII art startup banner           | 1     |
+| Package                   | Description                    | Files |
+| ------------------------- | ------------------------------ | ----- |
+| `application`             | CLI commands and configuration | 3     |
+| `domain/agent`            | Agent lifecycle management     | 2     |
+| `domain/plugin`           | Plugin registry system         | 1     |
+| `domain/telemetry`        | Telemetry collection           | 2     |
+| `infrastructure/api`      | Backend API client             | 1     |
+| `infrastructure/buffer`   | Disk-backed retry buffer       | 1     |
+| `infrastructure/config`   | Configuration loader           | 1     |
+| `infrastructure/exporter` | OTLP exporters (gRPC/HTTP)     | 3     |
+| `integrations`            | 3rd party integrations         | 36    |
+| `presentation/banner`     | ASCII art startup banner       | 1     |
 
 ### Writing Unit Tests
 
@@ -484,15 +484,15 @@ make tidy
 
 ### Key Dependencies
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| go.opentelemetry.io/otel | v1.39.0 | OpenTelemetry SDK |
-| go.opentelemetry.io/otel/exporters/otlp | v1.39.0 | OTLP exporters |
-| github.com/spf13/cobra | v1.9.1 | CLI framework |
-| github.com/spf13/viper | v1.20.1 | Configuration |
-| go.uber.org/zap | v1.27.0 | Structured logging |
-| google.golang.org/grpc | v1.77.0 | gRPC communication |
-| github.com/stretchr/testify | v1.10.0 | Testing assertions |
+| Package                                 | Version | Purpose            |
+| --------------------------------------- | ------- | ------------------ |
+| go.opentelemetry.io/otel                | v1.40.0 | OpenTelemetry SDK  |
+| go.opentelemetry.io/otel/exporters/otlp | v1.40.0 | OTLP exporters     |
+| github.com/spf13/cobra                  | v1.9.1  | CLI framework      |
+| github.com/spf13/viper                  | v1.20.1 | Configuration      |
+| go.uber.org/zap                         | v1.27.0 | Structured logging |
+| google.golang.org/grpc                  | v1.77.0 | gRPC communication |
+| github.com/stretchr/testify             | v1.10.0 | Testing assertions |
 
 ---
 
@@ -634,18 +634,21 @@ GitHub Actions automatically builds and publishes releases when a tag is pushed.
 ### Common Issues
 
 **Go module issues:**
+
 ```bash
 go clean -modcache
 make deps
 ```
 
 **Linter cache issues:**
+
 ```bash
 golangci-lint cache clean
 make lint
 ```
 
 **Test failures with race detector:**
+
 - Ensure thread-safe access to shared state
 - Use `sync.Mutex` or `sync/atomic` for concurrent access
 - Increase timeouts for timing-sensitive tests

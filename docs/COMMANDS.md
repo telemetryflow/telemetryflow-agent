@@ -142,6 +142,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
 **Signal Handling:**
 
 The start command handles the following signals:
+
 - `SIGINT` (Ctrl+C): Graceful shutdown
 - `SIGTERM`: Graceful shutdown
 - `SIGHUP`: Configuration reload
@@ -357,14 +358,14 @@ Shows help for any command.
 
 ## Exit Codes
 
-| Code | Description |
-|------|-------------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Configuration error |
-| 3 | Connection error |
-| 130 | Interrupted (SIGINT) |
-| 143 | Terminated (SIGTERM) |
+| Code | Description          |
+| ---- | -------------------- |
+| 0    | Success              |
+| 1    | General error        |
+| 2    | Configuration error  |
+| 3    | Connection error     |
+| 130  | Interrupted (SIGINT) |
+| 143  | Terminated (SIGTERM) |
 
 ---
 
@@ -402,12 +403,12 @@ docker run -d telemetryflow/telemetryflow-agent:latest \
 
 ```yaml
 containers:
-- name: tfo-agent
-  image: telemetryflow/telemetryflow-agent:latest
-  args:
-    - "start"
-    - "--config"
-    - "/etc/tfo-agent/config.yaml"
+  - name: tfo-agent
+    image: telemetryflow/telemetryflow-agent:latest
+    args:
+      - "start"
+      - "--config"
+      - "/etc/tfo-agent/config.yaml"
 ```
 
 ---

@@ -59,7 +59,7 @@ graph LR
     end
 
     subgraph "SDKs"
-        SDK[TFO-Go-SDK<br/>v1.1.2]
+        SDK[TFO-Go-SDK<br/>v1.1.4]
     end
 
     subgraph "Agents"
@@ -511,13 +511,13 @@ graph TD
 ```mermaid
 graph LR
     subgraph "TelemetryFlow Ecosystem"
-        SDK[TFO-GO-SDK<br/>v1.1.2]
-        AGENT[TFO-Agent<br/>v1.1.2]
-        COLL[TFO-Collector<br/>v1.1.2]
+        SDK[TFO-GO-SDK<br/>v1.1.4]
+        AGENT[TFO-Agent<br/>v1.1.4]
+        COLL[TFO-Collector<br/>v1.1.4]
     end
 
     subgraph "OpenTelemetry"
-        OTEL[OTel SDK<br/>v1.39.0]
+        OTEL[OTel SDK<br/>v1.40.0]
         PROTO[OTLP Proto<br/>v1.9.0]
     end
 

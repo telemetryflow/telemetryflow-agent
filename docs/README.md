@@ -1,7 +1,7 @@
 # TelemetryFlow Agent Documentation
 
-- **Version:** 1.1.2
-- **OTEL SDK Version:** 1.39.0
+- **Version:** 1.1.6
+- **OTEL SDK Version:** 1.40.0
 - **Last Updated:** January 2026
 - **Status:** Production Ready
 
@@ -9,13 +9,13 @@
 
 ## Overview
 
-TelemetryFlow Agent (`tfo-agent`) is a custom-built enterprise-grade telemetry collection agent written in Go. Built on the standard OpenTelemetry Go SDK v1.39.0, `tfo-agent` provides a purpose-built CLI with Cobra commands, custom configuration format, and TelemetryFlow-specific features while maintaining full compatibility with the OTEL ecosystem.
+TelemetryFlow Agent (`tfo-agent`) is a custom-built enterprise-grade telemetry collection agent written in Go. Built on the standard OpenTelemetry Go SDK v1.40.0, `tfo-agent` provides a purpose-built CLI with Cobra commands, custom configuration format, and TelemetryFlow-specific features while maintaining full compatibility with the OTEL ecosystem.
 
 ### Key Differentiators
 
 | Feature         | tfo-agent (Custom)               | OTEL Collector     |
 | --------------- | -------------------------------- | ------------------ |
-| SDK Base        | OpenTelemetry SDK v1.39.0        | OTEL Collector     |
+| SDK Base        | OpenTelemetry SDK v1.40.0        | OTEL Collector     |
 | CLI Framework   | Cobra with subcommands           | Standard OTEL      |
 | Config Format   | Custom YAML with `enabled` flags | Standard OTEL YAML |
 | Banner/Branding | Custom ASCII art banner          | None               |
@@ -30,11 +30,11 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 graph LR
     subgraph "TelemetryFlow Ecosystem v1.1.4"
         subgraph "Instrumentation"
-            SDK[TFO-Go-SDK<br/>OTEL SDK v1.39.0]
+            SDK[TFO-Go-SDK<br/>OTEL SDK v1.40.0]
         end
 
         subgraph "Collection"
-            AGENT[TFO-Agent<br/>OTEL SDK v1.39.0]
+            AGENT[TFO-Agent<br/>OTEL SDK v1.40.0]
         end
 
         subgraph "Processing"
@@ -55,9 +55,9 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.4  | SDK v1.39.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.3  | SDK v1.39.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.3  | Collector v0.146.1 | Central telemetry collector |
+| **TFO-Agent**     | v1.1.6  | SDK v1.40.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.1.4  | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.1.4  | Collector v0.146.1 | Central telemetry collector |
 
 This alignment ensures:
 

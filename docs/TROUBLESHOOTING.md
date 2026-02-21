@@ -59,11 +59,13 @@ curl -v http://localhost:4318/v1/metrics
 ### 1. Agent Fails to Start
 
 #### Symptom
+
 Agent exits immediately after starting with an error.
 
 #### Possible Causes & Solutions
 
 **Configuration file not found:**
+
 ```bash
 # Error: configuration file not found
 # Solution: Specify correct path
@@ -75,6 +77,7 @@ ls -la ./configs/tfo-agent.yaml
 ```
 
 **Invalid configuration:**
+
 ```bash
 # Error: validation failed
 # Solution: Validate configuration
@@ -87,6 +90,7 @@ ls -la ./configs/tfo-agent.yaml
 ```
 
 **Permission denied:**
+
 ```bash
 # Error: permission denied
 # Solution: Check file permissions
@@ -100,6 +104,7 @@ sudo chown -R telemetryflow:telemetryflow /var/lib/tfo-agent
 ```
 
 **Port already in use:**
+
 ```bash
 # Error: address already in use
 # Solution: Check what's using the port
@@ -114,28 +119,32 @@ lsof -i :4318
 ### 2. Connection Failures
 
 #### Symptom
+
 Agent starts but cannot connect to the collector/backend.
 
 #### Solutions
 
 **Check endpoint configuration:**
+
 ```yaml
 telemetryflow:
-  endpoint: "collector.example.com:4317"  # Correct format
+  endpoint: "collector.example.com:4317" # Correct format
   # endpoint: "http://collector.example.com:4317"  # Wrong for gRPC
   protocol: grpc
 ```
 
 **TLS issues:**
+
 ```yaml
 telemetryflow:
   endpoint: "collector.example.com:4317"
   tls:
     enabled: true
-    skip_verify: false  # Set to true for self-signed certs (dev only)
+    skip_verify: false # Set to true for self-signed certs (dev only)
 ```
 
 **Network connectivity:**
+
 ```bash
 # Test DNS resolution
 nslookup collector.example.com
@@ -149,6 +158,7 @@ docker exec tfo-agent nc -zv collector.example.com 4317
 ```
 
 **Firewall rules:**
+
 ```bash
 # Check iptables
 sudo iptables -L -n | grep 4317
@@ -163,18 +173,21 @@ sudo ufw allow 4318/tcp
 ### 3. Authentication Failures
 
 #### Symptom
+
 Agent connects but receives 401/403 errors.
 
 #### Solutions
 
 **Check API credentials:**
+
 ```yaml
 telemetryflow:
-  api_key_id: "tfk_your_key_id"        # Must start with tfk_
-  api_key_secret: "tfs_your_secret"    # Must start with tfs_
+  api_key_id: "tfk_your_key_id" # Must start with tfk_
+  api_key_secret: "tfs_your_secret" # Must start with tfs_
 ```
 
 **Environment variables:**
+
 ```bash
 # Check if env vars are set
 echo $TELEMETRYFLOW_API_KEY_ID
@@ -186,6 +199,7 @@ export TELEMETRYFLOW_API_KEY_SECRET="tfs_xxx"
 ```
 
 **Verify credentials in logs:**
+
 ```bash
 # Run with debug logging to see auth headers
 ./tfo-agent start --config config.yaml --log-level debug 2>&1 | grep -i auth
@@ -196,15 +210,17 @@ export TELEMETRYFLOW_API_KEY_SECRET="tfs_xxx"
 ### 4. Metrics Not Appearing
 
 #### Symptom
+
 Agent is running but metrics are not visible in the backend.
 
 #### Solutions
 
 **Check collector configuration:**
+
 ```yaml
 collector:
   system:
-    enabled: true      # Must be true
+    enabled: true # Must be true
     interval: 15s
     cpu: true
     memory: true
@@ -213,6 +229,7 @@ collector:
 ```
 
 **Verify exporter is running:**
+
 ```bash
 # Check logs for export messages
 journalctl -u tfo-agent | grep -i "export"
@@ -220,15 +237,17 @@ journalctl -u tfo-agent | grep -i "metric"
 ```
 
 **Check batch settings:**
+
 ```yaml
 exporter:
   otlp:
     enabled: true
     batch_size: 100
-    flush_interval: 10s    # Metrics sent every 10 seconds
+    flush_interval: 10s # Metrics sent every 10 seconds
 ```
 
 **Verify metrics are being collected:**
+
 ```bash
 # Run with debug logging
 ./tfo-agent start --config config.yaml --log-level debug
@@ -242,27 +261,31 @@ exporter:
 ### 5. High Memory Usage
 
 #### Symptom
+
 Agent consumes excessive memory over time.
 
 #### Solutions
 
 **Adjust buffer settings:**
+
 ```yaml
 buffer:
   enabled: true
-  max_size_mb: 50      # Reduce from 100
+  max_size_mb: 50 # Reduce from 100
   path: "/var/lib/tfo-agent/buffer"
 ```
 
 **Reduce batch size:**
+
 ```yaml
 exporter:
   otlp:
-    batch_size: 50     # Reduce from 100
+    batch_size: 50 # Reduce from 100
     flush_interval: 5s # Flush more frequently
 ```
 
 **Check for memory leaks:**
+
 ```bash
 # Monitor memory usage
 watch -n 5 'ps -o rss,vsz,pid,cmd -p $(pgrep tfo-agent)'
@@ -277,29 +300,33 @@ go tool pprof heap.prof
 ### 6. High CPU Usage
 
 #### Symptom
+
 Agent consumes excessive CPU.
 
 #### Solutions
 
 **Increase collection interval:**
+
 ```yaml
 collector:
   system:
-    interval: 30s     # Increase from 15s
+    interval: 30s # Increase from 15s
 ```
 
 **Reduce collectors:**
+
 ```yaml
 collector:
   system:
     enabled: true
     cpu: true
     memory: true
-    disk: false       # Disable if not needed
-    network: false    # Disable if not needed
+    disk: false # Disable if not needed
+    network: false # Disable if not needed
 ```
 
 **Check for busy loops:**
+
 ```bash
 # Profile CPU usage
 curl http://localhost:8888/debug/pprof/profile?seconds=30 > cpu.prof
@@ -311,17 +338,20 @@ go tool pprof cpu.prof
 ### 7. Disk Buffer Issues
 
 #### Symptom
+
 Buffer grows indefinitely or agent can't write to buffer.
 
 #### Solutions
 
 **Check disk space:**
+
 ```bash
 df -h /var/lib/tfo-agent
 du -sh /var/lib/tfo-agent/buffer
 ```
 
 **Clear stale buffer:**
+
 ```bash
 # Stop agent first
 sudo systemctl stop tfo-agent
@@ -334,6 +364,7 @@ sudo systemctl start tfo-agent
 ```
 
 **Verify buffer directory permissions:**
+
 ```bash
 ls -la /var/lib/tfo-agent/buffer
 sudo chown -R telemetryflow:telemetryflow /var/lib/tfo-agent
@@ -344,19 +375,22 @@ sudo chown -R telemetryflow:telemetryflow /var/lib/tfo-agent
 ### 8. Heartbeat Failures
 
 #### Symptom
+
 Agent disconnects frequently or shows as offline in backend.
 
 #### Solutions
 
 **Adjust heartbeat settings:**
+
 ```yaml
 heartbeat:
-  interval: 60s        # Default is fine for most cases
-  timeout: 10s         # Increase if network is slow
+  interval: 60s # Default is fine for most cases
+  timeout: 10s # Increase if network is slow
   include_system_info: true
 ```
 
 **Check network stability:**
+
 ```bash
 # Continuous ping test
 ping -c 100 collector.example.com
@@ -366,6 +400,7 @@ mtr collector.example.com
 ```
 
 **Verify heartbeat in logs:**
+
 ```bash
 journalctl -u tfo-agent | grep -i heartbeat
 ```
@@ -474,6 +509,7 @@ tail -f /var/log/tfo-agent/agent.log
 ### Common Log Patterns
 
 **Successful startup:**
+
 ```json
 {"level":"info","msg":"Starting TelemetryFlow Agent","version":"1.1.2"}
 {"level":"info","msg":"Configuration loaded","file":"config.yaml"}
@@ -484,14 +520,16 @@ tail -f /var/log/tfo-agent/agent.log
 ```
 
 **Connection issues:**
+
 ```json
 {"level":"error","msg":"Failed to export metrics","error":"connection refused"}
 {"level":"warn","msg":"Retrying export","attempt":2,"max_attempts":3}
 ```
 
 **Authentication issues:**
+
 ```json
-{"level":"error","msg":"Heartbeat failed","error":"status code: 401"}
+{ "level": "error", "msg": "Heartbeat failed", "error": "status code: 401" }
 ```
 
 ---

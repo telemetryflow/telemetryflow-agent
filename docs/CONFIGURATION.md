@@ -1,14 +1,14 @@
 # TelemetryFlow Agent Configuration Reference
 
-- **Version:** 1.1.2
-- **OTEL SDK Version:** 1.39.0
-- **Last Updated:** January 2026
+- **Version:** 1.1.6
+- **OTEL SDK Version:** 1.40.0
+- **Last Updated:** Februarry 2026
 
 ---
 
 ## Overview
 
-TelemetryFlow Agent uses a custom YAML configuration format with `enabled` flags for easy feature toggling. Built on the standard OpenTelemetry Go SDK v1.39.0, the agent maintains TelemetryFlow identity and branding while leveraging OTEL SDK capabilities for telemetry collection and export.
+TelemetryFlow Agent uses a custom YAML configuration format with `enabled` flags for easy feature toggling. Built on the standard OpenTelemetry Go SDK v1.40.0, the agent maintains TelemetryFlow identity and branding while leveraging OTEL SDK capabilities for telemetry collection and export.
 
 Starting with v1.1.2, the agent introduces a new `telemetryflow` configuration section that aligns with TFO-Collector for unified platform configuration.
 
@@ -65,22 +65,22 @@ telemetryflow:
 
 When connecting to TFO-Collector, the agent automatically sends these headers:
 
-| Header | Description |
-|--------|-------------|
-| `X-TelemetryFlow-Key-ID` | API key ID (tfk_xxx) |
+| Header                       | Description              |
+| ---------------------------- | ------------------------ |
+| `X-TelemetryFlow-Key-ID`     | API key ID (tfk_xxx)     |
 | `X-TelemetryFlow-Key-Secret` | API key secret (tfs_xxx) |
-| `X-TelemetryFlow-Agent-ID` | Unique agent identifier |
+| `X-TelemetryFlow-Agent-ID`   | Unique agent identifier  |
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TELEMETRYFLOW_API_KEY_ID` | API key ID | - |
-| `TELEMETRYFLOW_API_KEY_SECRET` | API key secret | - |
-| `TELEMETRYFLOW_ENDPOINT` | OTLP endpoint | `localhost:4317` |
-| `TELEMETRYFLOW_ENVIRONMENT` | Deployment environment | `production` |
-| `TELEMETRYFLOW_AGENT_ID` | Agent identifier | Auto-generated UUID |
-| `TELEMETRYFLOW_AGENT_NAME` | Agent display name | `TelemetryFlow Agent` |
+| Variable                       | Description            | Default               |
+| ------------------------------ | ---------------------- | --------------------- |
+| `TELEMETRYFLOW_API_KEY_ID`     | API key ID             | -                     |
+| `TELEMETRYFLOW_API_KEY_SECRET` | API key secret         | -                     |
+| `TELEMETRYFLOW_ENDPOINT`       | OTLP endpoint          | `localhost:4317`      |
+| `TELEMETRYFLOW_ENVIRONMENT`    | Deployment environment | `production`          |
+| `TELEMETRYFLOW_AGENT_ID`       | Agent identifier       | Auto-generated UUID   |
+| `TELEMETRYFLOW_AGENT_NAME`     | Agent display name     | `TelemetryFlow Agent` |
 
 ---
 
@@ -143,7 +143,7 @@ collectors:
     # Specific collectors to enable
     cpu:
       enabled: true
-      per_cpu: true  # Per-core metrics
+      per_cpu: true # Per-core metrics
     memory:
       enabled: true
     disk:
@@ -164,7 +164,7 @@ collectors:
         - lo
         - docker*
     process:
-      enabled: false  # High cardinality, enable carefully
+      enabled: false # High cardinality, enable carefully
       names:
         - nginx
         - postgres
@@ -232,7 +232,7 @@ receivers:
       http:
         enabled: true
         endpoint: "0.0.0.0:4318"
-        max_request_body_size: 10485760  # 10MB
+        max_request_body_size: 10485760 # 10MB
         # TLS configuration
         tls:
           enabled: false
@@ -431,10 +431,10 @@ Identifies the agent instance:
 
 ```yaml
 agent:
-  id: "prod-agent-001"           # Unique identifier
-  hostname: "server-01"          # Hostname (auto-detected if empty)
-  description: "Production"      # Human-readable description
-  tags:                          # Custom labels
+  id: "prod-agent-001" # Unique identifier
+  hostname: "server-01" # Hostname (auto-detected if empty)
+  description: "Production" # Human-readable description
+  tags: # Custom labels
     environment: "production"
     datacenter: "us-east-1"
 ```
@@ -447,10 +447,10 @@ Configures what data to collect:
 collectors:
   metrics:
     enabled: true
-    interval: 60s                # Collection interval
+    interval: 60s # Collection interval
     cpu:
       enabled: true
-      per_cpu: true              # Per-core metrics
+      per_cpu: true # Per-core metrics
     memory:
       enabled: true
     disk:
@@ -520,6 +520,7 @@ exporter:
 ```
 
 **Syntax:**
+
 - `${VAR}` - Required variable (error if not set)
 - `${VAR:-default}` - Variable with default value
 - `${VAR:?error message}` - Required with custom error
@@ -625,7 +626,7 @@ receivers:
           key_file: "/etc/tfo-agent/certs/agent.key"
           ca_file: "/etc/tfo-agent/certs/ca.crt"
       http:
-        enabled: false  # Disable HTTP, use gRPC only
+        enabled: false # Disable HTTP, use gRPC only
 
 exporter:
   otlp:
@@ -654,16 +655,19 @@ exporter:
 ### Common Validation Errors
 
 **Missing Required Field:**
+
 ```
 Error: exporter.otlp.endpoint is required when enabled=true
 ```
 
 **Invalid Value:**
+
 ```
 Error: logging.level must be one of: debug, info, warn, error
 ```
 
 **Invalid Duration:**
+
 ```
 Error: collectors.metrics.interval: invalid duration "60"
 ```
@@ -686,6 +690,7 @@ sudo systemctl reload tfo-agent
 ```
 
 **Note:** Some changes require restart:
+
 - Receiver endpoints
 - TLS certificates
 - Buffer path
@@ -700,7 +705,7 @@ sudo systemctl reload tfo-agent
 exporter:
   otlp:
     headers:
-      X-API-Key: "${TFO_API_KEY}"  # Not hardcoded
+      X-API-Key: "${TFO_API_KEY}" # Not hardcoded
 ```
 
 ### 2. Enable Memory Limiter
@@ -725,7 +730,7 @@ buffer:
 ```yaml
 processors:
   batch:
-    send_batch_size: 8192    # Default, good for most cases
+    send_batch_size: 8192 # Default, good for most cases
     timeout: 200ms
 ```
 
@@ -734,7 +739,7 @@ processors:
 ```yaml
 exporter:
   otlp:
-    compression: "gzip"      # Reduces bandwidth ~70%
+    compression: "gzip" # Reduces bandwidth ~70%
 ```
 
 ---
