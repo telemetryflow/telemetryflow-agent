@@ -36,6 +36,7 @@ on:
 
 env:
   GO_VERSION: '1.25'
+  BINARY_NAME: tfo-agent
   PRODUCT_NAME: TelemetryFlow Agent
   VENDOR: DevOpsCorner Indonesia
   MAINTAINER: support@telemetryflow.id
