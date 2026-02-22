@@ -1,4 +1,4 @@
-# GolangCI-Lint Configuration
+# GolangCI-Lint Configuration (v2)
 # TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 
 version: "2"
@@ -8,19 +8,18 @@ run:
   tests: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - staticcheck
     - govet
     - errcheck
     - ineffassign
     - unused
-
-issues:
-  exclude-dirs:
-    - vendor
-    - internal/collector/ebpf
-  exclude-rules:
-    - path: "tests/mocks/"
-      linters:
-        - staticcheck
+  exclusions:
+    paths:
+      - vendor
+      - internal/collector/ebpf
+    rules:
+      - path: "tests/mocks/"
+        linters:
+          - staticcheck

@@ -1,4 +1,4 @@
-# OTEL Collector Configuration for E2E Tests
+# TFO Collector Configuration for E2E Tests
 #
 # TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
 # Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
@@ -8,7 +8,7 @@ extensions:
     endpoint: 0.0.0.0:13133
 
 receivers:
-  otlp:
+  tfootlp:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
@@ -42,16 +42,16 @@ service:
 
   pipelines:
     traces:
-      receivers: [otlp]
+      receivers: [tfootlp]
       processors: [batch]
       exporters: [debug, otlp/jaeger]
 
     metrics:
-      receivers: [otlp]
+      receivers: [tfootlp]
       processors: [batch]
       exporters: [debug]
 
     logs:
-      receivers: [otlp]
+      receivers: [tfootlp]
       processors: [batch]
       exporters: [debug]
