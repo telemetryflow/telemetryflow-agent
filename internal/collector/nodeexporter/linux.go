@@ -149,15 +149,15 @@ func (c *NodeExporterCollector) collectSockstat() []collector.Metric {
 		if len(fields) < 3 {
 			continue
 		}
-		switch {
-		case fields[0] == "sockets:":
+		switch fields[0] {
+		case "sockets:":
 			// "sockets: used 123"
 			if fields[1] == "used" {
 				metrics = append(metrics, collector.NewMetric(
 					"node.sockstat.sockets_used", parseFloat64(fields[2]), collector.MetricTypeGauge,
 				).WithDescription("Total sockets in use"))
 			}
-		case fields[0] == "TCP:":
+		case "TCP:":
 			// "TCP: inuse 5 orphan 0 tw 3 alloc 7 mem 2"
 			for i := 1; i+1 < len(fields); i += 2 {
 				switch fields[i] {
@@ -171,7 +171,7 @@ func (c *NodeExporterCollector) collectSockstat() []collector.Metric {
 					).WithDescription("TCP sockets in TIME_WAIT"))
 				}
 			}
-		case fields[0] == "UDP:":
+		case "UDP:":
 			for i := 1; i+1 < len(fields); i += 2 {
 				if fields[i] == "inuse" {
 					metrics = append(metrics, collector.NewMetric(
