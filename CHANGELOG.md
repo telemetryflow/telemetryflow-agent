@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.6-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.7-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,13 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.7] - 2026-03-01
+
+### Fixed
+
+- **Duplicate `SyncKubernetesState` declaration**: Removed stale method from `pkg/api/client.go` (path-based, no gzip) that conflicted with the purpose-built declaration in `pkg/api/kubernetes.go`
+- **`KubernetesSyncClient` interface mismatch**: Updated `pkg/api/kubernetes.go` `SyncKubernetesState` signature from `(ctx, state interface{})` to `(ctx, clusterID string, payload interface{})`, matching the `exporter.KubernetesSyncClient` interface and the `sendSync` call in `internal/exporter/kubernetes_sync.go`; path now built as `/monitoring/kubernetes/clusters/{clusterID}/sync` with gzip encoding
 
 ## [1.1.6] - 2026-02-21
 
@@ -372,6 +379,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                               |
 | ------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| 1.1.7   | 2026-03-01 | v1.40.0  | Fix duplicate SyncKubernetesState declaration; align KubernetesSyncClient interface signature              |
+| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                           |
 | 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                       |
 | 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability        |
 | 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls               |

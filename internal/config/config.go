@@ -432,6 +432,11 @@ type KubernetesCollectorConfig struct {
 
 	// ClusterProvider is the Kubernetes provider (eks, gke, aks, k3s, self-managed)
 	ClusterProvider string `mapstructure:"cluster_provider"`
+
+	// ClusterID is the UUID of this cluster as registered in TFO Platform backend.
+	// Required when SyncToBackend is true. Obtain by registering the cluster via
+	// POST /api/v2/monitoring/kubernetes/clusters.
+	ClusterID string `mapstructure:"cluster_id"`
 }
 
 // SystemCollectorConfig contains system metrics collector settings

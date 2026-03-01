@@ -31,6 +31,7 @@ type Agent struct {
 	// Components
 	client           *api.Client
 	heartbeat        *exporter.Heartbeat
+	k8sSync          *exporter.KubernetesSync
 	collectors       []collector.Collector
 	prometheusServer *exporter.PrometheusServer
 
@@ -128,6 +129,7 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 	}
 
 	// Add Kubernetes collector if enabled
+	var k8sSync *exporter.KubernetesSync
 	if cfg.Collector.Kubernetes.Enabled {
 		k8sCollector, err := kubernetes.NewKubernetesCollector(cfg.Collector.Kubernetes, logger)
 		if err != nil {
@@ -139,6 +141,25 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 			logger.Info("Kubernetes collector enabled",
 				zap.String("cluster", cfg.Collector.Kubernetes.ClusterName),
 			)
+
+			// Create K8s state sync exporter when sync_to_backend is enabled
+			if cfg.Collector.Kubernetes.SyncToBackend {
+				syncInterval := cfg.Collector.Kubernetes.SyncInterval
+				if syncInterval == 0 {
+					syncInterval = 60 * time.Second
+				}
+				k8sSync = exporter.NewKubernetesSync(exporter.KubernetesSyncConfig{
+					ClusterID: cfg.Collector.Kubernetes.ClusterID,
+					Interval:  syncInterval,
+					Collector: k8sCollector,
+					Client:    client,
+					Logger:    logger,
+				})
+				logger.Info("Kubernetes state sync enabled",
+					zap.String("clusterID", cfg.Collector.Kubernetes.ClusterID),
+					zap.Duration("interval", syncInterval),
+				)
+			}
 		}
 	}
 
@@ -181,6 +202,7 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		logger:           logger,
 		client:           client,
 		heartbeat:        heartbeat,
+		k8sSync:          k8sSync,
 		collectors:       collectors,
 		prometheusServer: promServer,
 	}, nil
@@ -215,8 +237,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	)
 
 	// Create error channel for component errors
-	// Buffer: heartbeat + collectors + prometheus server
+	// Buffer: heartbeat + k8sSync + collectors + prometheus server
 	chanSize := 2 + len(a.collectors)
+	if a.k8sSync != nil {
+		chanSize++
+	}
 	errChan := make(chan error, chanSize)
 
 	// Start Prometheus metrics server
@@ -234,6 +259,15 @@ func (a *Agent) Run(ctx context.Context) error {
 			errChan <- fmt.Errorf("heartbeat error: %w", err)
 		}
 	}()
+
+	// Start Kubernetes state sync (no-op if not configured)
+	if a.k8sSync != nil {
+		go func() {
+			if err := a.k8sSync.Start(ctx); err != nil && err != context.Canceled {
+				errChan <- fmt.Errorf("kubernetes sync error: %w", err)
+			}
+		}()
+	}
 
 	// Start collectors
 	for _, c := range a.collectors {
@@ -289,6 +323,19 @@ func (a *Agent) shutdown() error {
 			errMu.Unlock()
 		}
 	}()
+
+	// Stop Kubernetes state sync
+	if a.k8sSync != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := a.k8sSync.Stop(); err != nil {
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("kubernetes sync stop: %w", err))
+				errMu.Unlock()
+			}
+		}()
+	}
 
 	// Stop collectors
 	for _, c := range a.collectors {

@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.6-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.7-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
@@ -32,7 +32,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.1.6"
+    subgraph "TelemetryFlow Ecosystem v1.1.7"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.40.0]
         end
@@ -59,7 +59,7 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.6  | SDK v1.40.0        | Telemetry collection agent  |
+| **TFO-Agent**     | v1.1.7  | SDK v1.40.0        | Telemetry collection agent  |
 | **TFO-Go-SDK**    | v1.1.4  | SDK v1.40.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.1.4  | Collector v0.146.1 | Central telemetry collector |
 
@@ -141,11 +141,11 @@ docker-compose down
 ```bash
 # Build image
 docker build \
-  --build-arg VERSION=1.1.6 \
+  --build-arg VERSION=1.1.7 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.1.6 .
+  -t telemetryflow/telemetryflow-agent:1.1.7 .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -155,7 +155,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.1.6
+  telemetryflow/telemetryflow-agent:1.1.7
 ```
 
 ### OTEL Collector Ports
@@ -200,7 +200,7 @@ POST http://localhost:4318/v1/logs
 Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
 
 ```yaml
-# TelemetryFlow Platform Configuration (v1.1.6+)
+# TelemetryFlow Platform Configuration (v1.1.7+)
 telemetryflow:
   api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
   api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
@@ -250,7 +250,7 @@ buffer:
 ### Environment Variables
 
 ```bash
-# TelemetryFlow Platform (v1.1.6+)
+# TelemetryFlow Platform (v1.1.7+)
 export TELEMETRYFLOW_ENDPOINT="localhost:4317"
 export TELEMETRYFLOW_API_KEY_ID="tfk_your_key_id"
 export TELEMETRYFLOW_API_KEY_SECRET="tfs_your_key_secret"

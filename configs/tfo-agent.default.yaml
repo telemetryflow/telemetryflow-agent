@@ -150,6 +150,15 @@ collectors:
       key_file: ""
       ca_file: ""
 
+    # Sync full cluster state to TFO Platform backend (PostgreSQL entities)
+    sync_to_backend: true
+    sync_interval: 60s
+    # UUID of the cluster registered in TFO Platform.
+    # Obtain: POST /api/v2/monitoring/kubernetes/clusters → {id}
+    cluster_id: "${TELEMETRYFLOW_K8S_CLUSTER_ID}"
+    cluster_name: ""       # Auto-detected if empty
+    cluster_provider: ""   # eks, gke, aks, k3s, rancher, self-managed, etc.
+
   # ──────────────────────────────────────────────────────────────────────────
   # eBPF Collector - Kernel-Level Observability (Linux-only)
   # ──────────────────────────────────────────────────────────────────────────

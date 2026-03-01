@@ -28,8 +28,9 @@ type RegisterClusterResponse struct {
 }
 
 // SyncKubernetesState sends the full cluster state snapshot to the TFO backend.
-func (c *Client) SyncKubernetesState(ctx context.Context, state interface{}) error {
-	resp, err := c.RequestWithGzip(ctx, http.MethodPost, "/monitoring/kubernetes/sync", state)
+func (c *Client) SyncKubernetesState(ctx context.Context, clusterID string, payload interface{}) error {
+	path := fmt.Sprintf("/monitoring/kubernetes/clusters/%s/sync", clusterID)
+	resp, err := c.RequestWithGzip(ctx, http.MethodPost, path, payload)
 	if err != nil {
 		return fmt.Errorf("sync kubernetes state: %w", err)
 	}

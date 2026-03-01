@@ -231,6 +231,9 @@ collectors:
     # Cluster metadata (auto-detected if empty)
     cluster_name: ""
     cluster_provider: "" # eks, gke, aks, k3s, self-managed, etc.
+    # UUID of the cluster registered in TFO Platform (required for sync_to_backend).
+    # Obtain by calling: POST /api/v2/monitoring/kubernetes/clusters
+    cluster_id: "${TELEMETRYFLOW_K8S_CLUSTER_ID}"
 
   # Log collector
   logs:

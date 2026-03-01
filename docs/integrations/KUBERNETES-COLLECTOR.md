@@ -38,7 +38,7 @@ graph TB
     BUF --> OTLP
     HB -->|"Heartbeat + SystemInfo"| API
 
-    KC -->|"Resource State Sync<br/>POST /api/v2/monitoring/kubernetes"| API
+    KC -->|"Resource State Sync<br/>POST /clusters/{id}/sync"| API
     OTLP -->|"OTLP gRPC :4317"| CH
     API --> PG
 
@@ -143,13 +143,18 @@ collectors:
 
 ### Environment Variables
 
-| Variable                             | Config Key                               | Default           |
-| ------------------------------------ | ---------------------------------------- | ----------------- |
-| `TELEMETRYFLOW_K8S_ENABLED`          | `collectors.kubernetes.enabled`          | `false`           |
-| `TELEMETRYFLOW_K8S_KUBECONFIG`       | `collectors.kubernetes.kubeconfig`       | `""` (in-cluster) |
-| `TELEMETRYFLOW_K8S_NAMESPACES`       | `collectors.kubernetes.namespaces`       | `[]` (all)        |
-| `TELEMETRYFLOW_K8S_CLUSTER_NAME`     | `collectors.kubernetes.cluster_name`     | `""` (auto)       |
-| `TELEMETRYFLOW_K8S_CLUSTER_PROVIDER` | `collectors.kubernetes.cluster_provider` | `""` (auto)       |
+| Variable                             | Config Key                               | Default                      |
+| ------------------------------------ | ---------------------------------------- | ---------------------------- |
+| `TELEMETRYFLOW_K8S_ENABLED`          | `collectors.kubernetes.enabled`          | `false`                      |
+| `TELEMETRYFLOW_K8S_CLUSTER_ID`       | `collectors.kubernetes.cluster_id`       | `""` (**required for sync**) |
+| `TELEMETRYFLOW_K8S_KUBECONFIG`       | `collectors.kubernetes.kubeconfig`       | `""` (in-cluster)            |
+| `TELEMETRYFLOW_K8S_NAMESPACES`       | `collectors.kubernetes.namespaces`       | `[]` (all)                   |
+| `TELEMETRYFLOW_K8S_CLUSTER_NAME`     | `collectors.kubernetes.cluster_name`     | `""` (auto)                  |
+| `TELEMETRYFLOW_K8S_CLUSTER_PROVIDER` | `collectors.kubernetes.cluster_provider` | `""` (auto)                  |
+
+> **`TELEMETRYFLOW_K8S_CLUSTER_ID`** is required for the resource state sync to the TFO Platform.
+> Obtain it by registering a cluster in the TFO Platform UI (**Kubernetes → Clusters → Register Cluster**)
+> or via the REST API. See [KUBERNETES-REGISTRATION.md](./KUBERNETES-REGISTRATION.md) for the full workflow.
 
 ## Metrics Reference
 
@@ -349,15 +354,20 @@ sequenceDiagram
     end
 
     loop Every 60s (sync interval)
-        KC->>Backend: POST /api/v2/monitoring/kubernetes/sync
-        Note over KC,Backend: Full resource state sync<br/>(clusters, nodes, pods,<br/>deployments, namespaces)
+        KC->>Backend: POST /api/v2/monitoring/kubernetes/clusters/{cluster_id}/sync
+        Note over KC,Backend: Header: X-TelemetryFlow-Key-Secret: tfs_xxx<br/>Full resource state snapshot<br/>(nodes, pods, deployments,<br/>namespaces, PVs, PVCs,<br/>workloads, services, events)
         Backend->>Backend: Upsert PostgreSQL entities
     end
 ```
 
 ## Backend Sync
 
-The collector syncs Kubernetes resource state to the TFO backend, populating PostgreSQL entities:
+The collector syncs Kubernetes resource state to the TFO backend every 60 seconds, populating PostgreSQL entities.
+
+**Endpoint:** `POST /api/v2/monitoring/kubernetes/clusters/{cluster_id}/sync`
+**Auth:** `X-TelemetryFlow-Key-Secret: tfs_xxx` (TFO API key)
+
+The `cluster_id` path parameter is the UUID returned when the cluster was registered in TFO Platform. Configure it via `TELEMETRYFLOW_K8S_CLUSTER_ID`. If this variable is not set, the sync loop is disabled with a warning and **no backend data is written**.
 
 | K8s Resource          | Backend Entity         | Table                                 |
 | --------------------- | ---------------------- | ------------------------------------- |
@@ -368,25 +378,65 @@ The collector syncs Kubernetes resource state to the TFO backend, populating Pos
 | Namespace             | `KubernetesNamespace`  | `kubernetes_namespaces`               |
 | PersistentVolume      | `KubernetesPV`         | `kubernetes_persistent_volumes`       |
 | PersistentVolumeClaim | `KubernetesPVC`        | `kubernetes_persistent_volume_claims` |
+| StatefulSet/DaemonSet | `KubernetesWorkload`   | `kubernetes_workloads`                |
+| Service               | `KubernetesService`    | `kubernetes_services`                 |
+| Event                 | `KubernetesEvent`      | `kubernetes_events`                   |
 
-Sync payload is compressed (gzip) and sent via `POST /api/v2/monitoring/kubernetes/sync`.
+Node and pod CPU/memory usage metrics are also written to ClickHouse (`kubernetes_metrics` table) as part of each sync.
 
 ## Cluster Provider Detection
 
-If `cluster_provider` is not set, the collector auto-detects based on:
+If `cluster_provider` is not set, the collector auto-detects the provider by inspecting node labels, annotations, and providerIDs in priority order:
 
-| Signal                                      | Provider       |
-| ------------------------------------------- | -------------- |
-| Node label `eks.amazonaws.com/nodegroup`    | `eks`          |
-| Node label `cloud.google.com/gke-nodepool`  | `gke`          |
-| Node label `kubernetes.azure.com/agentpool` | `aks`          |
-| Node providerID prefix `aws://`             | `eks`          |
-| Node providerID prefix `gce://`             | `gke`          |
-| Node providerID prefix `azure://`           | `aks`          |
-| Node annotation `k3s.io/`                   | `k3s`          |
-| Platform `kind` detected                    | `kind`         |
-| Platform `minikube` detected                | `minikube`     |
-| Fallback                                    | `self-managed` |
+### Managed Cloud Providers
+
+| Signal                                         | Provider |
+| ---------------------------------------------- | -------- |
+| Node label `eks.amazonaws.com/nodegroup`       | `eks`    |
+| Node providerID prefix `aws://`                | `eks`    |
+| Node label `cloud.google.com/gke-nodepool`     | `gke`    |
+| Node providerID prefix `gce://`                | `gke`    |
+| Node label `kubernetes.azure.com/agentpool`    | `aks`    |
+| Node providerID prefix `azure://`              | `aks`    |
+| Node label `alibabacloud.com/nodepool-id`      | `ack`    |
+| Node providerID prefix `alicloud://`           | `ack`    |
+| Node label `cce.cloud.com/cce-nodepool`        | `cce`    |
+| Node providerID prefix `huawei://` or `cce://` | `cce`    |
+
+### Distributions & Local
+
+| Signal                                                  | Provider       |
+| ------------------------------------------------------- | -------------- |
+| Node annotation `rke.cattle.io/` or `cattle.io/creator` | `rancher`      |
+| Node label `node.openshift.io/os_id` (OpenShift)        | `openshift`    |
+| Namespace `openshift-apiserver` exists                  | `openshift`    |
+| Namespace `openshift-apiserver` + OKD build annotations | `okd`          |
+| Node annotation `microshift.openshift.io/`              | `microshift`   |
+| Namespace `kubesphere-system` with `ks-apiserver` pod   | `kubesphere`   |
+| Node annotation `k3s.io/`                               | `k3s`          |
+| Platform `kind` detected                                | `kind`         |
+| Platform `minikube` detected                            | `minikube`     |
+| Fallback                                                | `self-managed` |
+
+### Full Provider Enum
+
+| Value          | Name                                    |
+| -------------- | --------------------------------------- |
+| `eks`          | Amazon Elastic Kubernetes Service (AWS) |
+| `gke`          | Google Kubernetes Engine (GCP)          |
+| `aks`          | Azure Kubernetes Service (Azure)        |
+| `ack`          | Alibaba Cloud Kubernetes Service (ACK)  |
+| `cce`          | Huawei Cloud Container Engine (CCE)     |
+| `rancher`      | Rancher (RKE / RKE2)                    |
+| `openshift`    | Red Hat OpenShift                       |
+| `okd`          | OKD — Origin Kubernetes Distribution    |
+| `microshift`   | MicroShift (OpenShift for Edge)         |
+| `kubesphere`   | KubeSphere                              |
+| `k3s`          | K3s (Lightweight Kubernetes)            |
+| `kind`         | Kind (Kubernetes IN Docker)             |
+| `minikube`     | Minikube                                |
+| `self-managed` | Self-managed / bare-metal               |
+| `other`        | Other / Unknown                         |
 
 ## Namespace Filtering
 
@@ -443,7 +493,7 @@ spec:
     - name: app
       image: my-app:latest
     - name: tfo-agent
-      image: telemetryflow/telemetryflow-agent:1.1.4
+      image: telemetryflow/telemetryflow-agent:1.1.7
       env:
         - name: TELEMETRYFLOW_K8S_ENABLED
           value: "true"
