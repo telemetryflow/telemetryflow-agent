@@ -10,17 +10,24 @@
 # =============================================================================
 # Environment Variables
 # =============================================================================
-#   TELEMETRYFLOW_API_KEY_ID      - API Key ID for authentication (tfk_xxx)
-#   TELEMETRYFLOW_API_KEY_SECRET  - API Key Secret for authentication (tfs_xxx)
-#   TELEMETRYFLOW_ENDPOINT        - TelemetryFlow backend endpoint (host:port)
-#   TELEMETRYFLOW_AGENT_ID        - Unique agent identifier (optional)
+#   TELEMETRYFLOW_API_KEY_ID      - API Key ID for authentication (format: tfk_xxx)
+#   TELEMETRYFLOW_API_KEY_SECRET  - API Key Secret for authentication (format: tfs_xxx)
+#   TELEMETRYFLOW_ENDPOINT        - TFO backend base URL
+#                                     gRPC:  tfo-collector:4317
+#                                     HTTP:  http://tfo-backend:3000/api/v2/monitoring
+#   TELEMETRYFLOW_AGENT_ID        - Unique agent ID (optional, auto-generated if unset)
 #   TELEMETRYFLOW_AGENT_NAME      - Human-readable agent name (optional)
-#   TELEMETRYFLOW_ENVIRONMENT     - Deployment environment (optional)
+#   TELEMETRYFLOW_ENVIRONMENT     - Deployment environment tag, e.g. production (optional)
+#   TELEMETRYFLOW_REGION          - Cloud/datacenter region tag, e.g. ap-southeast-3 (optional)
+#   TELEMETRYFLOW_CLUSTER         - Cluster name tag, e.g. telemetryflow (optional)
+#   TELEMETRYFLOW_DATACENTER      - Datacenter name tag, e.g. dc01 (optional)
+#   TELEMETRYFLOW_K8S_CLUSTER_ID  - K8s cluster UUID registered in TFO Platform (required for K8s sync)
 #
 # Example .env file:
 #   TELEMETRYFLOW_API_KEY_ID=tfk_your_key_id
 #   TELEMETRYFLOW_API_KEY_SECRET=tfs_your_key_secret
-#   TELEMETRYFLOW_ENDPOINT=collector.telemetryflow.id:4317
+#   TELEMETRYFLOW_ENDPOINT=http://tfo-backend:3000/api/v2/monitoring   # HTTP mode
+#   # TELEMETRYFLOW_ENDPOINT=tfo-collector:4317                        # gRPC mode
 #
 # =============================================================================
 
@@ -33,10 +40,14 @@ telemetryflow:
   api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
   # API Key Secret (format: tfs_xxx) - used for authentication
   api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
-  # TelemetryFlow backend endpoint for sending telemetry
-  endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
-  # Protocol: grpc or http
-  protocol: grpc
+  # TFO backend endpoint — format depends on protocol:
+  #   grpc: bare host:port     (e.g., tfo-collector:4317)
+  #   http: full HTTP base URL (e.g., http://tfo-backend:3000/api/v2/monitoring)
+  # Used for agent heartbeat/registration and as OTLP base URL when no
+  # per-signal endpoint override is configured in exporter.otlp.*.endpoint.
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-http://localhost:3000/api/v2/monitoring}"
+  # Protocol: grpc (OTLP native) or http (REST + OTLP/HTTP)
+  protocol: http
   # TLS settings for backend connection
   tls:
     enabled: true
@@ -62,21 +73,20 @@ agent:
   # Agent hostname (auto-detected if empty)
   hostname: ""
   # Human-readable agent name
-  name: "${TELEMETRYFLOW_AGENT_NAME:-TelemetryFlow Agent}"
+  name: "${TELEMETRYFLOW_AGENT_NAME:-tfo-agent}"
   # Human-readable description
   description: "TelemetryFlow Agent - Community Enterprise Observability Platform"
   # Agent version (auto-populated at build time)
   version: ""
-  # Custom tags for labeling and filtering (sent with heartbeat)
+  # Custom tags for labeling and filtering (sent with every heartbeat)
   tags:
     environment: "${TELEMETRYFLOW_ENVIRONMENT:-production}"
-    datacenter: "default"
-    # provider: "docker"
-    # region: "ap-southeast-3"
-    # cluster: "telemetryflow"
-    # team: platform
-    # region: us-west-2
-    # instance_type: "container"
+    provider: "${TELEMETRYFLOW_PROVIDER:-docker}"
+    region: "${TELEMETRYFLOW_REGION:-ap-southeast-3}"
+    cluster: "${TELEMETRYFLOW_CLUSTER:-telemetryflow}"
+    datacenter: "${TELEMETRYFLOW_DATACENTER:-dc01}"
+    instance_type: "${TELEMETRYFLOW_INSTANCE_TYPE:-container}"
+    team: "${TELEMETRYFLOW_TEAM:-platform}"
   # Custom labels attached to all metrics (key-value pairs)
   labels: {}
     # key1: "value1"
@@ -210,6 +220,8 @@ collectors:
     # Namespaces to exclude from collection
     exclude_namespaces:
       - kube-system
+      - kube-public
+      - kube-node-lease
     # Kubernetes label selector (empty = all resources)
     label_selector: ""
     # Resource collectors (individually toggleable)
@@ -217,20 +229,19 @@ collectors:
     pods: true
     deployments: true
     namespaces_collect: true
-    storage: true # PersistentVolume + PersistentVolumeClaim
-    services: true # Service + Endpoints
-    workloads: true # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
-    events: true # Kubernetes Events (Normal/Warning)
+    storage: true         # PersistentVolume + PersistentVolumeClaim
+    services: true        # Service + Endpoints
+    workloads: true       # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
+    events: true          # Kubernetes Events (Normal/Warning)
     resource_counts: true # Secrets, ConfigMaps, Ingresses count
     network: true         # Network bytes per namespace (Kubelet Summary API)
-    # Fetch actual CPU/Memory usage from metrics-server
-    metrics_api: true
-    # Sync resource state to TFO backend (PostgreSQL entities)
+    metrics_api: true     # Fetch actual CPU/Memory usage from metrics-server
+    # Sync resource state to TFO backend (populates PostgreSQL K8s entities)
     sync_to_backend: true
     sync_interval: 60s
     # Cluster metadata (auto-detected if empty)
     cluster_name: ""
-    cluster_provider: "" # eks, gke, aks, k3s, self-managed, etc.
+    cluster_provider: ""  # eks, gke, aks, k3s, self-managed, etc.
     # UUID of the cluster registered in TFO Platform (required for sync_to_backend).
     # Obtain by calling: POST /api/v2/monitoring/kubernetes/clusters
     cluster_id: "${TELEMETRYFLOW_K8S_CLUSTER_ID}"
@@ -335,35 +346,42 @@ exporter:
     compression: gzip
 
     # ==========================================================================
-    # Dual Endpoint Version Support
+    # Endpoint Version
     # ==========================================================================
-    # Endpoint version: "v1" for OTEL standard, "v2" for TFO Platform (default)
-    # - v1: Compatible with any standard OTEL Collector
-    # - v2: Enhanced TelemetryFlow Platform features
+    # Controls OTLP path suffix auto-generation when no per-signal endpoint is set:
+    #   v1: /v1/metrics, /v1/traces, /v1/logs  (OTEL community standard)
+    #   v2: /v2/metrics, /v2/traces, /v2/logs  (TFO Platform enhanced)
+    # Paths are appended to telemetryflow.endpoint as the base URL.
+    # TFO Collector accepts both v1 and v2 simultaneously.
     endpoint_version: v2
 
-    # Custom endpoint paths (optional, auto-generated based on endpoint_version)
+    # Override individual path suffixes (defaults derived from endpoint_version above).
+    # Uncomment to customise — these are appended to telemetryflow.endpoint.
     # metrics_endpoint: /v2/metrics
     # traces_endpoint: /v2/traces
     # logs_endpoint: /v2/logs
 
     # ==========================================================================
-    # Signal Type Configuration
+    # Per-Signal Configuration
     # ==========================================================================
-    # Metrics export configuration
+    # Set endpoint to a full URL to bypass telemetryflow.endpoint entirely for
+    # that signal. Useful when metrics, traces, and logs go to different collectors.
+    # Example: endpoint: "http://tfo-collector:4318/v2/metrics"
+
+    # Metrics export
     metrics:
       enabled: true
-      # endpoint: ""  # Override endpoint for metrics only
+      # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/metrics)
 
-    # Traces export configuration
+    # Traces export
     traces:
-      enabled: false # Enable when distributed tracing is needed
-      # endpoint: ""  # Override endpoint for traces only
+      enabled: false  # Enable when distributed tracing is needed
+      # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/traces)
 
-    # Logs export configuration
+    # Logs export
     logs:
-      enabled: false # Enable when log forwarding is needed
-      # endpoint: ""  # Override endpoint for logs only
+      enabled: false  # Enable when log forwarding is needed
+      # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/logs)
 
 # =============================================================================
 # Buffer - Offline/Retry Storage
@@ -774,7 +792,7 @@ integrations:
   # ---------------------------------------------------------------------------
   cloudwatch:
     enabled: false
-    region: "${AWS_REGION:-us-west-2}"
+    region: "${AWS_REGION:-ap-southeast-3}"
     # Authentication (uses AWS SDK chain if not specified)
     # access_key_id: "${AWS_ACCESS_KEY_ID}"
     # secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
