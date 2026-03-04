@@ -2,6 +2,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 )
 
@@ -2054,9 +2055,14 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// GetEffectiveEndpoint returns the TelemetryFlow endpoint
+// GetEffectiveEndpoint returns the TelemetryFlow endpoint as a full URL.
+// If the endpoint is configured as bare host:port (no scheme), http:// is prepended.
 func (c *Config) GetEffectiveEndpoint() string {
-	return c.TelemetryFlow.Endpoint
+	ep := c.TelemetryFlow.Endpoint
+	if ep != "" && !strings.HasPrefix(ep, "http://") && !strings.HasPrefix(ep, "https://") {
+		ep = "http://" + ep
+	}
+	return ep
 }
 
 // GetEffectiveAPIKeyID returns the TelemetryFlow API key ID

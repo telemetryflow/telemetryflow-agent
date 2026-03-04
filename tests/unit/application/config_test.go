@@ -152,7 +152,7 @@ func TestConfigHelpers(t *testing.T) {
 	t.Run("should return TelemetryFlow endpoint", func(t *testing.T) {
 		cfg := config.DefaultConfig()
 
-		assert.Equal(t, "localhost:4317", cfg.GetEffectiveEndpoint())
+		assert.Equal(t, "http://localhost:4317", cfg.GetEffectiveEndpoint())
 	})
 
 	t.Run("should return TelemetryFlow API key ID", func(t *testing.T) {
