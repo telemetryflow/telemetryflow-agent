@@ -574,7 +574,7 @@ type HeartbeatResponse struct {
 
 // Heartbeat sends a heartbeat to the backend
 func (c *Client) Heartbeat(ctx context.Context, agentID string, sysInfo *SystemInfoPayload) error {
-	path := fmt.Sprintf("/agents/%s/heartbeat", agentID)
+	path := fmt.Sprintf("/monitoring/agents/%s/heartbeat", agentID)
 
 	req := &HeartbeatRequest{
 		SystemInfo: sysInfo,
@@ -594,7 +594,7 @@ func (c *Client) Heartbeat(ctx context.Context, agentID string, sysInfo *SystemI
 
 // RegisterAgent registers the agent with the backend
 func (c *Client) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (*RegisterAgentResponse, error) {
-	resp, err := c.Request(ctx, http.MethodPost, "/agents", req)
+	resp, err := c.Request(ctx, http.MethodPost, "/monitoring/agents", req)
 	if err != nil {
 		return nil, fmt.Errorf("register agent request failed: %w", err)
 	}
