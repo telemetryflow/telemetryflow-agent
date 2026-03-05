@@ -43,7 +43,7 @@ spec:
       containers:
         - name: tfo-agent
           image: telemetryflow/telemetryflow-agent:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
 
           args:
             - start
@@ -61,6 +61,19 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            # Direct gopsutil to read host's /etc and /proc so that machine-id
+            # and other OS-level identifiers are read from the node, not the container.
+            # Required for stable UUIDv5 fingerprint across pod restarts.
+            - name: HOST_PROC
+              value: /host/proc
+            - name: HOST_ETC
+              value: /host/root/etc
+            - name: HOST_SYS
+              value: /host/sys
+            - name: HOST_VAR
+              value: /host/root/var
+            - name: HOST_RUN
+              value: /host/root/run
             - name: POD_NAME
               valueFrom:
                 fieldRef:

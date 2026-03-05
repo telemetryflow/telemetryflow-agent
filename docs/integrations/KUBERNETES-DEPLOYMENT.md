@@ -292,7 +292,7 @@ spec:
       containers:
         - name: tfo-agent
           image: telemetryflow/telemetryflow-agent:1.1.4
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - start
             - --config=/etc/tfo-agent/tfo-agent.yaml

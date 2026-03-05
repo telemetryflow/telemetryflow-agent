@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -43,12 +42,8 @@ type Agent struct {
 
 // New creates a new agent instance
 func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
-	// Generate agent ID if not provided
-	agentID := cfg.Agent.ID
-	if agentID == "" {
-		agentID = uuid.New().String()
-		logger.Info("Generated new agent ID", zap.String("id", agentID))
-	}
+	// Resolve a stable agent ID — deterministic via host fingerprint when not explicitly set.
+	agentID := ResolveAgentID(cfg.Agent.ID, cfg.Agent.Hostname, logger)
 
 	// Create API client using helper methods (prefer TelemetryFlow config over legacy API)
 	tlsConfig := cfg.GetEffectiveTLSConfig()
