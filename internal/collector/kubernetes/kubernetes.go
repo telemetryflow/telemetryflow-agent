@@ -306,6 +306,16 @@ func (k *KubernetesCollector) LastClusterState() *ClusterState {
 	return k.lastState
 }
 
+// ClusterName returns the detected or configured cluster name.
+func (k *KubernetesCollector) ClusterName() string {
+	return k.cfg.ClusterName
+}
+
+// ClusterProvider returns the detected or configured cluster provider.
+func (k *KubernetesCollector) ClusterProvider() string {
+	return k.cfg.ClusterProvider
+}
+
 // SetKubeletFetcher replaces the kubelet stats fetcher (used in tests).
 func (k *KubernetesCollector) SetKubeletFetcher(f KubeletStatsFetcher) {
 	k.kubeletFetcher = f

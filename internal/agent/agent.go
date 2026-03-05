@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -123,6 +124,16 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		}
 	}
 
+	// Auto-detect Kubernetes: enable collector + sync when running inside a K8s cluster.
+	// KUBERNETES_SERVICE_HOST is injected by the kubelet into every pod.
+	if !cfg.Collector.Kubernetes.Enabled && os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		cfg.Collector.Kubernetes.Enabled = true
+		if !cfg.Collector.Kubernetes.SyncToBackend {
+			cfg.Collector.Kubernetes.SyncToBackend = true
+		}
+		logger.Info("Kubernetes environment auto-detected, enabling K8s collector")
+	}
+
 	// Add Kubernetes collector if enabled
 	var k8sSync *exporter.KubernetesSync
 	if cfg.Collector.Kubernetes.Enabled {
@@ -134,11 +145,35 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		} else {
 			collectors = append(collectors, k8sCollector)
 			logger.Info("Kubernetes collector enabled",
-				zap.String("cluster", cfg.Collector.Kubernetes.ClusterName),
+				zap.String("cluster", k8sCollector.ClusterName()),
+				zap.String("provider", k8sCollector.ClusterProvider()),
 			)
 
+			// Auto-register cluster with backend if ClusterID is not pre-configured.
+			if cfg.Collector.Kubernetes.SyncToBackend && cfg.Collector.Kubernetes.ClusterID == "" {
+				regCtx, regCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				regResp, regErr := client.AgentRegisterCluster(regCtx, &api.AgentRegisterClusterRequest{
+					Name:     k8sCollector.ClusterName(),
+					Provider: k8sCollector.ClusterProvider(),
+				})
+				regCancel()
+				if regErr != nil {
+					logger.Warn("Failed to auto-register Kubernetes cluster, sync disabled",
+						zap.Error(regErr),
+						zap.String("cluster", k8sCollector.ClusterName()),
+					)
+				} else {
+					cfg.Collector.Kubernetes.ClusterID = regResp.ID
+					logger.Info("Kubernetes cluster auto-registered",
+						zap.String("clusterID", regResp.ID),
+						zap.String("name", regResp.Name),
+						zap.Bool("isNew", regResp.IsNew),
+					)
+				}
+			}
+
 			// Create K8s state sync exporter when sync_to_backend is enabled
-			if cfg.Collector.Kubernetes.SyncToBackend {
+			if cfg.Collector.Kubernetes.SyncToBackend && cfg.Collector.Kubernetes.ClusterID != "" {
 				syncInterval := cfg.Collector.Kubernetes.SyncInterval
 				if syncInterval == 0 {
 					syncInterval = 60 * time.Second

@@ -27,6 +27,23 @@ type RegisterClusterResponse struct {
 	ClusterName string `json:"cluster_name"`
 }
 
+// AgentRegisterClusterRequest is the payload for agent-driven cluster registration.
+// Uses API key auth and is safe to call on every restart (find-or-create semantics).
+type AgentRegisterClusterRequest struct {
+	Name     string            `json:"name"`
+	Provider string            `json:"provider,omitempty"`
+	Version  string            `json:"version,omitempty"`
+	Region   string            `json:"region,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty"`
+}
+
+// AgentRegisterClusterResponse is returned by the agent-register endpoint.
+type AgentRegisterClusterResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	IsNew bool   `json:"isNew"`
+}
+
 // SyncKubernetesState sends the full cluster state snapshot to the TFO backend.
 func (c *Client) SyncKubernetesState(ctx context.Context, clusterID string, payload interface{}) error {
 	path := fmt.Sprintf("/monitoring/kubernetes/clusters/%s/sync", clusterID)
@@ -50,6 +67,23 @@ func (c *Client) RegisterCluster(ctx context.Context, req *RegisterClusterReques
 	var result RegisterClusterResponse
 	if err := resp.JSON(&result); err != nil {
 		return nil, fmt.Errorf("parse register cluster response: %w", err)
+	}
+	return &result, nil
+}
+
+// AgentRegisterCluster auto-registers a Kubernetes cluster using API key auth.
+// Implements find-or-create — safe to call on every agent restart.
+func (c *Client) AgentRegisterCluster(ctx context.Context, req *AgentRegisterClusterRequest) (*AgentRegisterClusterResponse, error) {
+	resp, err := c.Request(ctx, http.MethodPost, "/monitoring/kubernetes/clusters/agent-register", req)
+	if err != nil {
+		return nil, fmt.Errorf("agent register cluster: %w", err)
+	}
+	if !resp.IsSuccess() {
+		return nil, fmt.Errorf("agent register cluster failed with status %d", resp.StatusCode)
+	}
+	var result AgentRegisterClusterResponse
+	if err := resp.JSON(&result); err != nil {
+		return nil, fmt.Errorf("parse agent register cluster response: %w", err)
 	}
 	return &result, nil
 }
