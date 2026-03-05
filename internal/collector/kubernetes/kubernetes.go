@@ -366,7 +366,32 @@ func detectClusterName() string {
 // variables and filesystem heuristics. Returns a value matching K8sProviderEnum
 // on the platform backend (eks, gke, aks, ack, cce, k3s, kind, minikube,
 // rancher, openshift, okd, microshift, kubesphere, self-managed).
+//
+// When running as a DaemonSet the container host filesystem is typically
+// bind-mounted at /hostfs (the value of TELEMETRYFLOW_HOST_ROOT, defaulting to
+// /hostfs). All path-based heuristics check both the direct path and the
+// host-root-prefixed path so detection works correctly inside containers.
 func detectClusterProvider() string {
+	// hostRoot is the mount point for the host filesystem inside the container.
+	// When running as a DaemonSet with hostPath / → /hostfs this lets us read
+	// host filesystem paths (e.g. /var/lib/rancher/rke2) that are not directly
+	// accessible inside the container.
+	hostRoot := os.Getenv("TELEMETRYFLOW_HOST_ROOT")
+	if hostRoot == "" {
+		hostRoot = "/hostfs"
+	}
+
+	// hostStat checks both the direct path and the host-root-prefixed path.
+	hostStat := func(path string) bool {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+		if _, err := os.Stat(hostRoot + path); err == nil {
+			return true
+		}
+		return false
+	}
+
 	// === Managed Cloud Providers ===
 
 	// EKS (Amazon Elastic Kubernetes Service)
@@ -393,35 +418,35 @@ func detectClusterProvider() string {
 	// === OpenShift Variants (check MicroShift first — it's a subset of OpenShift) ===
 
 	// MicroShift
-	if _, err := os.Stat("/var/lib/microshift"); err == nil {
+	if hostStat("/var/lib/microshift") {
 		return "microshift"
 	}
 	// OpenShift
 	if os.Getenv("OPENSHIFT_BUILD_NAMESPACE") != "" || os.Getenv("OPENSHIFT_DEPLOYMENT_NAME") != "" {
 		return "openshift"
 	}
-	if _, err := os.Stat("/etc/openshift"); err == nil {
+	if hostStat("/etc/openshift") {
 		return "openshift"
 	}
 	// OKD (Origin Kubernetes Distribution — community OpenShift)
 	if os.Getenv("OKD_CLUSTER") != "" {
 		return "okd"
 	}
-	if _, err := os.Stat("/etc/okd"); err == nil {
+	if hostStat("/etc/okd") {
 		return "okd"
 	}
 
 	// === Lightweight / Local Distributions ===
 
 	// k3s (check before Rancher — k3s lives under /var/lib/rancher/k3s)
-	if _, err := os.Stat("/var/lib/rancher/k3s"); err == nil {
+	if hostStat("/var/lib/rancher/k3s") {
 		return "k3s"
 	}
 	// Rancher (RKE / RKE2)
 	if os.Getenv("CATTLE_CLUSTER_AGENT_PORT") != "" || os.Getenv("CATTLE_SERVER") != "" {
 		return "rancher"
 	}
-	if _, err := os.Stat("/var/lib/rancher/rke2"); err == nil {
+	if hostStat("/var/lib/rancher/rke2") {
 		return "rancher"
 	}
 	// minikube

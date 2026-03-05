@@ -243,7 +243,7 @@ func TestClientRegisterAgent(t *testing.T) {
 	t.Run("should register agent successfully", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, http.MethodPost, r.Method)
-			assert.Equal(t, "/agents", r.URL.Path)
+			assert.Equal(t, "/monitoring/agents", r.URL.Path)
 
 			var req api.RegisterAgentRequest
 			err := json.NewDecoder(r.Body).Decode(&req)

@@ -1,0 +1,12 @@
+{{- if .Values.nodeCollector.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tfo-agent.nodeConfigMapName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tfo-agent.labels" . | nindent 4 }}
+data:
+  tfo-agent.yaml: |
+    {{- toYaml .Values.config | nindent 4 }}
+{{- end }}

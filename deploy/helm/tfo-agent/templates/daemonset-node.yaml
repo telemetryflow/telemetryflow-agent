@@ -1,0 +1,190 @@
+{{- if .Values.nodeCollector.enabled -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "tfo-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tfo-agent.nodeCollector.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "tfo-agent.nodeCollector.selectorLabels" . | nindent 6 }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        {{- include "tfo-agent.nodeCollector.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ toYaml .Values.config | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tfo-agent.serviceAccountName" . }}
+      automountServiceAccountToken: true
+      hostNetwork: {{ .Values.hostNetwork }}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      priorityClassName: system-node-critical
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      containers:
+        - name: tfo-agent
+          image: {{ include "tfo-agent.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.nodeCollectorSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - --config=/etc/tfo-agent/tfo-agent.yaml
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: CLUSTER_NAME
+              value: {{ .Values.clusterName | quote }}
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            # Auth + endpoint — read by Viper via explicit env bindings
+            - name: TELEMETRYFLOW_ENDPOINT
+              value: {{ required "telemetryflow.endpoint is required" .Values.telemetryflow.endpoint | quote }}
+            - name: TELEMETRYFLOW_API_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tfo-agent.secretName" . }}
+                  key: TELEMETRYFLOW_API_KEY_ID
+            - name: TELEMETRYFLOW_API_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tfo-agent.secretName" . }}
+                  key: TELEMETRYFLOW_API_KEY_SECRET
+            {{- if .Values.telemetryflow.workspaceId }}
+            - name: TELEMETRYFLOW_WORKSPACE_ID
+              value: {{ .Values.telemetryflow.workspaceId | quote }}
+            {{- end }}
+            {{- if .Values.telemetryflow.tenantId }}
+            - name: TELEMETRYFLOW_TENANT_ID
+              value: {{ .Values.telemetryflow.tenantId | quote }}
+            {{- end }}
+            # Per-workload collector toggles (override YAML config)
+            - name: TELEMETRYFLOW_NODE_EXPORTER_ENABLED
+              value: "true"
+            - name: TELEMETRYFLOW_K8S_ENABLED
+              value: "false"
+            # Prometheus /metrics server (used for liveness/readiness probes)
+            - name: TELEMETRYFLOW_PROMETHEUS_ENABLED
+              value: "true"
+            - name: TELEMETRYFLOW_PROMETHEUS_PORT
+              value: {{ .Values.ports.metrics | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.ports.otlpGrpc }}
+              name: otlp-grpc
+              hostPort: {{ .Values.ports.otlpGrpc }}
+              protocol: TCP
+            - containerPort: {{ .Values.ports.otlpHttp }}
+              name: otlp-http
+              hostPort: {{ .Values.ports.otlpHttp }}
+              protocol: TCP
+            - containerPort: {{ .Values.ports.metrics }}
+              name: metrics
+              protocol: TCP
+            - containerPort: {{ .Values.ports.health }}
+              name: health
+              protocol: TCP
+          # startupProbe: up to 90s (18×5s) for cold start
+          startupProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.ports.metrics }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.ports.metrics }}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ .Values.ports.metrics }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.nodeCollectorResources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/tfo-agent
+              readOnly: true
+            - name: buffer
+              mountPath: /var/lib/tfo-agent/buffer
+            # Host filesystem mounts for node_exporter metrics
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: rootfs
+              mountPath: /host/rootfs
+              readOnly: true
+              mountPropagation: HostToContainer
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "tfo-agent.nodeConfigMapName" . }}
+        - name: buffer
+          hostPath:
+            path: /var/lib/tfo-agent/buffer
+            type: DirectoryOrCreate
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: rootfs
+          hostPath:
+            path: /
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

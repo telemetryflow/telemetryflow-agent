@@ -1,0 +1,25 @@
+TFO-Agent has been deployed!
+
+{{- if .Values.kubernetesCollector.enabled }}
+  Kubernetes Cluster Collector: ENABLED (Deployment, 1 replica)
+  {{- if .Values.kubernetesCollector.clusterId }}
+  Cluster ID: {{ .Values.kubernetesCollector.clusterId }}
+  {{- else }}
+  Cluster ID: will be auto-registered on first startup
+  {{- end }}
+{{- end }}
+
+{{- if .Values.nodeCollector.enabled }}
+  Node Metrics Collector: ENABLED (DaemonSet, one pod per node)
+{{- end }}
+
+TFO Platform endpoint: {{ .Values.telemetryflow.endpoint | default "(not set — update telemetryflow.endpoint)" }}
+
+To check agent status:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "tfo-agent.name" . }}
+
+To view logs from the K8s cluster collector:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=k8s-collector --tail=50
+
+To view logs from a node collector:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=node-collector --tail=50

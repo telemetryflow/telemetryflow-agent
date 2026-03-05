@@ -1,0 +1,291 @@
+# TFO-Agent Helm Chart Values
+
+# -- TFO Platform connection settings (REQUIRED)
+telemetryflow:
+  # -- TFO Platform API endpoint (e.g. https://platform.example.com)
+  endpoint: ""
+  # -- API key ID (from TFO Platform → Settings → API Keys)
+  apiKeyId: ""
+  # -- API key secret
+  apiKeySecret: ""
+  # -- Workspace ID (optional — multi-workspace setups)
+  workspaceId: ""
+  # -- Tenant ID (optional — multi-tenant setups)
+  tenantId: ""
+
+# -- Cluster / environment identity (injected as env vars into all containers)
+clusterName: ""
+environment: production
+
+# -- Container image settings
+image:
+  repository: ghcr.io/telemetryflow/tfo-agent
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to Chart.appVersion
+
+imagePullSecrets: []
+
+# -- Host network for node-level metrics (required for accurate network stats)
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+
+# -- Ports exposed by the agent
+ports:
+  otlpGrpc: 4317
+  otlpHttp: 4318
+  metrics: 8888
+  health: 13133
+
+# -- ServiceAccount settings
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# -- RBAC (ClusterRole + ClusterRoleBinding)
+rbac:
+  create: true
+  clusterRole: true
+  rules:
+    - apiGroups: [""]
+      resources:
+        - pods
+        - namespaces
+        - nodes
+        - nodes/stats
+        - nodes/proxy
+        - services
+        - replicationcontrollers
+        - events
+        - persistentvolumes
+        - persistentvolumeclaims
+        - resourcequotas
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["replicasets", "deployments", "statefulsets", "daemonsets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["batch"]
+      resources: ["jobs", "cronjobs"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["autoscaling"]
+      resources: ["horizontalpodautoscalers"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["networking.k8s.io"]
+      resources: ["ingresses"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["storage.k8s.io"]
+      resources: ["storageclasses", "volumeattachments"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["discovery.k8s.io"]
+      resources: ["endpointslices"]
+      verbs: ["get", "list", "watch"]
+    - nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
+      verbs: ["get"]
+
+# -- Node DaemonSet toggle
+nodeCollector:
+  enabled: true
+
+# -- Kubernetes cluster collector (Deployment, 1 replica)
+kubernetesCollector:
+  enabled: true
+  replicaCount: 1
+  # -- Cluster name sent to TFO Platform (auto-detected from CLUSTER_NAME env if empty)
+  clusterName: ""
+  # -- Kubernetes provider hint (eks, gke, aks, rancher, k3s, kubesphere, etc.)
+  clusterProvider: ""
+  # -- TFO cluster UUID — auto-registered on startup if empty (find-or-create)
+  clusterId: ""
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# -- Pod-level security context (node DaemonSet needs root for host metrics)
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+  fsGroup: 0
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context for node DaemonSet
+nodeCollectorSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+    add: ["SYS_PTRACE"]
+
+# -- Container security context for K8s cluster Deployment
+kubernetesCollectorSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# -- Resource limits for node DaemonSet pods
+nodeCollectorResources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# -- Tolerations for DaemonSet (run on all nodes including control-plane)
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/not-ready
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+  - key: node.kubernetes.io/unreachable
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300
+
+# -- Node selector for all pods
+nodeSelector: {}
+
+# -- Affinity rules
+affinity: {}
+
+# -- Annotations added to all pods
+podAnnotations: {}
+
+# -- Additional labels added to all resources
+commonLabels: {}
+
+# -- Extra environment variables injected into all agent containers
+extraEnv: []
+# - name: MY_VAR
+#   value: "my-value"
+
+# -- Base config for node DaemonSet (auth/endpoint come from env vars — managed by Viper)
+config:
+  agent:
+    description: "TFO Agent - ${NODE_NAME}"
+    tags:
+      environment: "${ENVIRONMENT}"
+      cluster: "${CLUSTER_NAME}"
+
+  heartbeat:
+    interval: 60s
+    timeout: 10s
+    include_system_info: true
+
+  collectors:
+    # Per-node OS metrics — toggled ON via TELEMETRYFLOW_NODE_EXPORTER_ENABLED env var
+    node_exporter:
+      enabled: true
+      interval: 15s
+      cpu: true
+      memory: true
+      disk_io: true
+      filesystem: true
+      network: true
+      load_avg: true
+      thermal: false
+      textfile: false
+      conntrack: false
+      psi: false
+      vmstat: false
+      sockstat: false
+
+    # Kubernetes cluster monitoring — toggled OFF for DaemonSet via env var
+    kubernetes:
+      enabled: false
+
+  prometheus_server:
+    enabled: true
+    port: 8888
+    path: /metrics
+
+  exporter:
+    otlp:
+      enabled: true
+      batch_size: 100
+      flush_interval: 10s
+      compression: gzip
+
+  buffer:
+    enabled: true
+    max_size_mb: 100
+    path: /var/lib/tfo-agent/buffer
+    flush_interval: 30s
+
+  logging:
+    level: info
+    format: json
+
+# -- Config override for the K8s cluster collector Deployment
+kubernetes:
+  config:
+    agent:
+      description: "TFO K8s Collector - ${CLUSTER_NAME}"
+      tags:
+        environment: "${ENVIRONMENT}"
+        cluster: "${CLUSTER_NAME}"
+
+    heartbeat:
+      interval: 60s
+      timeout: 10s
+
+    collectors:
+      # Node exporter OFF for K8s collector Deployment
+      node_exporter:
+        enabled: false
+
+      # Kubernetes cluster monitoring ON — toggled via TELEMETRYFLOW_K8S_ENABLED env var
+      kubernetes:
+        enabled: true
+        interval: 30s
+        sync_to_backend: true
+        sync_interval: 60s
+        nodes: true
+        pods: true
+        deployments: true
+        namespaces_collect: true
+        storage: true
+        services: true
+        workloads: true
+        events: true
+        resource_counts: true
+        network: true
+        metrics_api: true
+        exclude_namespaces:
+          - kube-system
+
+    prometheus_server:
+      enabled: true
+      port: 8888
+      path: /metrics
+
+    exporter:
+      otlp:
+        enabled: false
+
+    buffer:
+      enabled: true
+      max_size_mb: 50
+      path: /var/lib/tfo-agent/buffer
+      flush_interval: 30s
+
+    logging:
+      level: info
+      format: json
+
+# -- PodDisruptionBudget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
