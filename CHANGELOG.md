@@ -24,7 +24,20 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.7] - 2026-03-01
+## [1.1.7] - 2026-03-05
+
+### Added
+
+- **Stable Agent Identity (`internal/agent/identity.go`)**: Agent ID is now deterministic across restarts and container rebuilds via UUIDv5 fingerprinting — no more phantom duplicate agents after pod rollouts
+  - **Priority chain**: explicit `TELEMETRYFLOW_ID` / `agent.id` config → UUIDv5 fingerprint → random UUIDv4 fallback (with warning)
+  - **Fingerprint components**: `NODE_NAME` (Kubernetes Downward API, highest priority) + OS `HostID` (`/etc/machine-id` on Linux, hardware UUID on macOS) + hostname — joined and hashed with a fixed TelemetryFlow namespace UUID
+  - Same agent UUID is produced on every restart as long as the underlying host/node identity is unchanged
+  - Logs `Derived stable agent ID from host fingerprint` with component labels for observability
+
+### Changed
+
+- **`internal/agent/agent.go`**: Replaced inline `uuid.New()` call with `ResolveAgentID(cfg.Agent.ID, cfg.Agent.Hostname, logger)` from the new identity module
+- **`deploy/kubernetes/daemonset.yaml`**: Added `HOST_PROC`, `HOST_ETC`, `HOST_SYS`, `HOST_VAR`, `HOST_RUN` environment variables so that `gopsutil` reads `/etc/machine-id` and other identity files from the **host node** rather than the container image — required for a stable `HostID` in the fingerprint
 
 ### Fixed
 
@@ -379,9 +392,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                               |
 | ------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------- |
-| 1.1.7   | 2026-03-01 | v1.40.0  | Fix duplicate SyncKubernetesState declaration; align KubernetesSyncClient interface signature              |
+| 1.1.7   | 2026-03-05 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; fix SyncKubernetesState; K8s gopsutil host paths       |
 | 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                           |
-| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                       |
+| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                      |
 | 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability        |
 | 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls               |
 | 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine) |
