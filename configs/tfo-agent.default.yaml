@@ -374,12 +374,12 @@ exporter:
 
     # Traces export
     traces:
-      enabled: false  # Enable when distributed tracing is needed
+      enabled: true
       # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/traces)
 
     # Logs export
     logs:
-      enabled: false  # Enable when log forwarding is needed
+      enabled: true
       # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/logs)
 
 # =============================================================================

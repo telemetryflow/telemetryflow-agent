@@ -1,30 +1,44 @@
 ---
-# TFO-Agent DaemonSet
-# Runs one agent pod per node for per-node OS metrics (node_exporter).
-# Kubernetes cluster state is collected separately by deployment-k8s.yaml.
+# TFO-Agent K8s Cluster Collector Deployment
+# Runs as a single replica (not DaemonSet) — collects cluster-wide Kubernetes state
+# and syncs it to the TFO Platform backend via REST API.
+#
+# Auto-registration: on startup the agent calls POST /api/v2/monitoring/kubernetes/clusters/agent-register
+# (find-or-create semantics) — safe to restart/redeploy without manual pre-registration.
+#
+# Pre-requisites:
+#   kubectl create secret generic tfo-agent-credentials \
+#     --from-literal=api-key-id=tfk_xxx \
+#     --from-literal=api-key-secret=tfs_xxx \
+#     -n telemetryflow
+#
+# Optional — skip auto-registration by pre-setting the cluster UUID:
+#   kubectl create secret generic tfo-agent-credentials \
+#     --from-literal=api-key-id=tfk_xxx \
+#     --from-literal=api-key-secret=tfs_xxx \
+#     --from-literal=k8s-cluster-id=<uuid-from-tfo-platform> \
+#     -n telemetryflow
 
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
-  name: tfo-agent
+  name: tfo-agent-k8s
   namespace: telemetryflow
   labels:
     app.kubernetes.io/name: tfo-agent
-    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/component: k8s-collector
     app.kubernetes.io/part-of: telemetryflow
 spec:
+  replicas: 1   # exactly 1 — multiple replicas would duplicate cluster state syncs
   selector:
     matchLabels:
       app.kubernetes.io/name: tfo-agent
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
+      app.kubernetes.io/component: k8s-collector
   template:
     metadata:
       labels:
         app.kubernetes.io/name: tfo-agent
-        app.kubernetes.io/component: monitoring
+        app.kubernetes.io/component: k8s-collector
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8888"
@@ -34,17 +48,10 @@ spec:
       automountServiceAccountToken: true
       terminationGracePeriodSeconds: 30
 
-      # Tolerate all taints to run on every node (including control-plane)
-      tolerations:
-        - operator: Exists
-
-      # Run on Linux nodes only
-      nodeSelector:
-        kubernetes.io/os: linux
-
       # Wait for tfo-backend to be ready before starting the agent.
-      # This prevents heartbeat/auth failures on cluster cold-start when the agent
-      # pod comes up before the backend service is accepting requests.
+      # The K8s collector performs auto-registration on startup (POST /clusters/agent-register).
+      # If the backend is not yet up, registration fails and k8sSync is never created —
+      # meaning no K8s state is ever synced until the pod is manually restarted.
       initContainers:
         - name: wait-for-backend
           image: busybox:1.36
@@ -81,24 +88,7 @@ spec:
               protocol: TCP
 
           env:
-            # Downward API — node and pod identity
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # Direct gopsutil to read host's /etc and /proc so that machine-id
-            # and other OS-level identifiers are read from the node, not the container.
-            # Required for stable UUIDv5 fingerprint across pod restarts.
-            - name: HOST_PROC
-              value: /host/proc
-            - name: HOST_ETC
-              value: /host/root/etc
-            - name: HOST_SYS
-              value: /host/sys
-            - name: HOST_VAR
-              value: /host/root/var
-            - name: HOST_RUN
-              value: /host/root/run
+            # Pod identity
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -107,22 +97,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            - name: POD_IP
+            - name: NODE_NAME
               valueFrom:
                 fieldRef:
-                  fieldPath: status.podIP
+                  fieldPath: spec.nodeName
 
-            # TFO Platform endpoint — must point to backend REST API (NOT the OTLP collector port)
-            # The agent uses this URL for: heartbeat, cluster auto-registration, and K8s state sync.
-            # Format: http://<backend-service>:<port>/api/v2
+            # TFO Platform endpoint — MUST point to backend REST API (port 3100), NOT OTLP collector (port 4317)
+            # The agent uses this for: heartbeat, auto-registration of cluster, K8s state sync
             - name: TELEMETRYFLOW_ENDPOINT
               value: "http://tfo-backend.telemetryflow.svc.cluster.local:3100/api/v2"
 
             # API credentials from Secret
-            # Create secret: kubectl create secret generic tfo-agent-credentials \
-            #   --from-literal=api-key-id=tfk_xxx \
-            #   --from-literal=api-key-secret=tfs_xxx \
-            #   -n telemetryflow
             - name: TELEMETRYFLOW_API_KEY_ID
               valueFrom:
                 secretKeyRef:
@@ -136,11 +121,20 @@ spec:
                   key: api-key-secret
                   optional: false
 
-            # Per-workload collector toggles (override YAML config)
-            - name: TELEMETRYFLOW_NODE_EXPORTER_ENABLED
-              value: "true"
+            # Optional: pre-registered cluster UUID — skip auto-registration
+            # If not set, the agent will auto-register on startup (find-or-create).
+            - name: TELEMETRYFLOW_K8S_CLUSTER_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tfo-agent-credentials
+                  key: k8s-cluster-id
+                  optional: true
+
+            # Per-workload collector toggles
             - name: TELEMETRYFLOW_K8S_ENABLED
-              value: "false"  # K8s state handled by tfo-agent-k8s Deployment (deployment-k8s.yaml)
+              value: "true"
+            - name: TELEMETRYFLOW_NODE_EXPORTER_ENABLED
+              value: "false"  # node metrics handled by tfo-agent DaemonSet
 
             # Prometheus server for liveness/readiness probes
             - name: TELEMETRYFLOW_PROMETHEUS_ENABLED
@@ -148,11 +142,16 @@ spec:
             - name: TELEMETRYFLOW_PROMETHEUS_PORT
               value: "8888"
 
-            # Cluster and environment tags for OTEL resource attributes
+            # Cluster identity — used in auto-registration name and OTEL resource attributes
             - name: CLUSTER_NAME
-              value: ""     # override with your cluster name, or auto-detected from hostname
+              value: ""   # override with your cluster name; auto-detected from hostname if empty
             - name: ENVIRONMENT
               value: "production"
+
+            # Host filesystem root — used by cluster provider auto-detection
+            # (checks /var/lib/rancher/k3s, /var/lib/rancher/rke2, etc.)
+            - name: TELEMETRYFLOW_HOST_ROOT
+              value: /hostfs
 
           resources:
             requests:
@@ -162,11 +161,20 @@ spec:
               cpu: 200m
               memory: 256Mi
 
+          # startupProbe: 90s budget for first-boot cluster auto-registration REST call
+          startupProbe:
+            httpGet:
+              path: /metrics
+              port: 8888
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 18
+
           livenessProbe:
             httpGet:
               path: /metrics
               port: 8888
-            initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
@@ -175,9 +183,9 @@ spec:
             httpGet:
               path: /metrics
               port: 8888
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
             failureThreshold: 3
 
           volumeMounts:
@@ -186,42 +194,28 @@ spec:
               readOnly: true
             - name: buffer
               mountPath: /var/lib/tfo-agent/buffer
-            # Host filesystem for node_exporter metrics
-            - name: proc
-              mountPath: /host/proc
-              readOnly: true
-            - name: sys
-              mountPath: /host/sys
-              readOnly: true
-            - name: root
-              mountPath: /host/root
+            # Host filesystem — needed for cluster provider auto-detection heuristics
+            - name: hostfs
+              mountPath: /hostfs
               readOnly: true
               mountPropagation: HostToContainer
 
           securityContext:
-            runAsUser: 0      # required to read /proc and /sys for node metrics
-            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 65534
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
-              add:
-                - SYS_PTRACE  # process inspection for node metrics
 
       volumes:
         - name: config
           configMap:
-            name: tfo-agent-config
+            name: tfo-agent-k8s-config
         - name: buffer
           emptyDir:
-            sizeLimit: 200Mi
-        - name: proc
-          hostPath:
-            path: /proc
-        - name: sys
-          hostPath:
-            path: /sys
-        - name: root
+            sizeLimit: 100Mi
+        - name: hostfs
           hostPath:
             path: /

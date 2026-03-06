@@ -1,6 +1,7 @@
 ---
 # TFO-Agent RBAC Configuration
 # Provides read-only access to Kubernetes resources for metrics collection
+# and kubelet /stats/summary for network metrics.
 
 apiVersion: v1
 kind: ServiceAccount
@@ -20,20 +21,25 @@ metadata:
     app.kubernetes.io/name: tfo-agent
     app.kubernetes.io/component: monitoring
 rules:
-  # Core resources
+  # Core resources — state + metadata
   - apiGroups: [""]
     resources:
       - nodes
+      - nodes/stats   # kubelet /stats/summary (network bytes per namespace)
+      - nodes/proxy   # kubelet /stats/summary proxy (direct kubelet access)
       - pods
       - services
       - endpoints
       - namespaces
+      - events
       - persistentvolumes
       - persistentvolumeclaims
       - resourcequotas
+      - configmaps
+      - secrets
     verbs: ["get", "list", "watch"]
 
-  # Apps resources
+  # Apps workloads
   - apiGroups: ["apps"]
     resources:
       - deployments
@@ -42,19 +48,54 @@ rules:
       - replicasets
     verbs: ["get", "list", "watch"]
 
-  # Batch resources
+  # Batch workloads
   - apiGroups: ["batch"]
     resources:
       - jobs
       - cronjobs
     verbs: ["get", "list", "watch"]
 
-  # Metrics-server resources
+  # Autoscaling
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch"]
+
+  # Networking — Ingresses + EndpointSlices (replaces deprecated v1/Endpoints in K8s 1.33+)
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["get", "list", "watch"]
+
+  # Storage classes
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+      - volumeattachments
+    verbs: ["get", "list", "watch"]
+
+  # Events API (events.k8s.io/v1 replaces core/v1 events in K8s 1.19+)
+  - apiGroups: ["events.k8s.io"]
+    resources:
+      - events
+    verbs: ["get", "list", "watch"]
+
+  # Metrics-server — actual CPU/Memory usage per node and pod
   - apiGroups: ["metrics.k8s.io"]
     resources:
       - nodes
       - pods
     verbs: ["get", "list"]
+
+  # Non-resource URLs — Prometheus metrics from kubelet/cAdvisor
+  - nonResourceURLs:
+      - /metrics
+      - /metrics/cadvisor
+    verbs: ["get"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

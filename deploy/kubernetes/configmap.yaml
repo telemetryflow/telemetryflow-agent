@@ -1,6 +1,7 @@
 ---
-# TFO-Agent ConfigMap
-# Kubernetes-enabled configuration
+# TFO-Agent ConfigMap (Node DaemonSet)
+# Per-node OS metrics: node_exporter ON, kubernetes collector OFF.
+# Auth and endpoint are injected via env vars (TELEMETRYFLOW_API_KEY_ID/SECRET/ENDPOINT).
 
 apiVersion: v1
 kind: ConfigMap
@@ -12,41 +13,103 @@ metadata:
     app.kubernetes.io/component: monitoring
 data:
   tfo-agent.yaml: |
-    telemetryflow:
-      api_key_id: ""
-      api_key_secret: ""
-      endpoint: "tfo-backend.telemetryflow.svc.cluster.local:4317"
-      protocol: grpc
-      tls:
-        enabled: false
-
     agent:
-      name: "TFO-Agent (Kubernetes)"
+      description: "TFO Agent - ${NODE_NAME}"
       tags:
-        environment: production
-        deployment: kubernetes
+        environment: "${ENVIRONMENT}"
+        cluster: "${CLUSTER_NAME}"
 
     heartbeat:
       interval: 60s
+      timeout: 10s
       include_system_info: true
 
     collectors:
-      system:
+      node_exporter:
         enabled: true
         interval: 15s
         cpu: true
         memory: true
-        disk: true
+        disk_io: true
+        filesystem: true
         network: true
+        load_avg: true
+        thermal: false
+        textfile: false
+        conntrack: false
+        psi: false
+        vmstat: false
+        sockstat: false
+
+      # kubernetes is handled by the separate K8s Collector Deployment (tfo-agent-k8s)
+      kubernetes:
+        enabled: false
+
+      ebpf:
+        enabled: false
+
+    prometheus_server:
+      enabled: true
+      port: 8888
+      path: /metrics
+
+    exporter:
+      otlp:
+        enabled: true
+        batch_size: 100
+        flush_interval: 10s
+        compression: gzip
+
+    buffer:
+      enabled: true
+      max_size_mb: 100
+      path: /var/lib/tfo-agent/buffer
+      flush_interval: 30s
+
+    logging:
+      level: info
+      format: json
+
+---
+# TFO-Agent K8s Collector ConfigMap
+# Single-replica Deployment: kubernetes collector ON, node_exporter OFF.
+# Connects to TFO Platform backend REST API (not the OTLP Collector port).
+# Auth and endpoint are injected via env vars.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tfo-agent-k8s-config
+  namespace: telemetryflow
+  labels:
+    app.kubernetes.io/name: tfo-agent
+    app.kubernetes.io/component: k8s-collector
+data:
+  tfo-agent.yaml: |
+    agent:
+      description: "TFO K8s Collector - ${CLUSTER_NAME}"
+      tags:
+        environment: "${ENVIRONMENT}"
+        cluster: "${CLUSTER_NAME}"
+
+    heartbeat:
+      interval: 60s
+      timeout: 10s
+
+    collectors:
+      node_exporter:
+        enabled: false
 
       kubernetes:
         enabled: true
         interval: 30s
-        kubeconfig: ""
+        kubeconfig: ""   # empty = in-cluster ServiceAccount auto-detection
         context: ""
         namespaces: []
         exclude_namespaces:
           - kube-system
+          - kube-public
+          - kube-node-lease
         nodes: true
         pods: true
         deployments: true
@@ -54,42 +117,34 @@ data:
         storage: true
         services: true
         workloads: true
-        metrics_api: true
+        events: true
+        resource_counts: true
+        network: true    # Kubelet /stats/summary (requires nodes/proxy RBAC)
+        metrics_api: true  # CPU/Memory usage from metrics-server (set false if not installed)
         sync_to_backend: true
         sync_interval: 60s
-        cluster_name: ""
-        cluster_provider: ""
+        cluster_name: ""     # auto-detected from CLUSTER_NAME env or hostname
+        cluster_provider: "" # auto-detected from env/filesystem heuristics
+        # cluster_id is auto-registered on startup (find-or-create)
+        # Set TELEMETRYFLOW_K8S_CLUSTER_ID env var to skip auto-registration
+
+      ebpf:
+        enabled: false
 
     prometheus_server:
       enabled: true
       port: 8888
       path: /metrics
-      include_go_metrics: true
-      include_process_metrics: true
-      metric_prefix: tfo
-      read_timeout: 10s
-      write_timeout: 10s
 
     exporter:
       otlp:
-        enabled: true
-        endpoint_version: v2
-        batch_size: 100
-        flush_interval: 10s
-        compression: gzip
-        metrics:
-          enabled: true
-        traces:
-          enabled: false
-        logs:
-          enabled: false
+        enabled: false  # K8s state syncs directly to backend REST API, not via OTLP
 
     buffer:
       enabled: true
-      max_size_mb: 100
+      max_size_mb: 50
       path: /var/lib/tfo-agent/buffer
-      max_age: 24h
-      flush_interval: 5s
+      flush_interval: 30s
 
     logging:
       level: info
