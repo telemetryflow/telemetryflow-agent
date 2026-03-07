@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,7 @@ type Agent struct {
 	client           *api.Client
 	heartbeat        *exporter.Heartbeat
 	k8sSync          *exporter.KubernetesSync
+	k8sCollector     *kubernetes.KubernetesCollector // kept for registration retry
 	collectors       []collector.Collector
 	prometheusServer *exporter.PrometheusServer
 
@@ -126,7 +128,10 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 
 	// Auto-detect Kubernetes: enable collector + sync when running inside a K8s cluster.
 	// KUBERNETES_SERVICE_HOST is injected by the kubelet into every pod.
-	if !cfg.Collector.Kubernetes.Enabled && os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+	// Skip auto-detection if K8s was explicitly disabled via TELEMETRYFLOW_K8S_ENABLED=false
+	// (e.g. DaemonSet pods that only run node_exporter).
+	k8sExplicitlyDisabled := strings.EqualFold(os.Getenv("TELEMETRYFLOW_K8S_ENABLED"), "false")
+	if !cfg.Collector.Kubernetes.Enabled && !k8sExplicitlyDisabled && os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
 		cfg.Collector.Kubernetes.Enabled = true
 		if !cfg.Collector.Kubernetes.SyncToBackend {
 			cfg.Collector.Kubernetes.SyncToBackend = true
@@ -136,13 +141,15 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 
 	// Add Kubernetes collector if enabled
 	var k8sSync *exporter.KubernetesSync
+	var k8sCollector *kubernetes.KubernetesCollector
 	if cfg.Collector.Kubernetes.Enabled {
-		k8sCollector, err := kubernetes.NewKubernetesCollector(cfg.Collector.Kubernetes, logger)
+		col, err := kubernetes.NewKubernetesCollector(cfg.Collector.Kubernetes, logger)
 		if err != nil {
 			logger.Warn("Failed to create Kubernetes collector, skipping",
 				zap.Error(err),
 			)
 		} else {
+			k8sCollector = col
 			collectors = append(collectors, k8sCollector)
 			logger.Info("Kubernetes collector enabled",
 				zap.String("cluster", k8sCollector.ClusterName()),
@@ -158,7 +165,7 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 				})
 				regCancel()
 				if regErr != nil {
-					logger.Warn("Failed to auto-register Kubernetes cluster, sync disabled",
+					logger.Warn("Failed to auto-register Kubernetes cluster, will retry in background",
 						zap.Error(regErr),
 						zap.String("cluster", k8sCollector.ClusterName()),
 					)
@@ -233,6 +240,7 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		client:           client,
 		heartbeat:        heartbeat,
 		k8sSync:          k8sSync,
+		k8sCollector:     k8sCollector,
 		collectors:       collectors,
 		prometheusServer: promServer,
 	}, nil
@@ -295,6 +303,57 @@ func (a *Agent) Run(ctx context.Context) error {
 		go func() {
 			if err := a.k8sSync.Start(ctx); err != nil && err != context.Canceled {
 				errChan <- fmt.Errorf("kubernetes sync error: %w", err)
+			}
+		}()
+	} else if a.k8sCollector != nil && a.config.Collector.Kubernetes.SyncToBackend {
+		// Registration failed at startup — retry with exponential backoff in background.
+		go func() {
+			backoff := 15 * time.Second
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(backoff):
+				}
+				regCtx, regCancel := context.WithTimeout(ctx, 30*time.Second)
+				regResp, regErr := a.client.AgentRegisterCluster(regCtx, &api.AgentRegisterClusterRequest{
+					Name:     a.k8sCollector.ClusterName(),
+					Provider: a.k8sCollector.ClusterProvider(),
+				})
+				regCancel()
+				if regErr != nil {
+					if backoff < 5*time.Minute {
+						backoff *= 2
+					}
+					a.logger.Warn("K8s cluster registration retry failed",
+						zap.Error(regErr),
+						zap.Duration("next_retry", backoff),
+					)
+					continue
+				}
+				a.config.Collector.Kubernetes.ClusterID = regResp.ID
+				a.logger.Info("Kubernetes cluster registered (retry succeeded)",
+					zap.String("clusterID", regResp.ID),
+					zap.String("name", regResp.Name),
+				)
+				syncInterval := a.config.Collector.Kubernetes.SyncInterval
+				if syncInterval == 0 {
+					syncInterval = 60 * time.Second
+				}
+				a.mu.Lock()
+				a.k8sSync = exporter.NewKubernetesSync(exporter.KubernetesSyncConfig{
+					ClusterID: regResp.ID,
+					Interval:  syncInterval,
+					Collector: a.k8sCollector,
+					Client:    a.client,
+					Logger:    a.logger,
+				})
+				sync := a.k8sSync
+				a.mu.Unlock()
+				if err := sync.Start(ctx); err != nil && err != context.Canceled {
+					a.logger.Error("Kubernetes sync stopped", zap.Error(err))
+				}
+				return
 			}
 		}()
 	}

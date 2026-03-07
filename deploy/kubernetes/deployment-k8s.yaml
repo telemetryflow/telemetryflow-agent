@@ -59,7 +59,7 @@ spec:
             - sh
             - -c
             - |
-              until wget -qO- http://tfo-backend.telemetryflow.svc.cluster.local:3100/api/v2/health >/dev/null 2>&1; do
+              until wget -qO- http://tfo-backend.telemetryflow.svc.cluster.local:3100/health >/dev/null 2>&1; do
                 echo "Waiting for tfo-backend..."; sleep 5
               done
               echo "tfo-backend is ready."
@@ -74,7 +74,7 @@ spec:
 
       containers:
         - name: tfo-agent
-          image: telemetryflow/telemetryflow-agent:latest
+          image: telemetryflow/telemetryflow-agent:1.1.7
           imagePullPolicy: Always
 
           args:
