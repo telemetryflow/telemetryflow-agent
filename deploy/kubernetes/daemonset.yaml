@@ -148,6 +148,12 @@ spec:
             - name: TELEMETRYFLOW_PROMETHEUS_PORT
               value: "8888"
 
+            # Host filesystem root — used by cloud/cluster provider auto-detection heuristics
+            # (checks /var/lib/rancher/rke2, /var/lib/rancher/k3s, /sys/class/dmi/id/*, etc.)
+            # Must match the mountPath of the 'root' hostPath volume below.
+            - name: TELEMETRYFLOW_HOST_ROOT
+              value: /host/root
+
             # Cluster and environment tags for OTEL resource attributes
             - name: CLUSTER_NAME
               value: ""     # override with your cluster name, or auto-detected from hostname

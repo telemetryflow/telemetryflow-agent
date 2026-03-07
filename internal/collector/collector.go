@@ -239,6 +239,8 @@ type SystemInfo struct {
 	ContainerImage     string `json:"containerImage,omitempty"`
 	IsVirtualized      bool   `json:"isVirtualized,omitempty"`
 	VirtualizationType string `json:"virtualizationType,omitempty"` // kvm, vmware, xen, etc.
+	IsKubernetes       bool   `json:"isKubernetes,omitempty"`
+	K8sProvider        string `json:"k8sProvider,omitempty"` // eks, gke, aks, ack, cce, k3s, kind, minikube, rancher, openshift, okd, microshift, kubesphere, self-managed
 	CloudProvider      string `json:"cloudProvider,omitempty"`      // aws, gcp, azure, etc.
 	CloudInstanceID    string `json:"cloudInstanceId,omitempty"`
 	CloudInstanceType  string `json:"cloudInstanceType,omitempty"`

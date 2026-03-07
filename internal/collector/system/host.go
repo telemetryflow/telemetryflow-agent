@@ -852,6 +852,9 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 
 	info.IsVirtualized, info.VirtualizationType = detectVirtualization()
 
+	// Kubernetes provider detection
+	info.IsKubernetes, info.K8sProvider = detectK8sProvider()
+
 	// Cloud metadata
 	info.CloudProvider, info.CloudInstanceID, info.CloudInstanceType,
 		info.CloudRegion, info.CloudZone = detectCloudMetadata()
@@ -885,6 +888,109 @@ func parseUint64(s string) uint64 {
 		}
 	}
 	return v
+}
+
+// detectK8sProvider detects whether the agent is running in a Kubernetes
+// environment and returns the specific distribution/provider. The returned
+// provider matches K8sProviderEnum values on the platform backend:
+// eks, gke, aks, ack, cce, k3s, kind, minikube, rancher, openshift, okd,
+// microshift, kubesphere, self-managed. Returns (false, "") when no
+// Kubernetes environment is detected.
+//
+// Detection priority:
+//  1. Managed cloud providers (env vars injected by the cloud control plane)
+//  2. OpenShift variants (MicroShift → OpenShift → OKD)
+//  3. Lightweight/local distributions (k3s → Rancher → minikube → KIND)
+//  4. Platform distributions (KubeSphere)
+//  5. Generic in-cluster fallback via KUBERNETES_SERVICE_HOST
+func detectK8sProvider() (isK8s bool, provider string) {
+	// hostRoot is the host filesystem mount point used when running as a
+	// DaemonSet (e.g. /hostfs). Falls back to empty string so that paths
+	// are checked directly when running outside a container.
+	hostRoot := os.Getenv("TELEMETRYFLOW_HOST_ROOT")
+
+	hostStat := func(path string) bool {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+		if hostRoot != "" {
+			if _, err := os.Stat(hostRoot + path); err == nil {
+				return true
+			}
+		}
+		return false
+	}
+
+	// === Managed Cloud Providers ===
+
+	// EKS (Amazon Elastic Kubernetes Service)
+	if os.Getenv("AWS_REGION") != "" || os.Getenv("EKS_CLUSTER_NAME") != "" {
+		return true, "eks"
+	}
+	// GKE (Google Kubernetes Engine)
+	if os.Getenv("GOOGLE_CLOUD_PROJECT") != "" || os.Getenv("GKE_CLUSTER_NAME") != "" {
+		return true, "gke"
+	}
+	// AKS (Azure Kubernetes Service)
+	if os.Getenv("AKS_CLUSTER_NAME") != "" || os.Getenv("AZURE_SUBSCRIPTION_ID") != "" {
+		return true, "aks"
+	}
+	// ACK (Alibaba Cloud Container Service for Kubernetes)
+	if os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID") != "" || os.Getenv("ACK_CLUSTER_ID") != "" {
+		return true, "ack"
+	}
+	// CCE (Huawei Cloud Container Engine)
+	if os.Getenv("HUAWEICLOUD_SDK_TYPE") != "" || os.Getenv("CCE_CLUSTER_ID") != "" {
+		return true, "cce"
+	}
+
+	// === OpenShift Variants (MicroShift first — it's a subset of OpenShift) ===
+
+	if hostStat("/var/lib/microshift") {
+		return true, "microshift"
+	}
+	if os.Getenv("OPENSHIFT_BUILD_NAMESPACE") != "" || os.Getenv("OPENSHIFT_DEPLOYMENT_NAME") != "" ||
+		hostStat("/etc/openshift") {
+		return true, "openshift"
+	}
+	// OKD (community OpenShift)
+	if os.Getenv("OKD_CLUSTER") != "" || hostStat("/etc/okd") {
+		return true, "okd"
+	}
+
+	// === Lightweight / Local Distributions ===
+
+	// k3s (must be checked before generic Rancher — k3s lives under /var/lib/rancher/k3s)
+	if hostStat("/var/lib/rancher/k3s") {
+		return true, "k3s"
+	}
+	// Rancher (RKE / RKE2) — CATTLE_* vars are injected by Rancher into pods
+	if os.Getenv("CATTLE_CLUSTER_AGENT_PORT") != "" || os.Getenv("CATTLE_SERVER") != "" ||
+		hostStat("/var/lib/rancher/rke2") || hostStat("/var/lib/rancher") {
+		return true, "rancher"
+	}
+	// minikube
+	if os.Getenv("MINIKUBE_ACTIVE_DOCKERD") != "" || os.Getenv("MINIKUBE_HOME") != "" {
+		return true, "minikube"
+	}
+	// KIND (Kubernetes IN Docker)
+	if os.Getenv("KIND_CLUSTER_NAME") != "" {
+		return true, "kind"
+	}
+
+	// === Platform Distributions ===
+
+	if os.Getenv("KUBESPHERE_NAMESPACE") != "" {
+		return true, "kubesphere"
+	}
+
+	// === Generic in-cluster fallback ===
+	// KUBERNETES_SERVICE_HOST is injected by the kubelet into every pod.
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return true, "self-managed"
+	}
+
+	return false, ""
 }
 
 // detectContainer checks if running inside a container
@@ -1019,8 +1125,27 @@ func detectVirtualization() (bool, string) {
 
 // detectCloudMetadata attempts to detect cloud provider and instance metadata
 func detectCloudMetadata() (provider, instanceID, instanceType, region, zone string) {
+	// hostRoot is the mount point for the host filesystem inside the container.
+	// DaemonSet mounts host / → /host/root and sets TELEMETRYFLOW_HOST_ROOT=/host/root.
+	// k8s-collector Deployment mounts host / → /hostfs and sets TELEMETRYFLOW_HOST_ROOT=/hostfs.
+	// Falls back to empty string (direct paths) when running outside a container.
+	hostRoot := os.Getenv("TELEMETRYFLOW_HOST_ROOT")
+
+	// hostStat checks the path directly and, if that fails, prefixed by hostRoot.
+	hostStat := func(path string) bool {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+		if hostRoot != "" {
+			if _, err := os.Stat(hostRoot + path); err == nil {
+				return true
+			}
+		}
+		return false
+	}
+
 	// AWS detection
-	if _, err := os.Stat("/sys/hypervisor/uuid"); err == nil {
+	if hostStat("/sys/hypervisor/uuid") {
 		if data, err := os.ReadFile("/sys/hypervisor/uuid"); err == nil {
 			if strings.HasPrefix(strings.ToLower(string(data)), "ec2") {
 				provider = "aws"
@@ -1033,9 +1158,12 @@ func detectCloudMetadata() (provider, instanceID, instanceType, region, zone str
 	}
 
 	// GCP detection
-	if data, err := os.ReadFile("/sys/class/dmi/id/product_name"); err == nil {
-		if strings.Contains(strings.ToLower(string(data)), "google") {
-			provider = "gcp"
+	for _, p := range []string{"/sys/class/dmi/id/product_name", hostRoot + "/sys/class/dmi/id/product_name"} {
+		if data, err := os.ReadFile(p); err == nil {
+			if strings.Contains(strings.ToLower(string(data)), "google") {
+				provider = "gcp"
+			}
+			break
 		}
 	}
 	if os.Getenv("GOOGLE_CLOUD_PROJECT") != "" {
@@ -1043,10 +1171,36 @@ func detectCloudMetadata() (provider, instanceID, instanceType, region, zone str
 	}
 
 	// Azure detection
-	if data, err := os.ReadFile("/sys/class/dmi/id/sys_vendor"); err == nil {
-		if strings.Contains(strings.ToLower(string(data)), "microsoft") {
-			provider = "azure"
+	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
+		if data, err := os.ReadFile(p); err == nil {
+			if strings.Contains(strings.ToLower(string(data)), "microsoft") {
+				provider = "azure"
+			}
+			break
 		}
+	}
+
+	// Rancher / RKE / RKE2 detection
+	// CATTLE_* vars are injected by Rancher into pods in the cattle-system namespace.
+	// For other namespaces we rely on host filesystem heuristics via hostRoot.
+	if os.Getenv("CATTLE_CLUSTER_AGENT_PORT") != "" || os.Getenv("CATTLE_SERVER") != "" {
+		provider = "rancher"
+		return provider, instanceID, instanceType, region, zone
+	}
+	// k3s lives under /var/lib/rancher/k3s (check before generic rancher path)
+	if hostStat("/var/lib/rancher/k3s") {
+		provider = "k3s"
+		return provider, instanceID, instanceType, region, zone
+	}
+	// RKE2
+	if hostStat("/var/lib/rancher/rke2") {
+		provider = "rancher"
+		return provider, instanceID, instanceType, region, zone
+	}
+	// RKE1 — /var/lib/rancher exists but neither k3s nor rke2 sub-dirs
+	if hostStat("/var/lib/rancher") {
+		provider = "rancher"
+		return provider, instanceID, instanceType, region, zone
 	}
 
 	return provider, instanceID, instanceType, region, zone

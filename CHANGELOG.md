@@ -24,7 +24,7 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.7] - 2026-03-05
+## [1.1.7] - 2026-03-08
 
 ### Added
 
@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fingerprint components**: `NODE_NAME` (Kubernetes Downward API, highest priority) + OS `HostID` (`/etc/machine-id` on Linux, hardware UUID on macOS) + hostname — joined and hashed with a fixed TelemetryFlow namespace UUID
   - Same agent UUID is produced on every restart as long as the underlying host/node identity is unchanged
   - Logs `Derived stable agent ID from host fingerprint` with component labels for observability
+- **Kubernetes Provider Detection (`internal/collector/system/host.go`)**: Host collector now detects the Kubernetes distribution/provider and exposes it in `SystemInfo`
+  - New `detectK8sProvider()` function covers all 15 provider types matching `K8sProviderEnum` on the platform backend
+  - **Managed cloud**: `eks` (AWS), `gke` (GCP), `aks` (Azure), `ack` (Alibaba Cloud), `cce` (Huawei Cloud) — detected from cloud-injected environment variables
+  - **OpenShift variants** (priority order): `microshift` → `openshift` → `okd` — detected via env vars and host filesystem paths
+  - **Lightweight/local distributions**: `k3s`, `rancher` (RKE/RKE2), `minikube`, `kind` — detected via `CATTLE_*` env vars and `/var/lib/rancher/*` host paths
+  - **Platform distributions**: `kubesphere` — detected via `KUBESPHERE_NAMESPACE` env var
+  - **Generic fallback**: `self-managed` when `KUBERNETES_SERVICE_HOST` is set but no specific distribution is identified
+  - Host filesystem paths checked both directly and under `TELEMETRYFLOW_HOST_ROOT` prefix — detection works correctly inside DaemonSet containers
+  - Returns `(false, "")` when not running in a Kubernetes environment at all
+  - New `IsKubernetes bool` and `K8sProvider string` fields added to `collector.SystemInfo` struct
 
 ### Changed
 
@@ -390,18 +400,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date       | OTEL SDK | Description                                                                                               |
-| ------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------- |
-| 1.1.7   | 2026-03-05 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; fix SyncKubernetesState; K8s gopsutil host paths       |
-| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                           |
-| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                      |
-| 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability        |
-| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls               |
-| 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine) |
-| 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)          |
-| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                         |
-| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                             |
-| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                           |
+| Version | Date       | OTEL SDK | Description                                                                                                       |
+| ------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
+| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                   |
+| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                              |
+| 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                |
+| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls                       |
+| 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine)         |
+| 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)                  |
+| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                 |
+| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                                     |
+| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                                   |
 
 ## Upgrade Guide
 
