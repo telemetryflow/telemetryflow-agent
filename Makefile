@@ -434,15 +434,13 @@ vet:
 ## Run staticcheck
 staticcheck:
 	@echo "$(GREEN)Running staticcheck...$(NC)"
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022' $$($(GOCMD) list ./... | grep -v '/internal/collector/ebpf$$'); \
-		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022,-U1000' ./internal/collector/ebpf; \
-	else \
-		echo "$(YELLOW)Installing staticcheck...$(NC)"; \
-		$(GOINSTALL) honnef.co/go/tools/cmd/staticcheck@latest; \
-		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022' $$($(GOCMD) list ./... | grep -v '/internal/collector/ebpf$$'); \
-		staticcheck -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022,-U1000' ./internal/collector/ebpf; \
-	fi
+	@STATICCHECK="$$(go env GOPATH)/bin/staticcheck"; \
+	if ! $$STATICCHECK -version 2>/dev/null | grep -q "v0\.7\|2026\."; then \
+		echo "$(YELLOW)Installing staticcheck v0.7.0...$(NC)"; \
+		$(GOINSTALL) honnef.co/go/tools/cmd/staticcheck@v0.7.0; \
+	fi; \
+	$$STATICCHECK -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022' $$($(GOCMD) list ./... | grep -v '/internal/collector/ebpf$$'); \
+	$$STATICCHECK -checks 'all,-ST1000,-ST1003,-ST1016,-ST1020,-ST1021,-ST1022,-U1000' ./internal/collector/ebpf
 
 ## Run all checks (fmt, vet, lint, test)
 check: fmt vet lint test

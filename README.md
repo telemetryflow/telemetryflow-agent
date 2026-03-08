@@ -9,7 +9,7 @@
 
 [![Version](https://img.shields.io/badge/Version-1.1.7-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -60,8 +60,8 @@ graph LR
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
 | **TFO-Agent**     | v1.1.7  | SDK v1.40.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.4  | SDK v1.40.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.4  | Collector v0.146.1 | Central telemetry collector |
+| **TFO-Go-SDK**    | v1.1.7  | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.1.7  | Collector v0.146.1 | Central telemetry collector |
 
 ## Features
 

@@ -9,7 +9,7 @@
 
 [![Version](https://img.shields.io/badge/Version-1.1.7-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -53,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Duplicate `SyncKubernetesState` declaration**: Removed stale method from `pkg/api/client.go` (path-based, no gzip) that conflicted with the purpose-built declaration in `pkg/api/kubernetes.go`
 - **`KubernetesSyncClient` interface mismatch**: Updated `pkg/api/kubernetes.go` `SyncKubernetesState` signature from `(ctx, state interface{})` to `(ctx, clusterID string, payload interface{})`, matching the `exporter.KubernetesSyncClient` interface and the `sendSync` call in `internal/exporter/kubernetes_sync.go`; path now built as `/monitoring/kubernetes/clusters/{clusterID}/sync` with gzip encoding
+
+### Security
+
+- **Go toolchain upgraded 1.25 → 1.26** (`Dockerfile`, `go.mod`): addresses two Go `crypto/x509` vulnerabilities in the stdlib fixed in Go 1.26
+  - **CVE-2026-27138** (UNKNOWN): certificate chain verification could panic when a certificate contained certain malformed fields
+  - **CVE-2026-27137** (UNKNOWN): certificate chain containing a crafted certificate could trigger incorrect verification behaviour
+- **zlib upgraded to 1.3.2-r0** via `apk upgrade --no-cache` in the runtime Alpine stage (already present): addresses two zlib vulnerabilities fixed in Alpine package `zlib 1.3.2-r0`
+  - **CVE-2026-22184** (CRITICAL): arbitrary code execution via buffer overflow in the `untgz` utility
+  - **CVE-2026-27171** (MEDIUM): denial of service via infinite loop in CRC32 combine functions
 
 ## [1.1.6] - 2026-02-21
 

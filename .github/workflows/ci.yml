@@ -58,7 +58,7 @@ on:
         default: false
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   PRODUCT_NAME: TelemetryFlow Agent
   BINARY_NAME: tfo-agent
 
@@ -93,6 +93,9 @@ jobs:
 
       - name: Run go vet
         run: make vet
+
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
 
       - name: Run staticcheck
         run: make staticcheck
