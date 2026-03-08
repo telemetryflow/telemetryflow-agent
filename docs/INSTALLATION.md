@@ -82,7 +82,7 @@ docker-compose down
 
 | Variable                       | Description                      | Default                             |
 | ------------------------------ | -------------------------------- | ----------------------------------- |
-| `VERSION`                      | Build version                    | `1.1.6`                             |
+| `VERSION`                      | Build version                    | `1.1.8`                             |
 | `OTEL_SDK_VERSION`             | OpenTelemetry SDK version        | `1.40.0`                            |
 | `IMAGE_NAME`                   | Docker image name                | `telemetryflow/telemetryflow-agent` |
 | `OTLP_GRPC_PORT`               | OTLP gRPC port                   | `4317`                              |

@@ -483,7 +483,7 @@ spec:
     spec:
       containers:
         - name: tfo-agent
-          image: telemetryflow/telemetryflow-agent:1.1.4
+          image: telemetryflow/telemetryflow-agent:1.1.8
           volumeMounts:
             - name: hubble-tls
               mountPath: /etc/hubble

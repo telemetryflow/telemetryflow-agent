@@ -48,7 +48,7 @@ graph TB
 
 - Kubernetes cluster v1.26+
 - `kubectl` configured with cluster admin access
-- TFO-Agent Docker image: `telemetryflow/telemetryflow-agent:1.1.4`
+- TFO-Agent Docker image: `telemetryflow/telemetryflow-agent:1.1.8`
 - TelemetryFlow API Key (from TFO Platform)
 - (Optional) metrics-server deployed for actual CPU/Memory usage
 
@@ -291,7 +291,7 @@ spec:
 
       containers:
         - name: tfo-agent
-          image: telemetryflow/telemetryflow-agent:1.1.4
+          image: telemetryflow/telemetryflow-agent:1.1.8
           imagePullPolicy: Always
           args:
             - start

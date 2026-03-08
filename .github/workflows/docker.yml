@@ -48,7 +48,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., 1.1.2)'
+        description: 'Version tag (e.g., 1.1.8)'
         required: false
         default: ''
       push:
