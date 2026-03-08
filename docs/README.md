@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Documentation
 
-- **Version:** 1.1.7
+- **Version:** 1.1.8
 - **OTEL SDK Version:** 1.40.0
 - **Last Updated:** January 2026
 - **Status:** Production Ready
@@ -28,7 +28,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.1.4"
+    subgraph "TelemetryFlow Ecosystem v1.1.7"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.40.0]
         end
@@ -38,7 +38,7 @@ graph LR
         end
 
         subgraph "Processing"
-            COLLECTOR[TFO-Collector<br/>OTEL v0.146.1]
+            COLLECTOR[TFO-Collector<br/>OTEL v0.147.0]
         end
     end
 
@@ -55,9 +55,9 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.6  | SDK v1.40.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.4  | SDK v1.40.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.4  | Collector v0.146.1 | Central telemetry collector |
+| **TFO-Agent**     | v1.1.8  | SDK v1.40.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.1.8  | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.1.7  | Collector v0.147.0 | Central telemetry collector |
 
 This alignment ensures:
 

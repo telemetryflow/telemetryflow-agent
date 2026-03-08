@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.7-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.8-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
@@ -24,7 +24,7 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.7] - 2026-03-08
+## [1.1.8] - 2026-03-08
 
 ### Added
 
@@ -411,7 +411,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                       |
 | ------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
+| 1.1.8   | 2026-03-08 | v1.40.0  | Go 1.26.0 upgrade, OTEL SDK v1.40.0, Helm deployment for Kubernetes Cluster                                       |
+| 1.1.7   | 2026-03-04 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
 | 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                   |
 | 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                              |
 | 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                |

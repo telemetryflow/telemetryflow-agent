@@ -10,7 +10,7 @@
 # =============================================================================
 PRODUCT_NAME := TelemetryFlow Agent
 BINARY_NAME := tfo-agent
-VERSION ?= 1.1.7
+VERSION ?= 1.1.8
 OTEL_SDK_VERSION := 1.40.0
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
