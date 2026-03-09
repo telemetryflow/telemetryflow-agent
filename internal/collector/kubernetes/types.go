@@ -22,29 +22,44 @@ type ClusterState struct {
 	Events          []EventState            `json:"events,omitempty"`
 	ResourceCounts  *ResourceCounts         `json:"resource_counts,omitempty"`
 	NetworkStats    []NamespaceNetworkStats `json:"network_stats,omitempty"`
+	HPAs            []HPAState              `json:"hpas,omitempty"`
+	PDBs            []PDBState              `json:"pdbs,omitempty"`
+	PodLogs         []PodLogEntry           `json:"pod_logs,omitempty"`
 }
 
 // NodeState represents a single Kubernetes node.
 type NodeState struct {
-	Name              string            `json:"name"`
-	Status            string            `json:"status"` // Ready, NotReady
-	Roles             []string          `json:"roles,omitempty"`
-	Labels            map[string]string `json:"labels,omitempty"`
-	KubeletVersion    string            `json:"kubelet_version,omitempty"`
-	ContainerRuntime  string            `json:"container_runtime,omitempty"`
-	OS                string            `json:"os,omitempty"`
-	Architecture      string            `json:"architecture,omitempty"`
-	CPUCapacity       int64             `json:"cpu_capacity"`       // millicores
-	CPUAllocatable    int64             `json:"cpu_allocatable"`    // millicores
-	MemoryCapacity    int64             `json:"memory_capacity"`    // bytes
-	MemoryAllocatable int64             `json:"memory_allocatable"` // bytes
-	PodsCapacity      int64             `json:"pods_capacity"`
-	PodsCount         int64             `json:"pods_count"`
-	Conditions        map[string]bool   `json:"conditions,omitempty"`   // condition → true/false
-	CPUUsage          *float64          `json:"cpu_usage,omitempty"`    // cores (from metrics-server)
-	MemoryUsage       *int64            `json:"memory_usage,omitempty"` // bytes (from metrics-server)
-	InternalIP        string            `json:"internal_ip,omitempty"`
-	ExternalIP        string            `json:"external_ip,omitempty"`
+	Name                        string            `json:"name"`
+	Status                      string            `json:"status"` // Ready, NotReady
+	Roles                       []string          `json:"roles,omitempty"`
+	Labels                      map[string]string `json:"labels,omitempty"`
+	KubeletVersion              string            `json:"kubelet_version,omitempty"`
+	ContainerRuntime            string            `json:"container_runtime,omitempty"`
+	OS                          string            `json:"os,omitempty"`
+	Architecture                string            `json:"architecture,omitempty"`
+	CPUCapacity                 int64             `json:"cpu_capacity"`                  // millicores
+	CPUAllocatable              int64             `json:"cpu_allocatable"`               // millicores
+	MemoryCapacity              int64             `json:"memory_capacity"`               // bytes
+	MemoryAllocatable           int64             `json:"memory_allocatable"`            // bytes
+	EphemeralStorageCapacity    int64             `json:"ephemeral_storage_capacity"`    // bytes
+	EphemeralStorageAllocatable int64             `json:"ephemeral_storage_allocatable"` // bytes
+	PodsCapacity                int64             `json:"pods_capacity"`
+	PodsCount                   int64             `json:"pods_count"`
+	Conditions                  map[string]bool   `json:"conditions,omitempty"`               // condition → true/false
+	CPUUsage                    *float64          `json:"cpu_usage,omitempty"`                // cores (from metrics-server)
+	MemoryUsage                 *int64            `json:"memory_usage,omitempty"`             // bytes (from metrics-server)
+	CPUUsageNanoseconds         *uint64           `json:"cpu_usage_ns,omitempty"`             // cumulative CPU nanoseconds (Kubelet summary)
+	MemoryWorkingSetBytes       *uint64           `json:"memory_working_set_bytes,omitempty"` // memory pressure indicator (Kubelet summary)
+	MemoryPageFaults            *uint64           `json:"memory_page_faults,omitempty"`       // cumulative page faults (Kubelet summary)
+	MemoryMajorPageFaults       *uint64           `json:"memory_major_page_faults,omitempty"` // cumulative major page faults (Kubelet summary)
+	FSUsedBytes                 *uint64           `json:"fs_used_bytes,omitempty"`            // filesystem used bytes (Kubelet summary)
+	FSCapacityBytes             *uint64           `json:"fs_capacity_bytes,omitempty"`        // filesystem capacity bytes (Kubelet summary)
+	ImageFSUsedBytes            *uint64           `json:"image_fs_used_bytes,omitempty"`      // container image layer disk usage (Kubelet summary)
+	ImageFSCapacityBytes        *uint64           `json:"image_fs_capacity_bytes,omitempty"`  // container image fs capacity (Kubelet summary)
+	NetworkRxBytes              *uint64           `json:"network_rx_bytes,omitempty"`         // cumulative network rx bytes (Kubelet summary)
+	NetworkTxBytes              *uint64           `json:"network_tx_bytes,omitempty"`         // cumulative network tx bytes (Kubelet summary)
+	InternalIP                  string            `json:"internal_ip,omitempty"`
+	ExternalIP                  string            `json:"external_ip,omitempty"`
 }
 
 // PodState represents a single Kubernetes pod.
@@ -61,21 +76,29 @@ type PodState struct {
 	Containers   []ContainerState  `json:"containers,omitempty"`
 	IP           string            `json:"ip,omitempty"`
 	QOSClass     string            `json:"qos_class,omitempty"`
+	Conditions   map[string]bool   `json:"conditions,omitempty"` // PodScheduled, ContainersReady, Initialized, Ready
 }
 
 // ContainerState represents a container within a pod.
 type ContainerState struct {
-	Name          string   `json:"name"`
-	Image         string   `json:"image,omitempty"`
-	Ready         bool     `json:"ready"`
-	RestartCount  int32    `json:"restart_count"`
-	Status        string   `json:"status"`                   // running, waiting, terminated
-	CPURequest    int64    `json:"cpu_request,omitempty"`    // millicores
-	CPULimit      int64    `json:"cpu_limit,omitempty"`      // millicores
-	MemoryRequest int64    `json:"memory_request,omitempty"` // bytes
-	MemoryLimit   int64    `json:"memory_limit,omitempty"`   // bytes
-	CPUUsage      *float64 `json:"cpu_usage,omitempty"`      // cores (metrics-server)
-	MemoryUsage   *int64   `json:"memory_usage,omitempty"`   // bytes (metrics-server)
+	Name                    string   `json:"name"`
+	Image                   string   `json:"image,omitempty"`
+	Ready                   bool     `json:"ready"`
+	RestartCount            int32    `json:"restart_count"`
+	Status                  string   `json:"status"`                              // running, waiting, terminated
+	CPURequest              int64    `json:"cpu_request,omitempty"`               // millicores
+	CPULimit                int64    `json:"cpu_limit,omitempty"`                 // millicores
+	MemoryRequest           int64    `json:"memory_request,omitempty"`            // bytes
+	MemoryLimit             int64    `json:"memory_limit,omitempty"`              // bytes
+	EphemeralStorageRequest int64    `json:"ephemeral_storage_request,omitempty"` // bytes
+	EphemeralStorageLimit   int64    `json:"ephemeral_storage_limit,omitempty"`   // bytes
+	CPUUsage                *float64 `json:"cpu_usage,omitempty"`                 // cores (metrics-server)
+	MemoryUsage             *int64   `json:"memory_usage,omitempty"`              // bytes (metrics-server)
+	MemoryWorkingSetBytes   *int64   `json:"memory_working_set_bytes,omitempty"`  // bytes (Kubelet summary — memory pressure indicator)
+	EphemeralStorageUsage   *int64   `json:"ephemeral_storage_usage,omitempty"`   // bytes (Kubelet summary: rootfs+logs)
+	// Last termination details (kube-state-metrics equivalent)
+	LastTerminationReason string `json:"last_termination_reason,omitempty"` // OOMKilled, Error, Completed, etc.
+	LastTerminationCode   *int32 `json:"last_termination_code,omitempty"`   // exit code of last terminated instance
 }
 
 // DeploymentStrategy represents the deployment strategy configuration.
@@ -107,6 +130,40 @@ type DeploymentState struct {
 	Selector            map[string]string     `json:"selector,omitempty"`
 	Generation          int64                 `json:"generation,omitempty"`
 	ObservedGeneration  int64                 `json:"observed_generation,omitempty"`
+}
+
+// HPAState represents a HorizontalPodAutoscaler resource.
+type HPAState struct {
+	Name            string            `json:"name"`
+	Namespace       string            `json:"namespace"`
+	ScaleTargetKind string            `json:"scale_target_kind"` // Deployment, StatefulSet, etc.
+	ScaleTargetName string            `json:"scale_target_name"`
+	MinReplicas     int32             `json:"min_replicas"`
+	MaxReplicas     int32             `json:"max_replicas"`
+	CurrentReplicas int32             `json:"current_replicas"`
+	DesiredReplicas int32             `json:"desired_replicas"`
+	Conditions      map[string]bool   `json:"conditions,omitempty"` // AbleToScale, ScalingActive, ScalingLimited
+	Labels          map[string]string `json:"labels,omitempty"`
+}
+
+// PDBState represents a PodDisruptionBudget resource.
+type PDBState struct {
+	Name               string            `json:"name"`
+	Namespace          string            `json:"namespace"`
+	CurrentHealthy     int32             `json:"current_healthy"`
+	DesiredHealthy     int32             `json:"desired_healthy"`
+	ExpectedPods       int32             `json:"expected_pods"`
+	DisruptionsAllowed int32             `json:"disruptions_allowed"`
+	Labels             map[string]string `json:"labels,omitempty"`
+}
+
+// PodLogEntry holds a tail of recent log lines for a single container.
+type PodLogEntry struct {
+	Namespace     string    `json:"namespace"`
+	PodName       string    `json:"pod_name"`
+	ContainerName string    `json:"container_name"`
+	Lines         []string  `json:"lines,omitempty"`
+	CollectedAt   time.Time `json:"collected_at"`
 }
 
 // ResourceQuotaUsage represents a single resource's used/hard values.
@@ -229,13 +286,47 @@ type KubeletSummary struct {
 // KubeletNodeStats holds node-level stats from the Kubelet summary.
 type KubeletNodeStats struct {
 	NodeName string               `json:"nodeName"`
+	CPU      *KubeletCPUStats     `json:"cpu,omitempty"`
+	Memory   *KubeletMemoryStats  `json:"memory,omitempty"`
 	Network  *KubeletNetworkStats `json:"network,omitempty"`
+	Fs       *KubeletFSStats      `json:"fs,omitempty"`
+	Runtime  *KubeletRuntimeStats `json:"runtime,omitempty"`
+}
+
+// KubeletRuntimeStats holds container runtime stats (image filesystem) from the Kubelet summary.
+type KubeletRuntimeStats struct {
+	ImageFs *KubeletFSStats `json:"imageFs,omitempty"`
+}
+
+// KubeletCPUStats holds CPU usage stats from the Kubelet summary.
+type KubeletCPUStats struct {
+	UsageNanoCores       *uint64 `json:"usageNanoCores,omitempty"`       // current CPU usage in nanocores
+	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"` // cumulative CPU nanoseconds
+}
+
+// KubeletMemoryStats holds memory stats from the Kubelet summary.
+type KubeletMemoryStats struct {
+	UsageBytes      *uint64 `json:"usageBytes,omitempty"`
+	WorkingSetBytes *uint64 `json:"workingSetBytes,omitempty"` // memory under active use (excludes reclaimable cache)
+	PageFaults      *uint64 `json:"pageFaults,omitempty"`
+	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
 }
 
 // KubeletPodStats holds per-pod stats from the Kubelet summary.
 type KubeletPodStats struct {
-	PodRef  KubeletPodRef        `json:"podRef"`
-	Network *KubeletNetworkStats `json:"network,omitempty"`
+	PodRef     KubeletPodRef           `json:"podRef"`
+	Network    *KubeletNetworkStats    `json:"network,omitempty"`
+	Containers []KubeletContainerStats `json:"containers,omitempty"`
+}
+
+// KubeletContainerStats holds per-container stats from the Kubelet summary.
+// Ephemeral storage usage = Rootfs.UsedBytes + Logs.UsedBytes.
+type KubeletContainerStats struct {
+	Name   string              `json:"name"`
+	CPU    *KubeletCPUStats    `json:"cpu,omitempty"`
+	Memory *KubeletMemoryStats `json:"memory,omitempty"`
+	Rootfs *KubeletFSStats     `json:"rootfs,omitempty"`
+	Logs   *KubeletFSStats     `json:"logs,omitempty"`
 }
 
 // KubeletPodRef identifies a pod in the Kubelet summary response.
@@ -256,4 +347,11 @@ type KubeletInterfaceStats struct {
 	TxBytes  *uint64 `json:"txBytes,omitempty"`
 	RxErrors *uint64 `json:"rxErrors,omitempty"`
 	TxErrors *uint64 `json:"txErrors,omitempty"`
+}
+
+// KubeletFSStats holds filesystem statistics from the Kubelet summary API.
+type KubeletFSStats struct {
+	CapacityBytes  *uint64 `json:"capacityBytes,omitempty"`
+	UsedBytes      *uint64 `json:"usedBytes,omitempty"`
+	AvailableBytes *uint64 `json:"availableBytes,omitempty"`
 }

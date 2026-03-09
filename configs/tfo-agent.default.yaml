@@ -235,6 +235,11 @@ collectors:
     network: true         # Network bytes per namespace (Kubelet Summary API)
     # Fetch actual CPU/Memory usage from metrics-server
     metrics_api: true
+    hpa: true             # HorizontalPodAutoscaler (current/desired replicas + conditions)
+    pdb: true             # PodDisruptionBudget (healthy/desired/disruptions allowed)
+    pod_logs: true        # Collect recent log lines from each running container
+    pod_logs_tail_lines: 100     # Log lines per container per collection cycle
+    pod_logs_namespaces: []      # Restrict pod log collection to these namespaces (empty = same as namespace filter)
     # Sync resource state to TFO backend (PostgreSQL entities)
     sync_to_backend: true
     sync_interval: 60s

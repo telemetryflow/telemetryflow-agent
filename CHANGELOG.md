@@ -24,7 +24,7 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.8] - 2026-03-08
+## [1.1.8] - 2026-03-09
 
 ### Added
 
@@ -43,11 +43,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Host filesystem paths checked both directly and under `TELEMETRYFLOW_HOST_ROOT` prefix — detection works correctly inside DaemonSet containers
   - Returns `(false, "")` when not running in a Kubernetes environment at all
   - New `IsKubernetes bool` and `K8sProvider string` fields added to `collector.SystemInfo` struct
+- **HPA Sub-collector (`collectors.kubernetes.hpa: true`)**: HorizontalPodAutoscaler monitoring
+  - 5 new metrics: `k8s.hpa.min_replicas`, `k8s.hpa.max_replicas`, `k8s.hpa.current_replicas`, `k8s.hpa.desired_replicas`, `k8s.hpa.condition`
+  - Condition types: `AbleToScale`, `ScalingActive`, `ScalingLimited` — emitted as `1` (True) / `0` (False/Unknown)
+  - Labels: `namespace`, `hpa`, `target_kind`, `target_name`
+- **PDB Sub-collector (`collectors.kubernetes.pdb: true`)**: PodDisruptionBudget health monitoring
+  - 4 new metrics: `k8s.pdb.pods_healthy`, `k8s.pdb.pods_desired`, `k8s.pdb.disruptions_allowed`, `k8s.pdb.expected_pods`
+  - Labels: `namespace`, `pdb`
+  - RBAC: `policy` apiGroup with `poddisruptionbudgets` resource added to ClusterRole
+- **Pod Log Collection (`collectors.kubernetes.pod_logs: true`)**: Tail-based container log collection from the Kubernetes API
+  - Collects last N lines (`pod_logs_tail_lines`, default 100) per running container per cycle
+  - Optional namespace allowlist via `pod_logs_namespaces` (empty = same as `namespace_filter`)
+  - Emits `PodLogEntry` records: `timestamp`, `namespace`, `pod`, `container`, `log_line`
+  - Respects the existing `namespace_filter` / `exclude_namespaces` config
+- **Kubelet `/stats/summary` Expansion**: Extended Kubelet summary scraping with container-level and node-level data
+  - **Container ephemeral storage**: `k8s.pod.container.ephemeral_storage.usage` and `k8s.pod.container.ephemeral_storage.limit` (bytes)
+  - **Container memory working set**: `k8s.pod.container.memory.working_set` (bytes, matches `kubectl top`)
+  - **Node-level network I/O** via Kubelet summary: namespace-level `k8s.network.rx_bytes` / `k8s.network.tx_bytes` (existing `network: true` flag)
+- **Collector Documentation (`docs/collectors/`)**: 17 new reference documents covering every collector and sub-collector
+  - Kubernetes: NODES, PODS, DEPLOYMENTS, WORKLOADS, STORAGE, NETWORK, HPA, PDB, EVENTS, RESOURCE-COUNTS, POD-LOGS
+  - Host: NODE-EXPORTER (50+ metrics), SYSTEM (14 metrics + SystemInfo heartbeat fields)
+  - Container: DOCKER (24 metrics), CADVISOR (Prometheus scraper)
+  - Kernel: EBPF (20 metrics, 7 sub-collectors)
+  - `README.md` index with data source table and metric naming conventions
 
 ### Changed
 
 - **`internal/agent/agent.go`**: Replaced inline `uuid.New()` call with `ResolveAgentID(cfg.Agent.ID, cfg.Agent.Hostname, logger)` from the new identity module
 - **`deploy/kubernetes/daemonset.yaml`**: Added `HOST_PROC`, `HOST_ETC`, `HOST_SYS`, `HOST_VAR`, `HOST_RUN` environment variables so that `gopsutil` reads `/etc/machine-id` and other identity files from the **host node** rather than the container image — required for a stable `HostID` in the fingerprint
+- **Config files updated** — all YAML configs now include `hpa`, `pdb`, `pod_logs`, `pod_logs_tail_lines`, `pod_logs_namespaces` under `collectors.kubernetes`:
+  - `configs/tfo-agent.yaml`
+  - `configs/tfo-agent.default.yaml`
+  - `deploy/helm/tfo-agent/values.yaml` (both `config` and `kubernetes.config` sections)
+- **RBAC ClusterRole** (`deploy/helm/tfo-agent/templates/clusterrole.yaml`): Added `policy` apiGroup rule for `poddisruptionbudgets` (required by PDB sub-collector)
 
 ### Fixed
 
@@ -411,8 +439,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                       |
 | ------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| 1.1.8   | 2026-03-08 | v1.40.0  | Go 1.26.0 upgrade, OTEL SDK v1.40.0, Helm deployment for Kubernetes Cluster                                       |
-| 1.1.7   | 2026-03-04 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
+| 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs |
+| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
 | 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                   |
 | 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                              |
 | 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                |

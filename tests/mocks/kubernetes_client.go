@@ -3,8 +3,10 @@ package mocks
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -46,6 +48,10 @@ func NewFakeClientset() *fake.Clientset {
 		fakeIngress("default", "app-ingress"),
 		// ResourceQuotas
 		fakeResourceQuota("default", "default-quota"),
+		// HorizontalPodAutoscalers
+		fakeHPA("default", "app-hpa", "Deployment", "app", 2, 5, 3, 3),
+		// PodDisruptionBudgets
+		fakePDB("default", "app-pdb", 3, 3, 1, 3),
 	)
 }
 
@@ -354,6 +360,47 @@ func fakeResourceQuota(namespace, name string) *corev1.ResourceQuota {
 				corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
 				corev1.ResourcePods:           resource.MustParse("5"),
 			},
+		},
+	}
+}
+
+func fakeHPA(namespace, name, targetKind, targetName string, minR, maxR, currentR, desiredR int32) *autoscalingv2.HorizontalPodAutoscaler {
+	return &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				Kind: targetKind,
+				Name: targetName,
+			},
+			MinReplicas: &minR,
+			MaxReplicas: maxR,
+		},
+		Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+			CurrentReplicas: currentR,
+			DesiredReplicas: desiredR,
+			Conditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: "True"},
+				{Type: autoscalingv2.ScalingActive, Status: "True"},
+				{Type: autoscalingv2.ScalingLimited, Status: "False"},
+			},
+		},
+	}
+}
+
+func fakePDB(namespace, name string, currentHealthy, desiredHealthy, disruptionsAllowed, expectedPods int32) *policyv1.PodDisruptionBudget {
+	return &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Status: policyv1.PodDisruptionBudgetStatus{
+			CurrentHealthy:     currentHealthy,
+			DesiredHealthy:     desiredHealthy,
+			DisruptionsAllowed: disruptionsAllowed,
+			ExpectedPods:       expectedPods,
 		},
 	}
 }

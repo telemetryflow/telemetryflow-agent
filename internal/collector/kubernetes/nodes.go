@@ -17,6 +17,7 @@ func collectNodes(
 	ctx context.Context,
 	cs kubernetes.Interface,
 	mc metricsv.Interface,
+	kubeletFetcher KubeletStatsFetcher,
 	cfg Config,
 	cluster string,
 	logger *zap.Logger,
@@ -52,6 +53,8 @@ func collectNodes(
 		cpuAlloc := parseCPU(*node.Status.Allocatable.Cpu())
 		memCap := parseMemory(*node.Status.Capacity.Memory())
 		memAlloc := parseMemory(*node.Status.Allocatable.Memory())
+		ephStorCap := node.Status.Capacity.StorageEphemeral().Value()
+		ephStorAlloc := node.Status.Allocatable.StorageEphemeral().Value()
 		podsCap := node.Status.Capacity.Pods().Value()
 
 		// Count pods on this node
@@ -74,6 +77,12 @@ func collectNodes(
 			collector.NewMetric("k8s.node.memory.allocatable", float64(memAlloc), collector.MetricTypeGauge).
 				WithLabels(labels).WithUnit("bytes").
 				WithDescription("Allocatable memory in bytes"),
+			collector.NewMetric("k8s.node.ephemeral_storage.capacity", float64(ephStorCap), collector.MetricTypeGauge).
+				WithLabels(labels).WithUnit("bytes").
+				WithDescription("Node ephemeral storage capacity in bytes"),
+			collector.NewMetric("k8s.node.ephemeral_storage.allocatable", float64(ephStorAlloc), collector.MetricTypeGauge).
+				WithLabels(labels).WithUnit("bytes").
+				WithDescription("Allocatable ephemeral storage in bytes"),
 			collector.NewMetric("k8s.node.pods.capacity", float64(podsCap), collector.MetricTypeGauge).
 				WithLabels(labels).
 				WithDescription("Maximum pods capacity"),
@@ -109,23 +118,25 @@ func collectNodes(
 
 		// --- State ---
 		state := NodeState{
-			Name:              node.Name,
-			Status:            readyString(ready),
-			Roles:             roles,
-			Labels:            node.Labels,
-			KubeletVersion:    node.Status.NodeInfo.KubeletVersion,
-			ContainerRuntime:  node.Status.NodeInfo.ContainerRuntimeVersion,
-			OS:                node.Status.NodeInfo.OSImage,
-			Architecture:      node.Status.NodeInfo.Architecture,
-			CPUCapacity:       cpuCap,
-			CPUAllocatable:    cpuAlloc,
-			MemoryCapacity:    memCap,
-			MemoryAllocatable: memAlloc,
-			PodsCapacity:      podsCap,
-			PodsCount:         int64(podsCount),
-			Conditions:        conditions,
-			InternalIP:        internalIP,
-			ExternalIP:        externalIP,
+			Name:                        node.Name,
+			Status:                      readyString(ready),
+			Roles:                       roles,
+			Labels:                      node.Labels,
+			KubeletVersion:              node.Status.NodeInfo.KubeletVersion,
+			ContainerRuntime:            node.Status.NodeInfo.ContainerRuntimeVersion,
+			OS:                          node.Status.NodeInfo.OSImage,
+			Architecture:                node.Status.NodeInfo.Architecture,
+			CPUCapacity:                 cpuCap,
+			CPUAllocatable:              cpuAlloc,
+			MemoryCapacity:              memCap,
+			MemoryAllocatable:           memAlloc,
+			EphemeralStorageCapacity:    ephStorCap,
+			EphemeralStorageAllocatable: ephStorAlloc,
+			PodsCapacity:                podsCap,
+			PodsCount:                   int64(podsCount),
+			Conditions:                  conditions,
+			InternalIP:                  internalIP,
+			ExternalIP:                  externalIP,
 		}
 
 		// Metrics-server usage
@@ -143,6 +154,87 @@ func collectNodes(
 					WithLabels(labels).WithUnit("bytes").
 					WithDescription("Actual memory usage from metrics-server"),
 			)
+		}
+
+		// Enrich with Kubelet summary (CPU ns, memory working set, filesystem, imageFs, network)
+		if kubeletFetcher != nil {
+			if summary, err := kubeletFetcher(ctx, node.Name); err == nil && summary != nil {
+				// CPU nanoseconds (cumulative — use for rate calculations)
+				if summary.Node.CPU != nil {
+					if summary.Node.CPU.UsageCoreNanoSeconds != nil {
+						state.CPUUsageNanoseconds = summary.Node.CPU.UsageCoreNanoSeconds
+						metrics = append(metrics,
+							collector.NewMetric("k8s.node.cpu.usage_nanoseconds", float64(*summary.Node.CPU.UsageCoreNanoSeconds), collector.MetricTypeCounter).
+								WithLabels(labels).WithUnit("ns").
+								WithDescription("Cumulative CPU usage in nanoseconds from Kubelet summary"),
+						)
+					}
+				}
+				// Memory working set (better pressure indicator than RSS)
+				if summary.Node.Memory != nil {
+					if summary.Node.Memory.WorkingSetBytes != nil {
+						state.MemoryWorkingSetBytes = summary.Node.Memory.WorkingSetBytes
+						metrics = append(metrics,
+							collector.NewMetric("k8s.node.memory.working_set", float64(*summary.Node.Memory.WorkingSetBytes), collector.MetricTypeGauge).
+								WithLabels(labels).WithUnit("bytes").
+								WithDescription("Node memory working set bytes from Kubelet summary (excludes reclaimable cache)"),
+						)
+					}
+					if summary.Node.Memory.PageFaults != nil {
+						state.MemoryPageFaults = summary.Node.Memory.PageFaults
+					}
+					if summary.Node.Memory.MajorPageFaults != nil {
+						state.MemoryMajorPageFaults = summary.Node.Memory.MajorPageFaults
+					}
+				}
+				// Root filesystem usage
+				if summary.Node.Fs != nil {
+					state.FSUsedBytes = summary.Node.Fs.UsedBytes
+					state.FSCapacityBytes = summary.Node.Fs.CapacityBytes
+					if summary.Node.Fs.UsedBytes != nil {
+						metrics = append(metrics,
+							collector.NewMetric("k8s.node.filesystem.usage", float64(*summary.Node.Fs.UsedBytes), collector.MetricTypeGauge).
+								WithLabels(labels).WithUnit("bytes").
+								WithDescription("Node filesystem used bytes from Kubelet summary"),
+						)
+					}
+				}
+				// Container image filesystem (image layer disk usage)
+				if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil {
+					imgFs := summary.Node.Runtime.ImageFs
+					state.ImageFSUsedBytes = imgFs.UsedBytes
+					state.ImageFSCapacityBytes = imgFs.CapacityBytes
+					if imgFs.UsedBytes != nil {
+						metrics = append(metrics,
+							collector.NewMetric("k8s.node.image_filesystem.usage", float64(*imgFs.UsedBytes), collector.MetricTypeGauge).
+								WithLabels(labels).WithUnit("bytes").
+								WithDescription("Container image layer disk usage from Kubelet summary"),
+						)
+					}
+				}
+				// Node-level network I/O (sum all interfaces)
+				if summary.Node.Network != nil {
+					var totalRx, totalTx uint64
+					for _, iface := range summary.Node.Network.Interfaces {
+						if iface.RxBytes != nil {
+							totalRx += *iface.RxBytes
+						}
+						if iface.TxBytes != nil {
+							totalTx += *iface.TxBytes
+						}
+					}
+					state.NetworkRxBytes = &totalRx
+					state.NetworkTxBytes = &totalTx
+					totalIO := totalRx + totalTx
+					metrics = append(metrics,
+						collector.NewMetric("k8s.node.network.io", float64(totalIO), collector.MetricTypeGauge).
+							WithLabels(labels).WithUnit("bytes").
+							WithDescription("Node total network I/O bytes (rx+tx cumulative) from Kubelet summary"),
+					)
+				}
+			} else if err != nil {
+				logger.Debug("Failed to fetch kubelet stats for node", zap.String("node", node.Name), zap.Error(err))
+			}
 		}
 
 		states = append(states, state)

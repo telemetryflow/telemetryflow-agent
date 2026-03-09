@@ -263,6 +263,11 @@ kubernetes:
         resource_counts: true
         network: true
         metrics_api: true
+        hpa: true
+        pdb: true
+        pod_logs: true
+        pod_logs_tail_lines: 100
+        pod_logs_namespaces: []
         exclude_namespaces:
           - kube-system
 

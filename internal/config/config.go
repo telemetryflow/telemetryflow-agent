@@ -438,6 +438,21 @@ type KubernetesCollectorConfig struct {
 	// Required when SyncToBackend is true. Obtain by registering the cluster via
 	// POST /api/v2/monitoring/kubernetes/clusters.
 	ClusterID string `mapstructure:"cluster_id"`
+
+	// HPA enables HorizontalPodAutoscaler collection (current/desired replicas, conditions)
+	HPA bool `mapstructure:"hpa"`
+
+	// PDB enables PodDisruptionBudget collection (healthy/desired/disruptions allowed)
+	PDB bool `mapstructure:"pdb"`
+
+	// PodLogs enables collecting a tail of logs from each running container
+	PodLogs bool `mapstructure:"pod_logs"`
+
+	// PodLogsTailLines is the number of recent log lines to collect per container (default 100)
+	PodLogsTailLines int64 `mapstructure:"pod_logs_tail_lines"`
+
+	// PodLogsNamespaces restricts log collection to specific namespaces (empty = same as Namespaces filter)
+	PodLogsNamespaces []string `mapstructure:"pod_logs_namespaces"`
 }
 
 // SystemCollectorConfig contains system metrics collector settings
@@ -1688,6 +1703,10 @@ func DefaultConfig() *Config {
 				ResourceCounts:    true,
 				Network:           true,
 				MetricsAPI:        true,
+				HPA:               true,
+				PDB:               true,
+				PodLogs:           true,
+				PodLogsTailLines:  100,
 				SyncToBackend:     true,
 				SyncInterval:      60 * time.Second,
 				ExcludeNamespaces: []string{"kube-system"},

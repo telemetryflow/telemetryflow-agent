@@ -157,7 +157,7 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 
 	// --- Nodes ---
 	if k.cfg.Nodes {
-		metrics, nodes, err := collectNodes(ctx, k.clientset, k.metricsClient, k.cfg, k.cfg.ClusterName, k.logger)
+		metrics, nodes, err := collectNodes(ctx, k.clientset, k.metricsClient, k.kubeletFetcher, k.cfg, k.cfg.ClusterName, k.logger)
 		if err != nil {
 			k.logger.Warn("Failed to collect node metrics", zap.Error(err))
 		} else {
@@ -168,7 +168,7 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 
 	// --- Pods ---
 	if k.cfg.Pods {
-		metrics, pods, err := collectPods(ctx, k.clientset, k.metricsClient, k.cfg, k.cfg.ClusterName, k.logger)
+		metrics, pods, err := collectPods(ctx, k.clientset, k.metricsClient, k.kubeletFetcher, k.cfg, k.cfg.ClusterName, k.logger)
 		if err != nil {
 			k.logger.Warn("Failed to collect pod metrics", zap.Error(err))
 		} else {
@@ -256,6 +256,38 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		} else {
 			allMetrics = append(allMetrics, metrics...)
 			state.ResourceCounts = counts
+		}
+	}
+
+	// --- HPA ---
+	if k.cfg.HPA {
+		metrics, hpas, err := collectHPAs(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect HPA metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, metrics...)
+			state.HPAs = hpas
+		}
+	}
+
+	// --- PodDisruptionBudgets ---
+	if k.cfg.PDB {
+		metrics, pdbs, err := collectPDBs(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect PDB metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, metrics...)
+			state.PDBs = pdbs
+		}
+	}
+
+	// --- Pod Logs ---
+	if k.cfg.PodLogs {
+		logs, err := collectPodLogs(ctx, k.clientset, k.cfg, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect pod logs", zap.Error(err))
+		} else {
+			state.PodLogs = logs
 		}
 	}
 

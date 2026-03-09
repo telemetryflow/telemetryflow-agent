@@ -27,6 +27,8 @@ func testConfig() config.KubernetesCollectorConfig {
 		Workloads:         true,
 		Events:            true,
 		ResourceCounts:    true,
+		HPA:               true,
+		PDB:               true,
 		MetricsAPI:        false, // No metrics-server in tests
 		SyncToBackend:     false,
 		SyncInterval:      60 * time.Second,
@@ -133,6 +135,19 @@ func TestKubernetesCollectorCollect(t *testing.T) {
 	assert.True(t, metricNames["k8s.secret.count"], "expected k8s.secret.count metric")
 	assert.True(t, metricNames["k8s.configmap.count"], "expected k8s.configmap.count metric")
 	assert.True(t, metricNames["k8s.ingress.count"], "expected k8s.ingress.count metric")
+
+	// HPA metrics
+	assert.True(t, metricNames["k8s.hpa.replicas.min"], "expected k8s.hpa.replicas.min metric")
+	assert.True(t, metricNames["k8s.hpa.replicas.max"], "expected k8s.hpa.replicas.max metric")
+	assert.True(t, metricNames["k8s.hpa.replicas.current"], "expected k8s.hpa.replicas.current metric")
+	assert.True(t, metricNames["k8s.hpa.replicas.desired"], "expected k8s.hpa.replicas.desired metric")
+	assert.True(t, metricNames["k8s.hpa.condition"], "expected k8s.hpa.condition metric")
+
+	// PDB metrics
+	assert.True(t, metricNames["k8s.pdb.pods.current_healthy"], "expected k8s.pdb.pods.current_healthy metric")
+	assert.True(t, metricNames["k8s.pdb.pods.desired_healthy"], "expected k8s.pdb.pods.desired_healthy metric")
+	assert.True(t, metricNames["k8s.pdb.pods.expected"], "expected k8s.pdb.pods.expected metric")
+	assert.True(t, metricNames["k8s.pdb.disruptions_allowed"], "expected k8s.pdb.disruptions_allowed metric")
 }
 
 func TestKubernetesCollectorLastClusterState(t *testing.T) {
@@ -157,6 +172,8 @@ func TestKubernetesCollectorLastClusterState(t *testing.T) {
 	assert.NotEmpty(t, state.ResourceCounts.Secrets)
 	assert.NotEmpty(t, state.ResourceCounts.ConfigMaps)
 	assert.NotEmpty(t, state.ResourceCounts.Ingresses)
+	assert.NotEmpty(t, state.HPAs, "expected HPA state entries")
+	assert.NotEmpty(t, state.PDBs, "expected PDB state entries")
 }
 
 func TestKubernetesCollectorNamespaceExclusion(t *testing.T) {
