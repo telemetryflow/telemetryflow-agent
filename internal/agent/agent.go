@@ -1,4 +1,22 @@
-// Package agent provides the core agent lifecycle management.
+// Package agent implements the core TelemetryFlow Agent lifecycle.
+// It orchestrates all collectors, exporters, the API client, Kubernetes
+// sync, heartbeat, and the optional Prometheus /metrics endpoint.
+//
+// TelemetryFlow Agent - Community Enterprise Observability Platform
+// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Open Source Software built by DevOpsCorner Indonesia.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package agent
 
 import (
@@ -17,9 +35,11 @@ import (
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
+	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 )
 
@@ -221,6 +241,81 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 			Logger:      logger,
 		})
 		collectors = append(collectors, sysCollector)
+	}
+
+	// Add Prometheus Scraper collector if enabled
+	if cfg.Collector.PrometheusScraper.Enabled {
+		scraperCfg := scraper.ScraperConfig{
+			Enabled: cfg.Collector.PrometheusScraper.Enabled,
+		}
+		for _, j := range cfg.Collector.PrometheusScraper.ScrapeJobs {
+			job := scraper.ScrapeJobConfig{
+				JobName:         j.JobName,
+				Enabled:         j.Enabled,
+				Targets:         j.StaticTargets,
+				ScrapeInterval:  j.ScrapeInterval,
+				ScrapePath:      j.ScrapePath,
+				ScrapeTimeout:   j.ScrapeTimeout,
+				HonorLabels:     j.HonorLabels,
+				BearerToken:     j.BearerToken,
+				BearerTokenFile: j.BearerTokenFile,
+				TLSConfig: scraper.TLSConfig{
+					InsecureSkipVerify: j.TLSConfig.SkipVerify,
+					CAFile:             j.TLSConfig.CAFile,
+					CertFile:           j.TLSConfig.CertFile,
+					KeyFile:            j.TLSConfig.KeyFile,
+				},
+			}
+			if j.BasicAuth != nil {
+				job.BasicAuth = &scraper.BasicAuthConfig{
+					Username: j.BasicAuth.Username,
+					Password: j.BasicAuth.Password,
+				}
+			}
+			for _, r := range j.RelabelConfigs {
+				job.RelabelConfigs = append(job.RelabelConfigs, scraper.RelabelConfig{
+					SourceLabels: r.SourceLabels,
+					Regex:        r.Regex,
+					TargetLabel:  r.TargetLabel,
+					Replacement:  r.Replacement,
+					Action:       r.Action,
+				})
+			}
+			scraperCfg.Jobs = append(scraperCfg.Jobs, job)
+		}
+		scraperCollector := scraper.NewPrometheusScraperCollector(scraperCfg, logger)
+		collectors = append(collectors, scraperCollector)
+		logger.Info("Prometheus scraper collector enabled",
+			zap.Int("jobs", len(scraperCfg.Jobs)),
+		)
+	}
+
+	// Add Remote Write Receiver collector if enabled
+	if cfg.Collector.RemoteWriteReceiver.Enabled {
+		rwCfg := remotewrite.RemoteWriteReceiverConfig{
+			Enabled:    cfg.Collector.RemoteWriteReceiver.Enabled,
+			Port:       cfg.Collector.RemoteWriteReceiver.Port,
+			BufferSize: cfg.Collector.RemoteWriteReceiver.BufferSize,
+		}
+		if cfg.Collector.RemoteWriteReceiver.BasicAuth != nil {
+			rwCfg.BasicAuth = &remotewrite.BasicAuthConfig{
+				Username: cfg.Collector.RemoteWriteReceiver.BasicAuth.Username,
+				Password: cfg.Collector.RemoteWriteReceiver.BasicAuth.Password,
+			}
+		}
+		if cfg.Collector.RemoteWriteReceiver.TLS != nil {
+			rwCfg.TLS = &remotewrite.TLSConfig{
+				InsecureSkipVerify: cfg.Collector.RemoteWriteReceiver.TLS.SkipVerify,
+				CAFile:             cfg.Collector.RemoteWriteReceiver.TLS.CAFile,
+				CertFile:           cfg.Collector.RemoteWriteReceiver.TLS.CertFile,
+				KeyFile:            cfg.Collector.RemoteWriteReceiver.TLS.KeyFile,
+			}
+		}
+		rwReceiver := remotewrite.NewRemoteWriteReceiver(rwCfg, logger)
+		collectors = append(collectors, rwReceiver)
+		logger.Info("Remote write receiver enabled",
+			zap.Int("port", rwCfg.Port),
+		)
 	}
 
 	// Create Prometheus metrics server if enabled

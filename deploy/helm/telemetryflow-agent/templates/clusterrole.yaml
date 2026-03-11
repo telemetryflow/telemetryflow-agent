@@ -12,6 +12,7 @@ rules:
       - nodes
       - nodes/metrics
       - nodes/stats
+      - nodes/proxy
       - pods
       - namespaces
       - services

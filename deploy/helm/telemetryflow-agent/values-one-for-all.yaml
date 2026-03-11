@@ -1,0 +1,50 @@
+# TFO-Agent One-For-All Preset
+# Usage: helm install tfo-agent ./deploy/helm/tfo-agent -f values-one-for-all.yaml
+
+oneForAll:
+  enabled: true
+
+nodeCollectorResources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+kubernetesCollector:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+config:
+  collectors:
+    node_exporter:
+      enabled: true
+
+    kubernetes:
+      enabled: false  # overridden to true in kubernetes.config section below
+
+    prometheus_scraper:
+      enabled: true
+      scrape_jobs: []  # user fills in their targets
+
+    remote_write_receiver:
+      enabled: true
+      port: 9091
+
+kubernetes:
+  config:
+    collectors:
+      kubernetes:
+        enabled: true
+        resource_quotas: true
+        limit_ranges: true
+        pod_conditions: true
+        node_taints: true
+        workload_generations: true
+        metrics_api: true

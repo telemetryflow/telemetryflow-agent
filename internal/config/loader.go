@@ -1,3 +1,22 @@
+// Package config defines the complete agent configuration structure and provides
+// Viper-based loading from YAML files and TFAGENT_ environment variables, with
+// sensible defaults for every field.
+//
+// TelemetryFlow Agent - Community Enterprise Observability Platform
+// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Open Source Software built by DevOpsCorner Indonesia.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package config
 
 import (
@@ -90,6 +109,18 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 		if err == nil {
 			cfg.Agent.Hostname = hostname
 		}
+	}
+
+	// Apply one_for_all shorthand: when enabled, set all sub-feature flags to true
+	if cfg.OneForAll.Enabled {
+		cfg.Collector.Kubernetes.ResourceQuotas = true
+		cfg.Collector.Kubernetes.LimitRanges = true
+		cfg.Collector.Kubernetes.PodConditions = true
+		cfg.Collector.Kubernetes.NodeTaints = true
+		cfg.Collector.Kubernetes.WorkloadGenerations = true
+		cfg.Collector.Kubernetes.MetricsAPI = true
+		cfg.Collector.PrometheusScraper.Enabled = true
+		cfg.Collector.RemoteWriteReceiver.Enabled = true
 	}
 
 	// Validate configuration

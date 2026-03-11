@@ -32,7 +32,7 @@ spec:
       automountServiceAccountToken: true
       hostNetwork: {{ .Values.hostNetwork }}
       dnsPolicy: {{ .Values.dnsPolicy }}
-      priorityClassName: system-node-critical
+      priorityClassName: {{ .Values.priorityClassName | default "system-node-critical" | quote }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -162,6 +162,9 @@ spec:
               mountPath: /host/rootfs
               readOnly: true
               mountPropagation: HostToContainer
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: config
           configMap:
@@ -179,6 +182,9 @@ spec:
         - name: rootfs
           hostPath:
             path: /
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

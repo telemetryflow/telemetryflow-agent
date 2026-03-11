@@ -35,6 +35,7 @@ rules:
       - persistentvolumes
       - persistentvolumeclaims
       - resourcequotas
+      - limitranges
       - configmaps
       - secrets
     verbs: ["get", "list", "watch"]

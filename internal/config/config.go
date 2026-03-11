@@ -1,4 +1,22 @@
-// Package config provides configuration management for the TelemetryFlow agent.
+// Package config defines the complete agent configuration structure and provides
+// Viper-based loading from YAML files and TFAGENT_ environment variables, with
+// sensible defaults for every field.
+//
+// TelemetryFlow Agent - Community Enterprise Observability Platform
+// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Open Source Software built by DevOpsCorner Indonesia.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package config
 
 import (
@@ -22,6 +40,9 @@ type Config struct {
 	Cache            CacheConfig            `mapstructure:"cache"`
 	Integrations     IntegrationsConfig     `mapstructure:"integrations"`
 	PrometheusServer PrometheusServerConfig `mapstructure:"prometheus_server"`
+
+	// OneForAll is a shorthand to enable all four new capabilities
+	OneForAll OneForAllConfig `mapstructure:"one_for_all"`
 
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
@@ -208,6 +229,12 @@ type CollectorConfig struct {
 
 	// System contains system metrics collector settings
 	System SystemCollectorConfig `mapstructure:"system"`
+
+	// PrometheusScraper contains Prometheus pull-based scraper settings
+	PrometheusScraper PrometheusScraperConfig `mapstructure:"prometheus_scraper"`
+
+	// RemoteWriteReceiver contains Prometheus remote_write push receiver settings
+	RemoteWriteReceiver RemoteWriteReceiverConfig `mapstructure:"remote_write_receiver"`
 }
 
 // CAdvisorCollectorConfig contains cAdvisor Prometheus scraper collector settings.
@@ -453,6 +480,24 @@ type KubernetesCollectorConfig struct {
 
 	// PodLogsNamespaces restricts log collection to specific namespaces (empty = same as Namespaces filter)
 	PodLogsNamespaces []string `mapstructure:"pod_logs_namespaces"`
+
+	// ResourceQuotas enables ResourceQuota metrics collection
+	ResourceQuotas bool `mapstructure:"resource_quotas"`
+
+	// LimitRanges enables LimitRange metrics collection
+	LimitRanges bool `mapstructure:"limit_ranges"`
+
+	// PodConditions enables per-pod condition metrics
+	PodConditions bool `mapstructure:"pod_conditions"`
+
+	// NodeTaints enables per-node taint metrics
+	NodeTaints bool `mapstructure:"node_taints"`
+
+	// WorkloadGenerations enables Deployment/StatefulSet generation metrics
+	WorkloadGenerations bool `mapstructure:"workload_generations"`
+
+	// KubeletInsecureSkipVerify skips TLS verification for Kubelet connections
+	KubeletInsecureSkipVerify bool `mapstructure:"kubelet_insecure_skip_verify"`
 }
 
 // SystemCollectorConfig contains system metrics collector settings
@@ -2028,6 +2073,86 @@ func DefaultConfig() *Config {
 			Custom: []CustomIntegration{},
 		},
 	}
+}
+
+// =============================================================================
+// Prometheus Scraper Configuration
+// =============================================================================
+
+// PrometheusScraperConfig contains Prometheus pull-based scraper settings
+type PrometheusScraperConfig struct {
+	// Enabled enables the Prometheus scraper collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// ScrapeJobs is the list of named scrape jobs
+	ScrapeJobs []ScrapeJobConfig `mapstructure:"scrape_jobs"`
+}
+
+// ScrapeJobConfig contains configuration for a single named scrape job
+type ScrapeJobConfig struct {
+	// JobName is the name of the scrape job
+	JobName string `mapstructure:"job_name"`
+
+	// Enabled enables this scrape job
+	Enabled bool `mapstructure:"enabled"`
+
+	// StaticTargets is the list of static scrape targets (host:port)
+	StaticTargets []string `mapstructure:"static_targets"`
+
+	// ScrapeInterval is the interval between scrapes
+	ScrapeInterval time.Duration `mapstructure:"scrape_interval"`
+
+	// ScrapePath is the HTTP path to scrape (default: /metrics)
+	ScrapePath string `mapstructure:"scrape_path"`
+
+	// ScrapeTimeout is the HTTP scrape timeout
+	ScrapeTimeout time.Duration `mapstructure:"scrape_timeout"`
+
+	// HonorLabels preserves existing job/instance labels from the target
+	HonorLabels bool `mapstructure:"honor_labels"`
+
+	// BasicAuth contains HTTP basic authentication settings
+	BasicAuth *BasicAuthConfig `mapstructure:"basic_auth"`
+
+	// BearerToken is a static bearer token for authentication
+	BearerToken string `mapstructure:"bearer_token"`
+
+	// BearerTokenFile is the path to a file containing the bearer token
+	BearerTokenFile string `mapstructure:"bearer_token_file"`
+
+	// TLSConfig contains TLS settings for the scrape HTTP client
+	TLSConfig TLSConfig `mapstructure:"tls_config"`
+
+	// RelabelConfigs is the list of metric relabeling rules applied after scraping
+	RelabelConfigs []RelabelConfig `mapstructure:"metric_relabel_configs"`
+}
+
+// =============================================================================
+// Remote Write Receiver Configuration
+// =============================================================================
+
+// RemoteWriteReceiverConfig contains Prometheus remote_write push receiver settings
+type RemoteWriteReceiverConfig struct {
+	// Enabled enables the remote write receiver HTTP server
+	Enabled bool `mapstructure:"enabled"`
+
+	// Port is the HTTP port for the remote write receiver (default: 9091)
+	Port int `mapstructure:"port"`
+
+	// BasicAuth contains optional HTTP basic authentication settings
+	BasicAuth *BasicAuthConfig `mapstructure:"basic_auth"`
+
+	// TLS contains optional TLS settings for the receiver HTTP server
+	TLS *TLSConfig `mapstructure:"tls"`
+
+	// BufferSize is the internal metrics channel buffer size (default: 10000)
+	BufferSize int `mapstructure:"buffer_size"`
+}
+
+// OneForAllConfig is a shorthand that enables all four new capabilities
+// with sensible defaults. Individual sections override these defaults.
+type OneForAllConfig struct {
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // Days is a helper to convert days to time.Duration

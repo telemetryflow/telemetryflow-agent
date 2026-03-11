@@ -27,7 +27,7 @@
 FROM golang:1.26-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.1.8
+ARG VERSION=1.1.9
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown

@@ -1,3 +1,23 @@
+// Package kubernetes collects resource and performance metrics from a Kubernetes
+// cluster via the API server and Kubelet stats endpoints, covering nodes, pods,
+// deployments, services, namespaces, storage, network policies, HPAs, PDBs,
+// workload controllers, events, and pod logs.
+//
+// TelemetryFlow Agent - Community Enterprise Observability Platform
+// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Open Source Software built by DevOpsCorner Indonesia.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package kubernetes
 
 import (
@@ -36,7 +56,7 @@ type KubernetesCollector struct {
 
 	// kubeletFetcher retrieves /stats/summary from each node's kubelet.
 	// nil means network collection is skipped (e.g. in unit tests).
-	kubeletFetcher KubeletStatsFetcher
+	kubeletFetcher KubeletProxyFunc
 }
 
 // NewKubernetesCollector creates a new Kubernetes collector.
@@ -317,6 +337,69 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 	}
 
+	// --- Usage Metrics (metrics-server with Kubelet fallback) ---
+	// collectUsageMetricsWithFallback tries the metrics.k8s.io API first and
+	// automatically falls back to querying each node's Kubelet /stats/summary
+	// endpoint when metrics-server is unavailable.
+	if k.cfg.MetricsAPI {
+		usageMetrics, err := collectUsageMetricsWithFallback(ctx, k)
+		if err != nil {
+			k.logger.Warn("Failed to collect usage metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, usageMetrics...)
+		}
+	}
+
+	// --- Resource Quotas ---
+	if k.cfg.ResourceQuotas {
+		rqMetrics, err := k.collectResourceQuotas(ctx)
+		if err != nil {
+			k.logger.Warn("Failed to collect resource quota metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, rqMetrics...)
+		}
+	}
+
+	// --- Limit Ranges ---
+	if k.cfg.LimitRanges {
+		lrMetrics, err := k.collectLimitRanges(ctx)
+		if err != nil {
+			k.logger.Warn("Failed to collect limit range metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, lrMetrics...)
+		}
+	}
+
+	// --- Pod Conditions ---
+	if k.cfg.PodConditions {
+		pcMetrics, err := k.collectPodConditions(ctx)
+		if err != nil {
+			k.logger.Warn("Failed to collect pod condition metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, pcMetrics...)
+		}
+	}
+
+	// --- Node Taints ---
+	if k.cfg.NodeTaints {
+		ntMetrics, err := k.collectNodeTaints(ctx)
+		if err != nil {
+			k.logger.Warn("Failed to collect node taint metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, ntMetrics...)
+		}
+	}
+
+	// --- Workload Generations ---
+	if k.cfg.WorkloadGenerations {
+		wgMetrics, err := k.collectWorkloadGenerations(ctx)
+		if err != nil {
+			k.logger.Warn("Failed to collect workload generation metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, wgMetrics...)
+		}
+	}
+
 	// Store state for backend sync
 	k.mu.Lock()
 	k.lastState = state
@@ -349,7 +432,7 @@ func (k *KubernetesCollector) ClusterProvider() string {
 }
 
 // SetKubeletFetcher replaces the kubelet stats fetcher (used in tests).
-func (k *KubernetesCollector) SetKubeletFetcher(f KubeletStatsFetcher) {
+func (k *KubernetesCollector) SetKubeletFetcher(f KubeletProxyFunc) {
 	k.kubeletFetcher = f
 }
 

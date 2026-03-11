@@ -8,5 +8,9 @@ metadata:
     {{- include "tfo-agent.labels" . | nindent 4 }}
 data:
   tfo-agent.yaml: |
+    {{- if .Values.oneForAll.enabled }}
+    one_for_all:
+      enabled: true
+    {{- end }}
     {{- toYaml .Values.kubernetes.config | nindent 4 }}
 {{- end }}

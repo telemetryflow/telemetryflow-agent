@@ -1,5 +1,9 @@
 # TFO-Agent Helm Chart Values
 
+# -- One-for-all mode: enables all four new capabilities with sensible defaults.
+oneForAll:
+  enabled: false
+
 # -- TFO Platform connection settings (REQUIRED)
 telemetryflow:
   # -- TFO Platform API endpoint (e.g. https://platform.example.com)
@@ -171,6 +175,21 @@ extraEnv: []
 # - name: MY_VAR
 #   value: "my-value"
 
+# -- Extra volumes to add to the DaemonSet/Deployment pod spec
+extraVolumes: []
+# - name: bearer-token
+#   secret:
+#     secretName: my-secret
+
+# -- Extra volume mounts to add to the agent container
+extraVolumeMounts: []
+# - name: bearer-token
+#   mountPath: /etc/tfo-agent/secrets
+#   readOnly: true
+
+# -- Priority class for all pods
+priorityClassName: ""
+
 # -- Base config for node DaemonSet (auth/endpoint come from env vars — managed by Viper)
 config:
   agent:
@@ -205,6 +224,15 @@ config:
     # Kubernetes cluster monitoring — toggled OFF for DaemonSet via env var
     kubernetes:
       enabled: false
+
+    prometheus_scraper:
+      enabled: false
+      scrape_jobs: []
+
+    remote_write_receiver:
+      enabled: false
+      port: 9091
+      basic_auth: {}
 
   prometheus_server:
     enabled: true
@@ -270,6 +298,13 @@ kubernetes:
         pod_logs_namespaces: []
         exclude_namespaces:
           - kube-system
+        # KSM gaps (new — all default false, enabled by oneForAll.enabled)
+        resource_quotas: false
+        limit_ranges: false
+        pod_conditions: false
+        node_taints: false
+        workload_generations: false
+        kubelet_insecure_skip_verify: false
 
     prometheus_server:
       enabled: true

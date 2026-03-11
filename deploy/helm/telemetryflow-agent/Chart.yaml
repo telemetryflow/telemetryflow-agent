@@ -3,7 +3,7 @@ name: tfo-agent
 description: TelemetryFlow Agent - Kubernetes observability and node metrics collector
 type: application
 version: 0.1.0
-appVersion: "1.3.4"
+appVersion: "1.1.9"
 keywords:
   - observability
   - monitoring

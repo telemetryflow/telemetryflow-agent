@@ -144,11 +144,11 @@ collectors:
     # Docker daemon socket path
     socket_path: /var/run/docker.sock
     # Sub-collector toggles
-    cpu: true         # CPU usage %, user/kernel time, throttling
-    memory: true      # Usage, limit, working set, RSS, cache
-    network: true     # Per-interface rx/tx bytes, packets, errors, drops
-    diskio: true      # Read/write bytes and operations
-    pids: true        # Current PID count per container
+    cpu: true # CPU usage %, user/kernel time, throttling
+    memory: true # Usage, limit, working set, RSS, cache
+    network: true # Per-interface rx/tx bytes, packets, errors, drops
+    diskio: true # Read/write bytes and operations
+    pids: true # Current PID count per container
     # Include stopped/exited containers in state summary metrics
     include_stopped: true
     # Container name filtering (regex patterns, empty = all)
@@ -229,24 +229,30 @@ collectors:
     pods: true
     deployments: true
     namespaces_collect: true
-    storage: true         # PersistentVolume + PersistentVolumeClaim
-    services: true        # Service + Endpoints
-    workloads: true       # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
-    events: true          # Kubernetes Events (Normal/Warning)
+    storage: true # PersistentVolume + PersistentVolumeClaim
+    services: true # Service + Endpoints
+    workloads: true # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
+    events: true # Kubernetes Events (Normal/Warning)
     resource_counts: true # Secrets, ConfigMaps, Ingresses count
-    network: true         # Network bytes per namespace (Kubelet Summary API)
-    metrics_api: true     # Fetch actual CPU/Memory usage from metrics-server
-    hpa: true             # HorizontalPodAutoscaler (current/desired replicas + conditions)
-    pdb: true             # PodDisruptionBudget (healthy/desired/disruptions allowed)
-    pod_logs: true        # Collect recent log lines from each running container
-    pod_logs_tail_lines: 100     # Log lines per container per collection cycle
-    pod_logs_namespaces: []      # Restrict pod log collection to these namespaces (empty = same as namespace filter)
+    network: true # Network bytes per namespace (Kubelet Summary API)
+    metrics_api: true # Fetch actual CPU/Memory usage from metrics-server
+    hpa: true # HorizontalPodAutoscaler (current/desired replicas + conditions)
+    pdb: true # PodDisruptionBudget (healthy/desired/disruptions allowed)
+    # KSM gaps — fills coverage gaps left by kube-state-metrics
+    resource_quotas: true # ResourceQuota hard/used per namespace
+    limit_ranges: true # LimitRange default/max constraints per namespace
+    pod_conditions: true # Per-pod condition status (Ready, PodScheduled, ContainersReady, etc.)
+    node_taints: true # Node taint inventory (key, effect, value)
+    workload_generations: true # Deployment/StatefulSet observed vs desired generation drift
+    pod_logs: true # Collect recent log lines from each running container
+    pod_logs_tail_lines: 100 # Log lines per container per collection cycle
+    pod_logs_namespaces: [] # Restrict pod log collection to these namespaces (empty = same as namespace filter)
     # Sync resource state to TFO backend (populates PostgreSQL K8s entities)
     sync_to_backend: true
     sync_interval: 60s
     # Cluster metadata (auto-detected if empty)
     cluster_name: ""
-    cluster_provider: ""  # eks, gke, aks, k3s, self-managed, etc.
+    cluster_provider: "" # eks, gke, aks, k3s, self-managed, etc.
     # UUID of the cluster registered in TFO Platform (required for sync_to_backend).
     # Obtain by calling: POST /api/v2/monitoring/kubernetes/clusters
     cluster_id: "${TELEMETRYFLOW_K8S_CLUSTER_ID}"
@@ -312,6 +318,14 @@ collectors:
     network: true
     # Specific disk paths to monitor (empty = all)
     disk_paths: []
+
+  # Remote Write Receiver
+  # Accepts Prometheus Remote Write (snappy-encoded protobuf) on a local port,
+  # allowing external tools (Prometheus, Grafana Agent, etc.) to push metrics
+  # directly to TFO-Agent for forwarding through the OTLP export pipeline.
+  remote_write_receiver:
+    enabled: false
+    port: 9091
 
 # =============================================================================
 # Prometheus Metrics Endpoint

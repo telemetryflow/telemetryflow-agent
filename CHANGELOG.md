@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.8-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.9-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,38 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.9] - 2026-03-12
+
+### Added
+
+- **Prometheus Remote Write Receiver (`internal/receiver/remotewrite/`)**: New push-based ingestion path accepting Prometheus `remote_write` traffic directly
+  - `receiver.go`: HTTP server lifecycle with graceful start/stop and configurable port
+  - `handler.go`: HTTP request handler — snappy decompression + protobuf decode, content-type validation
+  - `decoder.go`: `DecodeWriteRequest` converts raw HTTP body (snappy + protobuf `WriteRequest`) to `prompb.WriteRequest`
+  - `converter.go`: `ConvertTimeSeries` maps each `prompb.TimeSeries` to `[]collector.Metric`; extracts `__name__` as metric name, sanitizes all other labels
+  - `metrics.go`: Prometheus instrumentation counters for requests, bytes, timeseries, errors per receiver instance
+  - `config.go`: `RemoteWriteReceiverConfig` struct (Enabled, Port) mapping to `collectors.remote_write_receiver` config section
+  - Property-based tests (`converter_pbt_test.go`) validating label preservation, name extraction, and missing-name error path
+- **KSM Gap Sub-collectors** (`collectors.kubernetes`): Five new fields filling coverage gaps left by kube-state-metrics
+  - `resource_quotas: true` — ResourceQuota hard/used per namespace
+  - `limit_ranges: true` — LimitRange default/max constraints per namespace
+  - `pod_conditions: true` — Per-pod condition status (Ready, PodScheduled, ContainersReady, etc.)
+  - `node_taints: true` — Node taint inventory (key, effect, value)
+  - `workload_generations: true` — Deployment/StatefulSet observed vs desired generation drift
+- **`collectors.remote_write_receiver` config section**: Added to all config files (`tfo-agent.yaml`, `tfo-agent.default.yaml`, `tfo-agent-one-for-all.yaml`), default: `enabled: false`, `port: 9091`
+- **Apache License 2.0 headers**: Full license boilerplate + package documentation added to all 187 `.go` files across all packages; property-based test files previously missing headers now covered
+
+### Fixed
+
+- **eBPF build constraints**: Restored `//go:build linux` and `//go:build !linux` constraints to all 9 eBPF package files after bulk header replacement had stripped them
+  - `types.go`, `gen.go`, `loader.go`, `helpers.go`, `config_linux.go`, `linux.go`, `hubble_linux.go` → `//go:build linux`
+  - `linux_other.go`, `hubble_other.go` → `//go:build !linux`
+
+### Changed
+
+- **Helm chart path**: Renamed `deploy/helm/tfo-agent/` → `deploy/helm/telemetryflow-agent/` for naming consistency with other TelemetryFlow Helm charts
+- **Platform monolith configs** (`config/tfo-agent/`): All three deployment configs (`tfo-agent.yaml`, `tfo-agent.k8s.yaml`, `tfo-agent.container.yaml`) updated with KSM gap fields and `remote_write_receiver` section
 
 ## [1.1.8] - 2026-03-09
 
@@ -439,6 +471,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                       |
 | ------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1.1.9   | 2026-03-12 | v1.40.0  | Prometheus Remote Write Receiver; KSM gap fields (5); license headers all .go files; eBPF build constraint fixes; Helm rename |
 | 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs |
 | 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
 | 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                   |

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Generate Secure Secrets for TelemetryFlow SDK
+ * Generate Secure Secrets for TelemetryFlow Platform
  *
  * Usage:
  *   node scripts/generate-secrets.js              # Generate all secrets
@@ -12,7 +12,7 @@
  *   node scripts/generate-secrets.js --env        # Output as .env format only
  */
 
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -50,7 +50,7 @@ for (let i = 0; i < args.length; i++) {
     case '--help':
     case '-h':
       console.log(`
-TelemetryFlow SDK - Secure Secret Generator
+TelemetryFlow Viz - Secure Secret Generator
 
 Usage:
   node scripts/generate-secrets.js [options]
@@ -64,7 +64,7 @@ Options:
   --help, -h          Show this help
 
 Examples:
-  node scripts/generate-secrets.js                    # Generate all secrets
+  node scripts/generate-secrets.js                   # Generate all secrets
   node scripts/generate-secrets.js --api-keys        # API keys only
   node scripts/generate-secrets.js --jwt --length 64 # JWT with 64 bytes
   node scripts/generate-secrets.js --env             # .env format output
@@ -121,6 +121,9 @@ if (generateJwtSecrets) {
   secrets.JWT_SECRET = generateSecret(length, format);
   secrets.JWT_REFRESH_SECRET = generateSecret(length, format);
   secrets.SESSION_SECRET = generateSecret(length, format);
+  secrets.ENCRYPTION_KEY = generateHexString(64);
+  secrets.MFA_ENCRYPTION_KEY = generateHexString(64);
+  secrets.LLM_ENCRYPTION_KEY = generateHexString(64);
 }
 
 // Output
@@ -139,11 +142,16 @@ if (envOnly) {
     console.log(`JWT_EXPIRATION=24h`);
     console.log(`JWT_REFRESH_EXPIRATION=168h`);
     console.log(`SESSION_SECRET=${secrets.SESSION_SECRET}`);
+    console.log('');
+    console.log('# Encryption Keys');
+    console.log(`ENCRYPTION_KEY=${secrets.ENCRYPTION_KEY}`);
+    console.log(`MFA_ENCRYPTION_KEY=${secrets.MFA_ENCRYPTION_KEY}`);
+    console.log(`LLM_ENCRYPTION_KEY=${secrets.LLM_ENCRYPTION_KEY}`);
   }
 } else {
   // Decorated output
   console.log('\n=============================================');
-  console.log('  TelemetryFlow SDK - Secret Generator');
+  console.log('  TelemetryFlow Viz - Secret Generator');
   console.log('=============================================\n');
 
   if (generateApiKeys) {
@@ -155,11 +163,17 @@ if (envOnly) {
   }
 
   if (generateJwtSecrets) {
-    console.log(`JWT & Session Secrets (${length} bytes, ${format}):`)
+    console.log(`JWT & Session Secrets (${length} bytes, ${format}):`);
     console.log('----------------------------------------------');
     console.log(`  JWT Secret:         ${secrets.JWT_SECRET}`);
     console.log(`  JWT Refresh Secret: ${secrets.JWT_REFRESH_SECRET}`);
     console.log(`  Session Secret:     ${secrets.SESSION_SECRET}`);
+    console.log('');
+    console.log('Encryption Keys (32 bytes, hex):');
+    console.log('--------------------------------');
+    console.log(`  Encryption Key:     ${secrets.ENCRYPTION_KEY}`);
+    console.log(`  MFA Encryption Key: ${secrets.MFA_ENCRYPTION_KEY}`);
+    console.log(`  LLM Encryption Key: ${secrets.LLM_ENCRYPTION_KEY}`);
     console.log('');
   }
 
@@ -175,6 +189,9 @@ if (envOnly) {
     console.log(`JWT_EXPIRATION=24h`);
     console.log(`JWT_REFRESH_EXPIRATION=168h`);
     console.log(`SESSION_SECRET=${secrets.SESSION_SECRET}`);
+    console.log(`ENCRYPTION_KEY=${secrets.ENCRYPTION_KEY}`);
+    console.log(`MFA_ENCRYPTION_KEY=${secrets.MFA_ENCRYPTION_KEY}`);
+    console.log(`LLM_ENCRYPTION_KEY=${secrets.LLM_ENCRYPTION_KEY}`);
   }
   console.log('');
 
@@ -188,9 +205,12 @@ if (envOnly) {
   if (generateJwtSecrets) {
     dockerEnvs.push(`  -e JWT_SECRET="${secrets.JWT_SECRET}"`);
     dockerEnvs.push(`  -e SESSION_SECRET="${secrets.SESSION_SECRET}"`);
+    dockerEnvs.push(`  -e ENCRYPTION_KEY="${secrets.ENCRYPTION_KEY}"`);
+    dockerEnvs.push(`  -e MFA_ENCRYPTION_KEY="${secrets.MFA_ENCRYPTION_KEY}"`);
+    dockerEnvs.push(`  -e LLM_ENCRYPTION_KEY="${secrets.LLM_ENCRYPTION_KEY}"`);
   }
   console.log(`docker run -d \\\n${dockerEnvs.join(' \\\n')} \\`);
-  console.log('  TelemetryFlow SDK:latest\n');
+  console.log('  telemetryflow-viz:latest\n');
 
   console.log('Security Tips:');
   console.log('--------------');

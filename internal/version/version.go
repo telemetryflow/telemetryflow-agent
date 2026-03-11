@@ -1,7 +1,9 @@
-// Package version provides build and version information for TelemetryFlow Agent.
+// Package version exposes build-time metadata — semantic version, Git commit,
+// build date — and product identity constants for the TelemetryFlow Agent.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+// TelemetryFlow Agent - Community Enterprise Observability Platform
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Open Source Software built by DevOpsCorner Indonesia.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,7 +68,7 @@ const (
 // Build-time variables (set via ldflags)
 var (
 	// Version is the semantic version of the agent
-	Version = "1.1.8"
+	Version = "1.1.9"
 
 	// GitCommit is the git commit hash
 	GitCommit = "unknown"

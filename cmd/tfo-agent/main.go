@@ -1,7 +1,10 @@
-// Package main is the entry point for the TelemetryFlow Agent.
+// Package main is the entry point for the TelemetryFlow Agent (tfo-agent).
+// It wires together the Cobra CLI, configuration loading, and the core Agent
+// lifecycle — start, collect, export, heartbeat, and graceful shutdown.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform
 // Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Open Source Software built by DevOpsCorner Indonesia.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
