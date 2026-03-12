@@ -64,12 +64,14 @@ RUN /tfo-agent version
 # -----------------------------------------------------------------------------
 FROM alpine:3.23
 
+ARG VERSION=1.1.9
+
 # =============================================================================
 # TelemetryFlow Metadata Labels (OCI Image Spec)
 # =============================================================================
 LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
-    org.opencontainers.image.version="1.1.9" \
+    org.opencontainers.image.version="${VERSION}" \
     org.opencontainers.image.vendor="TelemetryFlow" \
     org.opencontainers.image.authors="DevOpsCorner Indonesia <support@devopscorner.id>" \
     org.opencontainers.image.url="https://telemetryflow.id" \
