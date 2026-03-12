@@ -55,9 +55,9 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.8  | SDK v1.40.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.8  | SDK v1.40.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.7  | Collector v0.147.0 | Central telemetry collector |
+| **TFO-Agent**     | v1.1.9  | SDK v1.40.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.1.9  | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.1.8  | Collector v0.147.0 | Central telemetry collector |
 
 This alignment ensures:
 

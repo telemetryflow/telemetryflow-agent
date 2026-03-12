@@ -33,7 +33,7 @@ make build
 **Expected Output:**
 
 ```
-TelemetryFlow Agent v1.1.8 (OTEL SDK 1.40.0)
+TelemetryFlow Agent v1.1.9 (OTEL SDK 1.40.0)
 
   Build Information
   ─────────────────────────────────────────────

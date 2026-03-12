@@ -32,7 +32,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.1.8"
+    subgraph "TelemetryFlow Ecosystem v1.3.5"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.40.0]
         end
@@ -59,9 +59,9 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.8  | SDK v1.40.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.8  | SDK v1.40.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.7  | Collector v0.147.0 | Central telemetry collector |
+| **TFO-Agent**     | v1.1.9  | SDK v1.40.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.1.9  | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.1.8  | Collector v0.147.0 | Central telemetry collector |
 
 ## Features
 
@@ -200,7 +200,7 @@ POST http://localhost:4318/v1/logs
 Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
 
 ```yaml
-# TelemetryFlow Platform Configuration (v1.1.8+)
+# TelemetryFlow Platform Configuration (v1.3.5+)
 telemetryflow:
   api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
   api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
@@ -250,7 +250,7 @@ buffer:
 ### Environment Variables
 
 ```bash
-# TelemetryFlow Platform (v1.1.8+)
+# TelemetryFlow Platform (v1.3.5+)
 export TELEMETRYFLOW_ENDPOINT="localhost:4317"
 export TELEMETRYFLOW_API_KEY_ID="tfk_your_key_id"
 export TELEMETRYFLOW_API_KEY_SECRET="tfs_your_key_secret"

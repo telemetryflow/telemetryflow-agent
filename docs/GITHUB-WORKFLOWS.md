@@ -38,9 +38,9 @@ Builds and releases TelemetryFlow Agent for multiple platforms with native packa
 workflow_dispatch:
   inputs:
     version:
-      description: "Version to release (e.g., 1.0.0)"
+      description: "Version to release (e.g., 1.1.9)"
       required: true
-      default: "1.0.0"
+      default: "1.1.9"
     prerelease:
       description: "Mark as pre-release"
       required: false
@@ -54,15 +54,15 @@ workflow_dispatch:
 
 ```bash
 # Create and push a version tag
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.9
+git push origin v1.1.9
 ```
 
 #### Manual Release
 
 1. Go to **Actions** > **Release**
 2. Click **Run workflow**
-3. Enter version (e.g., `1.0.0`)
+3. Enter version (e.g., `1.1.9`)
 4. Optionally check "Mark as pre-release"
 5. Click **Run workflow**
 
@@ -116,8 +116,8 @@ The workflow only runs when relevant files change:
 
 | Tag Pattern       | Description             | Example       |
 | ----------------- | ----------------------- | ------------- |
-| `{version}`       | Full semantic version   | `1.0.0`       |
-| `{major}.{minor}` | Major.minor version     | `1.0`         |
+| `{version}`       | Full semantic version   | `1.1.9`       |
+| `{major}.{minor}` | Major.minor version     | `1.1`         |
 | `{major}`         | Major version only      | `1`           |
 | `latest`          | Latest from main branch | `latest`      |
 | `sha-{commit}`    | Git commit SHA          | `sha-abc1234` |
@@ -133,7 +133,7 @@ The workflow only runs when relevant files change:
 workflow_dispatch:
   inputs:
     version:
-      description: "Version tag (e.g., 1.0.0)"
+      description: "Version tag (e.g., 1.1.9)"
       required: false
     push:
       description: "Push images to registry"
@@ -153,8 +153,8 @@ workflow_dispatch:
 git push origin main
 
 # Create version tag - builds version tags
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.9
+git push origin v1.1.9
 ```
 
 #### Manual Build
@@ -171,11 +171,11 @@ git push origin v1.0.0
 ```bash
 # GitHub Container Registry
 docker pull ghcr.io/{owner}/telemetryflow-agent:latest
-docker pull ghcr.io/{owner}/telemetryflow-agent:1.0.0
+docker pull ghcr.io/{owner}/telemetryflow-agent:1.1.9
 
 # Docker Hub
 docker pull telemetryflow/telemetryflow-agent:latest
-docker pull telemetryflow/telemetryflow-agent:1.0.0
+docker pull telemetryflow/telemetryflow-agent:1.1.9
 ```
 
 ### Security Features
