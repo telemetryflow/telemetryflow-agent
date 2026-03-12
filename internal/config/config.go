@@ -1,5 +1,5 @@
 // Package config defines the complete agent configuration structure and provides
-// Viper-based loading from YAML files and TFAGENT_ environment variables, with
+// Viper-based loading from YAML files and TFOAGENT_ environment variables, with
 // sensible defaults for every field.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform
