@@ -29,38 +29,141 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-// collectCoreDNSMetrics scrapes CoreDNS /metrics endpoint and returns aggregated
-// CoreDNSMetrics for the sync payload.
+// coreDNSLabelSelectors are the label selectors used to discover CoreDNS pods
+// across different Kubernetes distributions:
+//   - k8s-app=kube-dns    → vanilla Kubernetes, EKS, GKE, AKS, k3s
+//   - app.kubernetes.io/name=coredns → Helm-based installs (RKE2, etc.)
+//   - app.kubernetes.io/name=rke2-coredns → RKE2-specific
+var coreDNSLabelSelectors = []string{
+	"k8s-app=kube-dns",
+	"app.kubernetes.io/name=coredns",
+	"app.kubernetes.io/name=rke2-coredns",
+}
+
+// collectCoreDNSMetrics discovers CoreDNS pods and scrapes their /metrics
+// endpoint directly via pod IP:9153. This approach works across all distributions
+// (vanilla k8s, EKS, GKE, AKS, RKE2, k3s) regardless of how the CoreDNS
+// service is named or whether port 9153 is exposed on the service.
 func collectCoreDNSMetrics(
 	ctx context.Context,
 	cs kubernetes.Interface,
 	coreDNSService string,
 	logger *zap.Logger,
 ) (*CoreDNSMetrics, error) {
-	if coreDNSService == "" {
-		coreDNSService = "coredns.kube-system.svc.cluster.local:9153"
+	// Discover running CoreDNS pods across all known label selectors
+	pods := discoverCoreDNSPods(ctx, cs, logger)
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("no running CoreDNS pods found in kube-system")
 	}
 
-	// Try scraping via the Kubernetes API proxy first (works from outside the cluster too).
-	// GET /api/v1/namespaces/kube-system/services/kube-dns:metrics/proxy/metrics
-	body, err := scrapeCoreDNSViaProxy(ctx, cs)
-	if err != nil {
-		logger.Debug("CoreDNS proxy scrape failed, trying direct HTTP", zap.Error(err))
-		// Fall back to direct HTTP scrape (works from inside the cluster)
-		body, err = scrapeCoreDNSDirectly(ctx, coreDNSService)
+	// Scrape metrics from each pod and merge results
+	var allBodies []string
+	for _, pod := range pods {
+		if pod.Status.PodIP == "" {
+			continue
+		}
+		body, err := scrapeCoreDNSPod(ctx, pod.Status.PodIP, logger)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scrape CoreDNS metrics: %w", err)
+			logger.Debug("Failed to scrape CoreDNS pod",
+				zap.String("pod", pod.Name),
+				zap.String("ip", pod.Status.PodIP),
+				zap.Error(err),
+			)
+			continue
+		}
+		allBodies = append(allBodies, body)
+	}
+
+	if len(allBodies) == 0 {
+		// Fall back: try the API server proxy approach
+		body, err := scrapeCoreDNSViaProxy(ctx, cs)
+		if err != nil {
+			// Last resort: try direct service DNS if configured
+			if coreDNSService != "" {
+				body, err = scrapeCoreDNSDirectly(ctx, coreDNSService)
+				if err != nil {
+					return nil, fmt.Errorf("failed to scrape CoreDNS metrics (tried pod IPs, proxy, direct): %w", err)
+				}
+			} else {
+				return nil, fmt.Errorf("failed to scrape CoreDNS metrics (tried pod IPs and proxy): %w", err)
+			}
+		}
+		allBodies = append(allBodies, body)
+	}
+
+	// Merge all pod metrics into one body (simple concatenation — parser aggregates)
+	merged := strings.Join(allBodies, "\n")
+
+	return parseCoreDNSMetrics(merged, len(pods), logger), nil
+}
+
+// discoverCoreDNSPods finds running CoreDNS pods in kube-system using multiple
+// label selectors to cover all Kubernetes distributions.
+func discoverCoreDNSPods(ctx context.Context, cs kubernetes.Interface, logger *zap.Logger) []corev1.Pod {
+	seen := make(map[string]bool)
+	var result []corev1.Pod
+
+	for _, selector := range coreDNSLabelSelectors {
+		pods, err := cs.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
+			LabelSelector: selector,
+		})
+		if err != nil {
+			logger.Debug("CoreDNS pod discovery failed for selector",
+				zap.String("selector", selector),
+				zap.Error(err),
+			)
+			continue
+		}
+		for i := range pods.Items {
+			p := &pods.Items[i]
+			if p.Status.Phase == corev1.PodRunning && !seen[p.Name] {
+				seen[p.Name] = true
+				result = append(result, *p)
+			}
 		}
 	}
 
-	// Count CoreDNS pods
-	podCount := countCoreDNSPods(ctx, cs, logger)
+	logger.Debug("Discovered CoreDNS pods", zap.Int("count", len(result)))
+	return result
+}
 
-	return parseCoreDNSMetrics(body, podCount, logger), nil
+// scrapeCoreDNSPod fetches /metrics from a CoreDNS pod via its pod IP on port 9153.
+func scrapeCoreDNSPod(ctx context.Context, podIP string, logger *zap.Logger) (string, error) {
+	url := fmt.Sprintf("http://%s:9153/metrics", podIP)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("CoreDNS pod %s returned status %d", podIP, resp.StatusCode)
+	}
+
+	buf := make([]byte, 0, 512*1024)
+	for {
+		tmp := make([]byte, 32*1024)
+		n, readErr := resp.Body.Read(tmp)
+		if n > 0 {
+			buf = append(buf, tmp[:n]...)
+		}
+		if readErr != nil {
+			break
+		}
+	}
+	return string(buf), nil
 }
 
 // scrapeCoreDNSViaProxy uses the Kubernetes API server proxy to reach CoreDNS metrics.
@@ -80,7 +183,7 @@ func scrapeCoreDNSViaProxy(ctx context.Context, cs kubernetes.Interface) (string
 	return string(raw), nil
 }
 
-// scrapeCoreDNSDirectly fetches CoreDNS /metrics via direct HTTP.
+// scrapeCoreDNSDirectly fetches CoreDNS /metrics via direct HTTP to a service address.
 func scrapeCoreDNSDirectly(ctx context.Context, service string) (string, error) {
 	url := fmt.Sprintf("http://%s/metrics", service)
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -112,24 +215,6 @@ func scrapeCoreDNSDirectly(ctx context.Context, service string) (string, error) 
 		}
 	}
 	return string(buf), nil
-}
-
-// countCoreDNSPods counts the number of running CoreDNS pods in kube-system.
-func countCoreDNSPods(ctx context.Context, cs kubernetes.Interface, logger *zap.Logger) int {
-	pods, err := cs.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
-		LabelSelector: "k8s-app=kube-dns",
-	})
-	if err != nil {
-		logger.Debug("Failed to count CoreDNS pods", zap.Error(err))
-		return 0
-	}
-	count := 0
-	for _, p := range pods.Items {
-		if p.Status.Phase == "Running" {
-			count++
-		}
-	}
-	return count
 }
 
 // parseCoreDNSMetrics parses Prometheus text exposition format from CoreDNS
