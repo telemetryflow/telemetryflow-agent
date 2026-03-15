@@ -504,6 +504,15 @@ type KubernetesCollectorConfig struct {
 
 	// KubeletInsecureSkipVerify skips TLS verification for Kubelet connections
 	KubeletInsecureSkipVerify bool `mapstructure:"kubelet_insecure_skip_verify"`
+
+	// ApiServerMetrics enables scraping kube-apiserver /metrics endpoint
+	ApiServerMetrics bool `mapstructure:"apiserver_metrics"`
+
+	// CoreDNSMetrics enables scraping CoreDNS /metrics endpoint
+	CoreDNSMetrics bool `mapstructure:"coredns_metrics"`
+
+	// CoreDNSService is the CoreDNS service address for metrics scraping
+	CoreDNSService string `mapstructure:"coredns_service"`
 }
 
 // SystemCollectorConfig contains system metrics collector settings
@@ -1761,6 +1770,9 @@ func DefaultConfig() *Config {
 				SyncToBackend:     true,
 				SyncInterval:      60 * time.Second,
 				ExcludeNamespaces: []string{"kube-system"},
+				ApiServerMetrics:  true,
+				CoreDNSMetrics:    true,
+				CoreDNSService:    "kube-dns.kube-system.svc.cluster.local:9153",
 			},
 			Logs: LogCollectorConfig{
 				Enabled: false,

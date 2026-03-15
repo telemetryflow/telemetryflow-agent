@@ -24,27 +24,62 @@ import "time"
 
 // ClusterState is the full cluster snapshot sent to the TFO backend for sync.
 type ClusterState struct {
-	ClusterName     string                  `json:"cluster_name"`
-	ClusterProvider string                  `json:"cluster_provider"`
-	CollectedAt     time.Time               `json:"collected_at"`
-	Nodes           []NodeState             `json:"nodes,omitempty"`
-	Namespaces      []NamespaceState        `json:"namespaces,omitempty"`
-	Pods            []PodState              `json:"pods,omitempty"`
-	Deployments     []DeploymentState       `json:"deployments,omitempty"`
-	StatefulSets    []WorkloadState         `json:"statefulsets,omitempty"`
-	DaemonSets      []WorkloadState         `json:"daemonsets,omitempty"`
-	ReplicaSets     []WorkloadState         `json:"replicasets,omitempty"`
-	Jobs            []WorkloadState         `json:"jobs,omitempty"`
-	CronJobs        []WorkloadState         `json:"cronjobs,omitempty"`
-	Services        []ServiceState          `json:"services,omitempty"`
-	PVs             []PVState               `json:"pvs,omitempty"`
-	PVCs            []PVCState              `json:"pvcs,omitempty"`
-	Events          []EventState            `json:"events,omitempty"`
-	ResourceCounts  *ResourceCounts         `json:"resource_counts,omitempty"`
-	NetworkStats    []NamespaceNetworkStats `json:"network_stats,omitempty"`
-	HPAs            []HPAState              `json:"hpas,omitempty"`
-	PDBs            []PDBState              `json:"pdbs,omitempty"`
-	PodLogs         []PodLogEntry           `json:"pod_logs,omitempty"`
+	ClusterName      string                  `json:"cluster_name"`
+	ClusterProvider  string                  `json:"cluster_provider"`
+	CollectedAt      time.Time               `json:"collected_at"`
+	Nodes            []NodeState             `json:"nodes,omitempty"`
+	Namespaces       []NamespaceState        `json:"namespaces,omitempty"`
+	Pods             []PodState              `json:"pods,omitempty"`
+	Deployments      []DeploymentState       `json:"deployments,omitempty"`
+	StatefulSets     []WorkloadState         `json:"statefulsets,omitempty"`
+	DaemonSets       []WorkloadState         `json:"daemonsets,omitempty"`
+	ReplicaSets      []WorkloadState         `json:"replicasets,omitempty"`
+	Jobs             []WorkloadState         `json:"jobs,omitempty"`
+	CronJobs         []WorkloadState         `json:"cronjobs,omitempty"`
+	Services         []ServiceState          `json:"services,omitempty"`
+	PVs              []PVState               `json:"pvs,omitempty"`
+	PVCs             []PVCState              `json:"pvcs,omitempty"`
+	Events           []EventState            `json:"events,omitempty"`
+	ResourceCounts   *ResourceCounts         `json:"resource_counts,omitempty"`
+	NetworkStats     []NamespaceNetworkStats `json:"network_stats,omitempty"`
+	HPAs             []HPAState              `json:"hpas,omitempty"`
+	PDBs             []PDBState              `json:"pdbs,omitempty"`
+	PodLogs          []PodLogEntry           `json:"pod_logs,omitempty"`
+	ApiServerMetrics *ApiServerMetrics       `json:"apiserver_metrics,omitempty"`
+	CoreDNSMetrics   *CoreDNSMetrics         `json:"coredns_metrics,omitempty"`
+}
+
+// ApiServerInstanceMetrics holds per-instance API Server metrics.
+type ApiServerInstanceMetrics struct {
+	Instance       string  `json:"instance"`
+	RequestsPerSec float64 `json:"requests_per_sec"`
+	AvgLatencyMs   float64 `json:"avg_latency_ms"`
+	ErrorRate      float64 `json:"error_rate_percent"`
+	CPUUsage       float64 `json:"cpu_usage"`    // cores
+	MemoryUsage    float64 `json:"memory_usage"` // bytes
+	WorkQueueDepth float64 `json:"work_queue_depth"`
+}
+
+// ApiServerMetrics holds aggregated kube-apiserver metrics scraped from /metrics.
+type ApiServerMetrics struct {
+	HealthStatus   int                        `json:"health_status"` // 1=healthy, 0=down
+	Instances      []ApiServerInstanceMetrics `json:"instances,omitempty"`
+	RequestsByCode map[string]float64         `json:"requests_by_code,omitempty"` // {"200": 142, "404": 5}
+	RequestsByVerb map[string]float64         `json:"requests_by_verb,omitempty"` // {"GET": 100, "POST": 20}
+}
+
+// CoreDNSMetrics holds aggregated CoreDNS metrics scraped from /metrics.
+type CoreDNSMetrics struct {
+	HealthStatus           int                `json:"health_status"`
+	PodCount               int                `json:"pod_count"`
+	RequestsPerSec         float64            `json:"requests_per_sec"`
+	CacheHitRatePercent    float64            `json:"cache_hit_rate_percent"`
+	AvgDurationMs          float64            `json:"avg_duration_ms"`
+	RequestsByRcode        map[string]float64 `json:"requests_by_rcode,omitempty"` // {"NOERROR": 1200}
+	UpstreamRequestsPerSec float64            `json:"upstream_requests_per_sec"`
+	ErrorRate              float64            `json:"error_rate"`
+	CPUUsage               float64            `json:"cpu_usage"`    // cores
+	MemoryUsage            float64            `json:"memory_usage"` // bytes
 }
 
 // TaintState represents a single Kubernetes node taint.

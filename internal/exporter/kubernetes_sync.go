@@ -192,6 +192,8 @@ func (ks *KubernetesSync) sendSync(ctx context.Context) error {
 		zap.Int("deployments", len(state.Deployments)),
 		zap.Int("pvs", len(state.PVs)),
 		zap.Int("pvcs", len(state.PVCs)),
+		zap.Bool("apiserver_metrics", state.ApiServerMetrics != nil),
+		zap.Bool("coredns_metrics", state.CoreDNSMetrics != nil),
 	)
 	return nil
 }

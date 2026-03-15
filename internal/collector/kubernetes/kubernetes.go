@@ -400,6 +400,26 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 	}
 
+	// --- API Server Metrics ---
+	if k.cfg.ApiServerMetrics {
+		apiMetrics, err := collectApiServerMetrics(ctx, k.clientset, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect API server metrics", zap.Error(err))
+		} else {
+			state.ApiServerMetrics = apiMetrics
+		}
+	}
+
+	// --- CoreDNS Metrics ---
+	if k.cfg.CoreDNSMetrics {
+		dnsMetrics, err := collectCoreDNSMetrics(ctx, k.clientset, k.cfg.CoreDNSService, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect CoreDNS metrics", zap.Error(err))
+		} else {
+			state.CoreDNSMetrics = dnsMetrics
+		}
+	}
+
 	// Store state for backend sync
 	k.mu.Lock()
 	k.lastState = state
