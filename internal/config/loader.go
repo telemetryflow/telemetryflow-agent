@@ -20,6 +20,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,13 +82,41 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 		v.SetConfigFile(configFile)
 	}
 
-	// Read config file
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
+	// Read config file with environment variable expansion.
+	// This resolves ${VAR} placeholders in config values (e.g., ${NODE_IP} in cAdvisor endpoint).
+	// Viper's ReadInConfig does NOT expand env vars in values — only AutomaticEnv overrides keys.
+	configLoaded := false
+	if configFile != "" {
+		raw, err := os.ReadFile(configFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
 		}
-		// Config file not found is OK, we'll use defaults + env
+		expanded := os.ExpandEnv(string(raw))
+		if err := v.ReadConfig(bytes.NewBufferString(expanded)); err != nil {
+			return nil, fmt.Errorf("failed to parse config file: %w", err)
+		}
+		configLoaded = true
+	} else {
+		// Let Viper find the config file via search paths
+		if err := v.ReadInConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				return nil, fmt.Errorf("failed to read config file: %w", err)
+			}
+			// Config file not found is OK, we'll use defaults + env
+		} else {
+			// Re-read the found file with env expansion
+			foundFile := v.ConfigFileUsed()
+			if foundFile != "" {
+				raw, err := os.ReadFile(foundFile)
+				if err == nil {
+					expanded := os.ExpandEnv(string(raw))
+					_ = v.ReadConfig(bytes.NewBufferString(expanded))
+				}
+			}
+			configLoaded = true
+		}
 	}
+	_ = configLoaded // suppress unused warning
 
 	// Configure environment variables
 	v.SetEnvPrefix(l.envPrefix)
