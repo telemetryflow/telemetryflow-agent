@@ -275,7 +275,7 @@ func parsePromLine(line string) (map[string]string, float64) {
 
 	var value float64
 	if valuePart != "" {
-		fmt.Sscanf(valuePart, "%f", &value)
+		_, _ = fmt.Sscanf(valuePart, "%f", &value)
 	}
 
 	return labels, value
