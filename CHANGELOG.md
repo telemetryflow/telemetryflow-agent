@@ -24,9 +24,25 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.9] - 2026-03-12
+## [1.1.9] - 2026-03-15
 
 ### Added
+
+- **Extended K8s Metrics Config Fields** (`collectors.kubernetes`): Five new config fields enabling TFO Agent to replace Prometheus, kube-state-metrics, and cAdvisor as external dependencies
+  - `apiserver_metrics: true` — Scrape kube-apiserver `/metrics` endpoint for request rates, latency, error rates, work queue depth, CPU/memory usage
+  - `coredns_metrics: true` — Scrape CoreDNS `/metrics` endpoint for DNS request rates, cache hit rates, duration p99, upstream requests, error rates
+  - `coredns_service` — CoreDNS service address (default: `kube-dns.kube-system.svc.cluster.local:9153`)
+  - `container_extended_metrics: true` — Collect per-container CPU throttling, memory working set, and OOM kill detection via Kubelet `/stats/summary` and cAdvisor
+  - `pv_io_stats: true` — Collect PersistentVolume usage, IOPS, and throughput from Kubelet volume stats API
+- **cAdvisor TLS & Auth Support** (`internal/collector/cadvisor/cadvisor.go`): cAdvisor collector now supports HTTPS kubelet endpoints
+  - `InsecureSkipVerify` config field to skip TLS certificate verification for self-signed kubelet certs
+  - `BearerTokenPath` config field for custom ServiceAccount token path (auto-detected from standard K8s mount if empty)
+  - Auto-reads bearer token from `/var/run/secrets/kubernetes.io/serviceaccount/token` for kubelet authentication
+- **RBAC Updates** (`deploy/helm/`, `deploy/kubernetes/`): Added missing permissions for new collectors
+  - `pods/log` — required for pod log collection
+  - `poddisruptionbudgets` (policy API group) — required for PDB collector
+  - `endpointslices` (discovery.k8s.io) — replaces deprecated v1 Endpoints
+  - `/metrics/cadvisor` non-resource URL — required for cAdvisor scraping
 
 - **Prometheus Remote Write Receiver (`internal/receiver/remotewrite/`)**: New push-based ingestion path accepting Prometheus `remote_write` traffic directly
   - `receiver.go`: HTTP server lifecycle with graceful start/stop and configurable port
@@ -47,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Config env var expansion** (`internal/config/loader.go`): Viper-based config loader now calls `os.ExpandEnv()` on YAML content before parsing, resolving `${VAR}` placeholders in config values (e.g., `${NODE_IP}` in cAdvisor endpoint). Previously, env var references in config values were passed as literal strings, causing URL parse failures
+- **cAdvisor kubelet HTTPS** (`internal/collector/cadvisor/cadvisor.go`): HTTP client now respects `insecure_skip_verify` config and includes ServiceAccount bearer token in requests. Previously, HTTPS kubelet endpoints failed with `x509: certificate signed by unknown authority` and `403 Forbidden`
 - **eBPF build constraints**: Restored `//go:build linux` and `//go:build !linux` constraints to all 9 eBPF package files after bulk header replacement had stripped them
   - `types.go`, `gen.go`, `loader.go`, `helpers.go`, `config_linux.go`, `linux.go`, `hubble_linux.go` → `//go:build linux`
   - `linux_other.go`, `hubble_other.go` → `//go:build !linux`
@@ -55,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Helm chart path**: Renamed `deploy/helm/tfo-agent/` → `deploy/helm/telemetryflow-agent/` for naming consistency with other TelemetryFlow Helm charts
 - **Platform monolith configs** (`config/tfo-agent/`): All three deployment configs (`tfo-agent.yaml`, `tfo-agent.k8s.yaml`, `tfo-agent.container.yaml`) updated with KSM gap fields and `remote_write_receiver` section
+- **All config files updated** (`configs/`, `deploy/`): Added extended K8s metrics fields (`apiserver_metrics`, `coredns_metrics`, `container_extended_metrics`, `pv_io_stats`) to all config variants — `configs/tfo-agent.yaml`, `configs/tfo-agent.default.yaml`, `configs/tfo-agent-one-for-all.yaml`, `deploy/helm/values.yaml`, `deploy/helm/values-one-for-all.yaml`, `deploy/kubernetes/configmap.yaml`
 
 ## [1.1.8] - 2026-03-09
 

@@ -259,6 +259,12 @@ type CAdvisorCollectorConfig struct {
 	// MetricNames is an optional allowlist of metric names to collect (empty = all container_*/machine_*)
 	MetricNames []string `mapstructure:"metric_names"`
 
+	// InsecureSkipVerify disables TLS certificate verification for kubelet HTTPS endpoints
+	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"`
+
+	// BearerTokenPath is the path to the ServiceAccount token for kubelet auth (auto-detected if empty)
+	BearerTokenPath string `mapstructure:"bearer_token_path"`
+
 	// Labels are additional labels applied to all cAdvisor metrics
 	Labels map[string]string `mapstructure:"labels"`
 }

@@ -20,9 +20,11 @@ package cadvisor
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -40,9 +42,10 @@ const collectorName = "cadvisor"
 // CAdvisorCollector scrapes container metrics from a cAdvisor Prometheus endpoint.
 // It implements the collector.Collector interface.
 type CAdvisorCollector struct {
-	cfg    config.CAdvisorCollectorConfig
-	logger *zap.Logger
-	client *http.Client
+	cfg         config.CAdvisorCollectorConfig
+	logger      *zap.Logger
+	client      *http.Client
+	bearerToken string
 
 	mu       sync.RWMutex
 	running  bool
@@ -64,13 +67,29 @@ func NewCAdvisorCollector(cfg config.CAdvisorCollectorConfig, logger *zap.Logger
 		cfg.Timeout = 10 * time.Second
 	}
 
+	// Build HTTP transport with optional TLS skip for kubelet HTTPS endpoints
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if cfg.InsecureSkipVerify {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // user-configured for kubelet self-signed certs
+	}
+
+	// Auto-detect ServiceAccount bearer token for kubelet auth
+	bearerToken := ""
+	tokenPath := cfg.BearerTokenPath
+	if tokenPath == "" {
+		tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	}
+	if tokenBytes, err := os.ReadFile(tokenPath); err == nil {
+		bearerToken = strings.TrimSpace(string(tokenBytes))
+		logger.Named(collectorName).Info("Using ServiceAccount bearer token for kubelet auth")
+	}
+
 	return &CAdvisorCollector{
-		cfg:    cfg,
-		logger: logger.Named(collectorName),
-		client: &http.Client{
-			Timeout: cfg.Timeout,
-		},
-		stopChan: make(chan struct{}),
+		cfg:         cfg,
+		logger:      logger.Named(collectorName),
+		client:      &http.Client{Timeout: cfg.Timeout, Transport: transport},
+		bearerToken: bearerToken,
+		stopChan:    make(chan struct{}),
 	}
 }
 
@@ -155,6 +174,9 @@ func (c *CAdvisorCollector) Collect(ctx context.Context) ([]collector.Metric, er
 		return nil, fmt.Errorf("cadvisor: create request: %w", err)
 	}
 	req.Header.Set("Accept", string(expfmt.NewFormat(expfmt.TypeTextPlain)))
+	if c.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
