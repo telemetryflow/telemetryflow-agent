@@ -24,18 +24,22 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Fluent Bit binary (from official image)
 # -----------------------------------------------------------------------------
-FROM fluent/fluent-bit:3.2 AS fluent-bit
+# NOTE: Fluent Bit is glibc-based — runtime MUST use glibc (Debian), not musl (Alpine).
+# See: https://github.com/fluent/fluent-bit/issues/2464
+FROM fluent/fluent-bit:4.2.3 AS fluent-bit
 
 # -----------------------------------------------------------------------------
 # Stage 2: Builder
 # -----------------------------------------------------------------------------
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 # Build arguments
 ARG VERSION=1.1.9
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
+ARG TARGETOS=linux
+ARG TARGETARCH
 
 # Install build dependencies
 RUN apk add --no-cache git make ca-certificates tzdata
@@ -53,7 +57,8 @@ RUN go mod download && go mod verify
 COPY . .
 
 # Build the binary with version information
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+# Uses TARGETOS/TARGETARCH for multi-arch support (amd64, arm64)
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -ldflags "-s -w \
     -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.Version=${VERSION}' \
     -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.GitCommit=${GIT_COMMIT}' \
@@ -61,13 +66,14 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -X 'github.com/telemetryflow/telemetryflow-agent/internal/version.BuildTime=${BUILD_TIME}'" \
     -o /tfo-agent ./cmd/tfo-agent
 
-# Verify binary
-RUN /tfo-agent version
-
 # -----------------------------------------------------------------------------
-# Stage 3: Runtime
+# Stage 3: Runtime (Debian slim — glibc required for Fluent Bit compatibility)
 # -----------------------------------------------------------------------------
-FROM alpine:3.23
+# IMPORTANT: Do NOT switch to Alpine. Fluent Bit requires glibc and has known
+# issues with musl: memory allocator (jemalloc), Golang plugin loading, and
+# time format parsing. See https://github.com/fluent/fluent-bit/issues/2464
+# NOTE: Fluent Bit 4.x requires GLIBC >= 2.38 — bookworm (2.36) is too old.
+FROM debian:trixie-slim
 
 ARG VERSION=1.1.9
 
@@ -83,24 +89,29 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.documentation="https://docs.telemetryflow.id" \
     org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-platform" \
     org.opencontainers.image.licenses="Apache-2.0" \
-    org.opencontainers.image.base.name="alpine:3.23" \
+    org.opencontainers.image.base.name="debian:trixie-slim" \
     # TelemetryFlow specific labels
     io.telemetryflow.product="TelemetryFlow Agent" \
     io.telemetryflow.component="tfo-agent" \
     io.telemetryflow.platform="CEOP" \
     io.telemetryflow.maintainer="DevOpsCorner Indonesia"
 
-# Update packages to get security patches (CVE fixes) and install runtime dependencies
-RUN apk upgrade --no-cache && \
-    apk add --no-cache \
+# Install runtime dependencies and security patches
+# Fluent Bit 4.x requires: libyaml, openssl3, libcurl, libsasl2, libpq
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     ca-certificates \
-    tzdata \
     curl \
-    && rm -rf /var/cache/apk/*
+    libyaml-0-2 \
+    libssl3t64 \
+    libcurl4t64 \
+    libsasl2-2 \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user and group
-RUN addgroup -g 10001 -S telemetryflow && \
-    adduser -u 10001 -S telemetryflow -G telemetryflow -h /home/telemetryflow
+RUN groupadd -g 10001 telemetryflow && \
+    useradd -u 10001 -g telemetryflow -m -d /home/telemetryflow -s /usr/sbin/nologin telemetryflow
 
 # Create required directories
 RUN mkdir -p \
@@ -164,11 +175,16 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 # =============================================================================
 # Build with:
 #   docker build \
-#     --build-arg VERSION=1.1.3 \
+#     --build-arg VERSION=1.1.9 \
 #     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
 #     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
 #     --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-#     -t telemetryflow/telemetryflow-agent:1.1.3 .
+#     -t telemetryflow/telemetryflow-agent:1.1.9 .
+#
+# Multi-arch build:
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     --build-arg VERSION=1.1.9 \
+#     -t telemetryflow/telemetryflow-agent:1.1.9 .
 #
 # Run with:
 #   docker run -d \
@@ -179,5 +195,5 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 #     -p 13133:13133 \
 #     -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
 #     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-#     telemetryflow/telemetryflow-agent:1.1.3
+#     telemetryflow/telemetryflow-agent:1.1.9
 # =============================================================================

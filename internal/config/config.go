@@ -703,7 +703,7 @@ type FluentBitCollectorConfig struct {
 	// RestartDelay is the delay before restarting after a crash (default: 5s)
 	RestartDelay time.Duration `mapstructure:"restart_delay"`
 
-	// MaxRestarts is the maximum number of restarts (0 = unlimited; default: 0)
+	// MaxRestarts is the maximum number of restarts (0 = unlimited; default: 10)
 	MaxRestarts int `mapstructure:"max_restarts"`
 
 	// Tail configures file tailing inputs
@@ -1922,6 +1922,7 @@ func DefaultConfig() *Config {
 				HealthPort:     2020,
 				RestartOnCrash: true,
 				RestartDelay:   5 * time.Second,
+				MaxRestarts:    10,
 				Tail: FluentBitTailConfig{
 					Enabled:         true,
 					MultilineParser: "docker,cri",

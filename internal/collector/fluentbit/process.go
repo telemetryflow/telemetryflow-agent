@@ -23,6 +23,7 @@ package fluentbit
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -85,6 +86,11 @@ func (p *ProcessManager) RunWithAutoRestart(ctx context.Context) error {
 				zap.Error(err),
 				zap.Int("restart_count", p.restartCount),
 			)
+
+			// Fail fast if the binary is missing — retrying won't help
+			if errors.Is(err, exec.ErrNotFound) {
+				return fmt.Errorf("fluent-bit binary not found at %s: %w", p.binaryPath, err)
+			}
 		}
 
 		if !p.restartCrash {

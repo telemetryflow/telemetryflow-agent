@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Fluent Bit Bundled in Docker Image** (`Dockerfile`): Multi-stage build copies `fluent-bit` binary (~15MB) from official `fluent/fluent-bit:3.2` image into the agent container
+- **Fluent Bit Bundled in Docker Image** (`Dockerfile`): Multi-stage build copies `fluent-bit` binary (~15MB) from official `fluent/fluent-bit:4.2.3` image into the agent container
   - No external sidecar or binary installation needed — `fluent-bit` available at `/usr/local/bin/fluent-bit`
   - Enabled by default for K8S deployments (`fluent_bit.enabled: true` in K8S configs, Helm values, manifests)
   - Docker Compose / VM deployments default to `enabled: false` (native log collector used)
