@@ -26,12 +26,18 @@ collectors:
     pdb: true
     events: true
     metrics_api: true
-    # KSM gaps (new)
+    # KSM gaps
     resource_quotas: true
     limit_ranges: true
     pod_conditions: true
     node_taints: true
     workload_generations: true
+    # Extended metrics — full observability without external tools
+    apiserver_metrics: true
+    coredns_metrics: true
+    coredns_service: "kube-dns.kube-system.svc.cluster.local:9153"
+    container_extended_metrics: true
+    pv_io_stats: true
 
   prometheus_scraper:
     enabled: true

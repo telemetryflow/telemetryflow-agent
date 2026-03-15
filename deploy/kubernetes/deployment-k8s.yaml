@@ -29,7 +29,7 @@ metadata:
     app.kubernetes.io/component: k8s-collector
     app.kubernetes.io/part-of: telemetryflow
 spec:
-  replicas: 1   # exactly 1 — multiple replicas would duplicate cluster state syncs
+  replicas: 1 # exactly 1 — multiple replicas would duplicate cluster state syncs
   selector:
     matchLabels:
       app.kubernetes.io/name: tfo-agent
@@ -134,7 +134,7 @@ spec:
             - name: TELEMETRYFLOW_K8S_ENABLED
               value: "true"
             - name: TELEMETRYFLOW_NODE_EXPORTER_ENABLED
-              value: "false"  # node metrics handled by tfo-agent DaemonSet
+              value: "false" # node metrics handled by tfo-agent DaemonSet
 
             # Prometheus server for liveness/readiness probes
             - name: TELEMETRYFLOW_PROMETHEUS_ENABLED
@@ -144,7 +144,7 @@ spec:
 
             # Cluster identity — used in auto-registration name and OTEL resource attributes
             - name: CLUSTER_NAME
-              value: ""   # override with your cluster name; auto-detected from hostname if empty
+              value: "" # override with your cluster name; auto-detected from hostname if empty
             - name: ENVIRONMENT
               value: "production"
 

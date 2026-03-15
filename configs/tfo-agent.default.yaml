@@ -246,6 +246,12 @@ collectors:
     pod_logs: true # Collect recent log lines from each running container
     pod_logs_tail_lines: 100 # Log lines per container per collection cycle
     pod_logs_namespaces: [] # Restrict pod log collection to these namespaces (empty = same as namespace filter)
+    # Extended metrics — TFO Agent replaces Prometheus + kube-state-metrics + cAdvisor
+    apiserver_metrics: true # Scrape kube-apiserver /metrics endpoint
+    coredns_metrics: true # Scrape CoreDNS /metrics endpoint
+    coredns_service: "kube-dns.kube-system.svc.cluster.local:9153"
+    container_extended_metrics: true # cpu_throttled, memory_working_set, oom (via Kubelet)
+    pv_io_stats: true # PV usage + IOPS from Kubelet volume stats
     # Sync resource state to TFO backend (PostgreSQL entities)
     sync_to_backend: true
     sync_interval: 60s

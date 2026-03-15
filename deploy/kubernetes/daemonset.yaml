@@ -140,7 +140,7 @@ spec:
             - name: TELEMETRYFLOW_NODE_EXPORTER_ENABLED
               value: "true"
             - name: TELEMETRYFLOW_K8S_ENABLED
-              value: "false"  # K8s state handled by tfo-agent-k8s Deployment (deployment-k8s.yaml)
+              value: "false" # K8s state handled by tfo-agent-k8s Deployment (deployment-k8s.yaml)
 
             # Prometheus server for liveness/readiness probes
             - name: TELEMETRYFLOW_PROMETHEUS_ENABLED
@@ -156,7 +156,7 @@ spec:
 
             # Cluster and environment tags for OTEL resource attributes
             - name: CLUSTER_NAME
-              value: ""     # override with your cluster name, or auto-detected from hostname
+              value: "" # override with your cluster name, or auto-detected from hostname
             - name: ENVIRONMENT
               value: "production"
 
@@ -205,7 +205,7 @@ spec:
               mountPropagation: HostToContainer
 
           securityContext:
-            runAsUser: 0      # required to read /proc and /sys for node metrics
+            runAsUser: 0 # required to read /proc and /sys for node metrics
             runAsGroup: 0
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -213,7 +213,7 @@ spec:
               drop:
                 - ALL
               add:
-                - SYS_PTRACE  # process inspection for node metrics
+                - SYS_PTRACE # process inspection for node metrics
 
       volumes:
         - name: config

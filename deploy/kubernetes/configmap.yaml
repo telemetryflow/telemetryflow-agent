@@ -121,6 +121,16 @@ data:
         resource_counts: true
         network: true    # Kubelet /stats/summary (requires nodes/proxy RBAC)
         metrics_api: true  # CPU/Memory usage from metrics-server (set false if not installed)
+        hpa: true
+        pdb: true
+        pod_logs: true
+        pod_logs_tail_lines: 100
+        # Extended metrics — replaces Prometheus + kube-state-metrics + cAdvisor
+        apiserver_metrics: true
+        coredns_metrics: true
+        coredns_service: "kube-dns.kube-system.svc.cluster.local:9153"
+        container_extended_metrics: true  # cpu_throttled, memory_working_set, oom
+        pv_io_stats: true                 # PV usage + IOPS from Kubelet volume stats
         sync_to_backend: true
         sync_interval: 60s
         cluster_name: ""     # auto-detected from CLUSTER_NAME env or hostname

@@ -25,7 +25,7 @@ environment: production
 image:
   repository: ghcr.io/telemetryflow/tfo-agent
   pullPolicy: IfNotPresent
-  tag: ""  # Defaults to Chart.appVersion
+  tag: "" # Defaults to Chart.appVersion
 
 imagePullSecrets: []
 
@@ -298,6 +298,12 @@ kubernetes:
         pod_logs_namespaces: []
         exclude_namespaces:
           - kube-system
+        # Extended metrics — TFO Agent collects directly (replaces Prometheus stack)
+        apiserver_metrics: true # Scrape kube-apiserver /metrics
+        coredns_metrics: true # Scrape CoreDNS /metrics
+        coredns_service: "kube-dns.kube-system.svc.cluster.local:9153"
+        container_extended_metrics: true # cpu_throttled, memory_working_set, oom (via Kubelet)
+        pv_io_stats: true # PV usage + IOPS (via Kubelet volume stats)
         # KSM gaps (new — all default false, enabled by oneForAll.enabled)
         resource_quotas: false
         limit_ranges: false

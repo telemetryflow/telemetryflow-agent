@@ -79,6 +79,18 @@ rules:
       - volumeattachments
     verbs: ["get", "list", "watch"]
 
+  # Pod logs — for pod_logs collector
+  - apiGroups: [""]
+    resources:
+      - pods/log
+    verbs: ["get", "list"]
+
+  # Policy — PodDisruptionBudgets
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list", "watch"]
+
   # Events API (events.k8s.io/v1 replaces core/v1 events in K8s 1.19+)
   - apiGroups: ["events.k8s.io"]
     resources:

@@ -67,9 +67,28 @@ rules:
       - pods
     verbs: ["get", "list"]
 
-  # Non-resource URLs (e.g. /metrics, /healthz)
+  # Pod logs (for pod_logs collector)
+  - apiGroups: [""]
+    resources:
+      - pods/log
+    verbs: ["get", "list"]
+
+  # Policy resources (PDB)
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list", "watch"]
+
+  # Discovery (EndpointSlices)
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["get", "list", "watch"]
+
+  # Non-resource URLs (metrics, healthz, cAdvisor)
   - nonResourceURLs:
       - /metrics
+      - /metrics/cadvisor
       - /healthz
       - /readyz
     verbs: ["get"]

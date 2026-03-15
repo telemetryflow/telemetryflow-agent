@@ -27,11 +27,11 @@ config:
       enabled: true
 
     kubernetes:
-      enabled: false  # overridden to true in kubernetes.config section below
+      enabled: false # overridden to true in kubernetes.config section below
 
     prometheus_scraper:
       enabled: true
-      scrape_jobs: []  # user fills in their targets
+      scrape_jobs: [] # user fills in their targets
 
     remote_write_receiver:
       enabled: true
@@ -48,3 +48,9 @@ kubernetes:
         node_taints: true
         workload_generations: true
         metrics_api: true
+        # Extended metrics — full observability without external tools
+        apiserver_metrics: true
+        coredns_metrics: true
+        coredns_service: "kube-dns.kube-system.svc.cluster.local:9153"
+        container_extended_metrics: true
+        pv_io_stats: true
