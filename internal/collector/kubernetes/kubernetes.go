@@ -311,6 +311,16 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 	}
 
+	// --- Node Logs ---
+	if k.cfg.NodeLogs {
+		nodeLogs, err := collectNodeLogs(ctx, k.clientset, k.cfg, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect node logs", zap.Error(err))
+		} else {
+			state.NodeLogs = nodeLogs
+		}
+	}
+
 	// --- Network (Kubelet Summary API) ---
 	if k.cfg.Network {
 		// Gather node names from already-collected state, or list them

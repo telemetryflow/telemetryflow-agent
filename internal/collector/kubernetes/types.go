@@ -45,6 +45,7 @@ type ClusterState struct {
 	HPAs             []HPAState              `json:"hpas,omitempty"`
 	PDBs             []PDBState              `json:"pdbs,omitempty"`
 	PodLogs          []PodLogEntry           `json:"pod_logs,omitempty"`
+	NodeLogs         []NodeLogEntry          `json:"node_logs,omitempty"`
 	ApiServerMetrics *ApiServerMetrics       `json:"apiserver_metrics,omitempty"`
 	CoreDNSMetrics   *CoreDNSMetrics         `json:"coredns_metrics,omitempty"`
 }
@@ -227,6 +228,14 @@ type PodLogEntry struct {
 	ContainerName string    `json:"container_name"`
 	Lines         []string  `json:"lines,omitempty"`
 	CollectedAt   time.Time `json:"collected_at"`
+}
+
+// NodeLogEntry holds log lines from a K8s node system service (kubelet, kube-proxy, containerd).
+type NodeLogEntry struct {
+	NodeName    string    `json:"node_name"`
+	Source      string    `json:"source"` // kubelet, kube-proxy, containerd
+	Lines       []string  `json:"lines,omitempty"`
+	CollectedAt time.Time `json:"collected_at"`
 }
 
 // ResourceQuotaUsage represents a single resource's used/hard values.

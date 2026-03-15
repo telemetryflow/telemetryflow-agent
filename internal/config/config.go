@@ -487,6 +487,15 @@ type KubernetesCollectorConfig struct {
 	// PodLogsNamespaces restricts log collection to specific namespaces (empty = same as Namespaces filter)
 	PodLogsNamespaces []string `mapstructure:"pod_logs_namespaces"`
 
+	// NodeLogs enables node-level log collection (kubelet, kube-proxy, containerd)
+	NodeLogs bool `mapstructure:"node_logs"`
+
+	// NodeLogsTailLines is the number of recent log lines to collect per node source (default 200)
+	NodeLogsTailLines int64 `mapstructure:"node_logs_tail_lines"`
+
+	// NodeLogSources is the list of node log sources to collect (default: kubelet, kube-proxy, containerd)
+	NodeLogSources []string `mapstructure:"node_log_sources"`
+
 	// ResourceQuotas enables ResourceQuota metrics collection
 	ResourceQuotas bool `mapstructure:"resource_quotas"`
 
@@ -614,14 +623,41 @@ type LogCollectorConfig struct {
 	// Enabled enables the log collector
 	Enabled bool `mapstructure:"enabled"`
 
-	// Paths is a list of log file paths to collect
+	// Interval is how often to flush buffered log lines (default 10s)
+	Interval time.Duration `mapstructure:"interval"`
+
+	// Paths is a list of log file paths/globs to collect (e.g., /var/log/*.log)
 	Paths []string `mapstructure:"paths"`
 
-	// IncludePatterns is a list of patterns to include
+	// IncludePatterns is a list of regex patterns — only matching lines are collected
 	IncludePatterns []string `mapstructure:"include_patterns"`
 
-	// ExcludePatterns is a list of patterns to exclude
+	// ExcludePatterns is a list of regex patterns — matching lines are dropped
 	ExcludePatterns []string `mapstructure:"exclude_patterns"`
+
+	// MaxLineSize is the maximum single log line size in bytes (default 65536)
+	MaxLineSize int `mapstructure:"max_line_size"`
+
+	// BatchSize is the number of log records per OTLP export batch (default 500)
+	BatchSize int `mapstructure:"batch_size"`
+
+	// MultilinePattern is a regex for detecting multiline log entries (e.g., Java stack traces)
+	MultilinePattern string `mapstructure:"multiline_pattern"`
+
+	// Journald configures systemd journal log collection (Linux only)
+	Journald JournaldConfig `mapstructure:"journald"`
+}
+
+// JournaldConfig configures systemd journal log collection.
+type JournaldConfig struct {
+	// Enabled enables journald log collection
+	Enabled bool `mapstructure:"enabled"`
+
+	// Units is the list of systemd units to follow (e.g., sshd, kubelet, docker)
+	Units []string `mapstructure:"units"`
+
+	// Priorities is the journal priority filter (e.g., emerg, alert, crit, err, warning, info)
+	Priorities []string `mapstructure:"priorities"`
 }
 
 // ProcessCollectorConfig contains process collector settings
@@ -1767,6 +1803,9 @@ func DefaultConfig() *Config {
 				PDB:               true,
 				PodLogs:           true,
 				PodLogsTailLines:  100,
+				NodeLogs:          true,
+				NodeLogsTailLines: 200,
+				NodeLogSources:    []string{"kubelet", "kube-proxy", "containerd"},
 				SyncToBackend:     true,
 				SyncInterval:      60 * time.Second,
 				ExcludeNamespaces: []string{"kube-system"},

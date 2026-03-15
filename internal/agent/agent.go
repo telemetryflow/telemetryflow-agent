@@ -34,6 +34,7 @@ import (
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
+	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
@@ -241,6 +242,16 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 			Logger:      logger,
 		})
 		collectors = append(collectors, sysCollector)
+	}
+
+	// Add log collector if enabled (file tailing + journald)
+	if cfg.Collector.Logs.Enabled {
+		logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
+		collectors = append(collectors, logCol)
+		logger.Info("Log collector enabled",
+			zap.Int("paths", len(cfg.Collector.Logs.Paths)),
+			zap.Bool("journald", cfg.Collector.Logs.Journald.Enabled),
+		)
 	}
 
 	// Add Prometheus Scraper collector if enabled
