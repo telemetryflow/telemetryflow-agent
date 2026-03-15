@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **K8s Node Log Collection** (`internal/collector/kubernetes/node_logs.go`): New collector that retrieves kubelet, kube-proxy, and containerd logs from every K8s node
+  - Uses K8s API server node proxy endpoint: `GET /api/v1/nodes/{name}/proxy/logs/{source}.log`
+  - Configurable via `node_logs: true`, `node_logs_tail_lines: 200`, `node_log_sources: [kubelet, kube-proxy, containerd]`
+  - Collected log lines included in cluster sync payload (`node_logs` field in `ClusterState`)
+  - Backend stores in dedicated `kubernetes_node_logs` ClickHouse table (7-day TTL) + dual-write to unified `logs` table (30-day TTL)
+- **VM File & Journald Log Collector** (`internal/collector/log/`): Full implementation of the previously-stubbed `LogCollectorConfig`
+  - `collector.go`: Main `LogCollector` implementing `collector.Collector` interface — orchestrates file tailers and journald, exports via OTLP callback
+  - `tail.go`: `FileTailer` engine — tails log files from EOF, handles rotation (truncation/inode change), supports glob path expansion
+  - `journald_linux.go`: Systemd journal follower via `journalctl --follow --output=json` with unit and priority filtering
+  - `journald_stub.go`: No-op stub for non-Linux platforms
+  - `inode_unix.go` / `inode_windows.go`: Platform-specific inode detection for log rotation
+  - Enhanced `LogCollectorConfig`: `interval`, `max_line_size`, `batch_size`, `multiline_pattern`, nested `journald { enabled, units, priorities }`
+  - Self-monitoring metrics: `tfo.log_collector.lines_total`, `tfo.log_collector.bytes_total`
+  - Include/exclude regex pattern filtering applied at collection time (before buffering)
 - **Extended K8s Metrics Config Fields** (`collectors.kubernetes`): Five new config fields enabling TFO Agent to replace Prometheus, kube-state-metrics, and cAdvisor as external dependencies
   - `apiserver_metrics: true` — Scrape kube-apiserver `/metrics` endpoint for request rates, latency, error rates, work queue depth, CPU/memory usage
   - `coredns_metrics: true` — Scrape CoreDNS `/metrics` endpoint for DNS request rates, cache hit rates, duration p99, upstream requests, error rates
