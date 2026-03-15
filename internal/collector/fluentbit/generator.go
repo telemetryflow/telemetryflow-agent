@@ -52,18 +52,18 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	multilineParsersFile := filepath.Join(cfg.ConfigDir, "multiline-parsers.conf")
 
 	b.WriteString("[SERVICE]\n")
-	b.WriteString(fmt.Sprintf("    flush             %d\n", flush))
+	fmt.Fprintf(&b, "    flush             %d\n", flush)
 	b.WriteString("    daemon            off\n")
-	b.WriteString(fmt.Sprintf("    log_level         %s\n", logLevel))
-	b.WriteString(fmt.Sprintf("    parsers_file      %s\n", parsersFile))
-	b.WriteString(fmt.Sprintf("    plugins_file      %s\n", multilineParsersFile))
+	fmt.Fprintf(&b, "    log_level         %s\n", logLevel)
+	fmt.Fprintf(&b, "    parsers_file      %s\n", parsersFile)
+	fmt.Fprintf(&b, "    plugins_file      %s\n", multilineParsersFile)
 
 	if cfg.StorageEnabled {
 		storagePath := cfg.StoragePath
 		if storagePath == "" {
 			storagePath = filepath.Join(cfg.ConfigDir, "storage")
 		}
-		b.WriteString(fmt.Sprintf("    storage.path      %s\n", storagePath))
+		fmt.Fprintf(&b, "    storage.path      %s\n", storagePath)
 		b.WriteString("    storage.sync      normal\n")
 		b.WriteString("    storage.checksum  off\n")
 		b.WriteString("    storage.backlog.mem_limit 5M\n")
@@ -74,13 +74,13 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 		if port <= 0 {
 			port = 2020
 		}
-		b.WriteString(fmt.Sprintf("    health_check      on\n"))
-		b.WriteString(fmt.Sprintf("    hc_errors_count   5\n"))
-		b.WriteString(fmt.Sprintf("    hc_retry_failure_count 5\n"))
-		b.WriteString(fmt.Sprintf("    hc_period         5\n"))
-		b.WriteString(fmt.Sprintf("    http_server       on\n"))
-		b.WriteString(fmt.Sprintf("    http_listen       0.0.0.0\n"))
-		b.WriteString(fmt.Sprintf("    http_port         %d\n", port))
+		b.WriteString("    health_check      on\n")
+		b.WriteString("    hc_errors_count   5\n")
+		b.WriteString("    hc_retry_failure_count 5\n")
+		b.WriteString("    hc_period         5\n")
+		b.WriteString("    http_server       on\n")
+		b.WriteString("    http_listen       0.0.0.0\n")
+		fmt.Fprintf(&b, "    http_port         %d\n", port)
 	}
 	b.WriteString("\n")
 
@@ -89,27 +89,27 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 		for i, path := range cfg.Tail.Paths {
 			b.WriteString("[INPUT]\n")
 			b.WriteString("    name              tail\n")
-			b.WriteString(fmt.Sprintf("    tag               file.%d.*\n", i))
-			b.WriteString(fmt.Sprintf("    path              %s\n", path))
+			fmt.Fprintf(&b, "    tag               file.%d.*\n", i)
+			fmt.Fprintf(&b, "    path              %s\n", path)
 			if len(cfg.Tail.ExcludePaths) > 0 {
-				b.WriteString(fmt.Sprintf("    exclude_path      %s\n", strings.Join(cfg.Tail.ExcludePaths, ",")))
+				fmt.Fprintf(&b, "    exclude_path      %s\n", strings.Join(cfg.Tail.ExcludePaths, ","))
 			}
 			if cfg.Tail.MultilineParser != "" {
-				b.WriteString(fmt.Sprintf("    multiline.parser  %s\n", cfg.Tail.MultilineParser))
+				fmt.Fprintf(&b, "    multiline.parser  %s\n", cfg.Tail.MultilineParser)
 			}
 			if cfg.Tail.DBPath != "" {
-				b.WriteString(fmt.Sprintf("    db                %s\n", cfg.Tail.DBPath))
+				fmt.Fprintf(&b, "    db                %s\n", cfg.Tail.DBPath)
 			} else {
-				b.WriteString(fmt.Sprintf("    db                %s\n", filepath.Join(cfg.ConfigDir, fmt.Sprintf("tail-%d.db", i))))
+				fmt.Fprintf(&b, "    db                %s\n", filepath.Join(cfg.ConfigDir, fmt.Sprintf("tail-%d.db", i)))
 			}
 			if cfg.Tail.ReadFromHead {
 				b.WriteString("    read_from_head    on\n")
 			}
 			if cfg.Tail.RefreshInterval > 0 {
-				b.WriteString(fmt.Sprintf("    refresh_interval  %d\n", cfg.Tail.RefreshInterval))
+				fmt.Fprintf(&b, "    refresh_interval  %d\n", cfg.Tail.RefreshInterval)
 			}
 			if cfg.Tail.RotateWait > 0 {
-				b.WriteString(fmt.Sprintf("    rotate_wait       %d\n", cfg.Tail.RotateWait))
+				fmt.Fprintf(&b, "    rotate_wait       %d\n", cfg.Tail.RotateWait)
 			}
 			if cfg.StorageEnabled {
 				b.WriteString("    storage.type      filesystem\n")
@@ -124,7 +124,7 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 		b.WriteString("    name              systemd\n")
 		b.WriteString("    tag               journald.*\n")
 		for _, unit := range cfg.Systemd.Units {
-			b.WriteString(fmt.Sprintf("    systemd_filter    _SYSTEMD_UNIT=%s.service\n", unit))
+			fmt.Fprintf(&b, "    systemd_filter    _SYSTEMD_UNIT=%s.service\n", unit)
 		}
 		if cfg.Systemd.StripUnderscores {
 			b.WriteString("    strip_underscores on\n")
@@ -144,9 +144,9 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 		b.WriteString("[INPUT]\n")
 		b.WriteString("    name              tail\n")
 		b.WriteString("    tag               kube.*\n")
-		b.WriteString(fmt.Sprintf("    path              %s\n", logPath))
+		fmt.Fprintf(&b, "    path              %s\n", logPath)
 		b.WriteString("    multiline.parser  cri\n")
-		b.WriteString(fmt.Sprintf("    db                %s\n", filepath.Join(cfg.ConfigDir, "kube-containers.db")))
+		fmt.Fprintf(&b, "    db                %s\n", filepath.Join(cfg.ConfigDir, "kube-containers.db"))
 		b.WriteString("    mem_buf_limit     5MB\n")
 		b.WriteString("    skip_long_lines   on\n")
 		if cfg.StorageEnabled {
@@ -179,7 +179,7 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	for _, input := range cfg.CustomInputs {
 		b.WriteString("[INPUT]\n")
 		for k, v := range input.Properties {
-			b.WriteString(fmt.Sprintf("    %-18s%s\n", k, v))
+			fmt.Fprintf(&b, "    %-18s%s\n", k, v)
 		}
 		b.WriteString("\n")
 	}
@@ -188,7 +188,7 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	for _, filter := range cfg.CustomFilters {
 		b.WriteString("[FILTER]\n")
 		for k, v := range filter.Properties {
-			b.WriteString(fmt.Sprintf("    %-18s%s\n", k, v))
+			fmt.Fprintf(&b, "    %-18s%s\n", k, v)
 		}
 		b.WriteString("\n")
 	}
@@ -202,8 +202,8 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	b.WriteString("[OUTPUT]\n")
 	b.WriteString("    name              opentelemetry\n")
 	b.WriteString("    match             *\n")
-	b.WriteString(fmt.Sprintf("    host              %s\n", host))
-	b.WriteString(fmt.Sprintf("    port              %s\n", port))
+	fmt.Fprintf(&b, "    host              %s\n", host)
+	fmt.Fprintf(&b, "    port              %s\n", port)
 	b.WriteString("    logs_uri          /v1/logs\n")
 
 	if tls {
@@ -218,10 +218,10 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	}
 
 	if tfCfg.APIKeyID != "" {
-		b.WriteString(fmt.Sprintf("    header            X-TelemetryFlow-Key-ID %s\n", tfCfg.APIKeyID))
+		fmt.Fprintf(&b, "    header            X-TelemetryFlow-Key-ID %s\n", tfCfg.APIKeyID)
 	}
 	if tfCfg.APIKeySecret != "" {
-		b.WriteString(fmt.Sprintf("    header            X-TelemetryFlow-Key-Secret %s\n", tfCfg.APIKeySecret))
+		fmt.Fprintf(&b, "    header            X-TelemetryFlow-Key-Secret %s\n", tfCfg.APIKeySecret)
 	}
 
 	b.WriteString("    logs_body_key     $message\n")
@@ -270,7 +270,7 @@ func parseEndpoint(endpoint string) (host, port string, tls bool, err error) {
 		return "localhost", "4318", false, nil
 	}
 
-	// If no scheme, assume gRPC (which uses https for TLS)
+	// If no scheme, assume plain TCP
 	if !strings.Contains(endpoint, "://") {
 		h, p, splitErr := net.SplitHostPort(endpoint)
 		if splitErr != nil {
