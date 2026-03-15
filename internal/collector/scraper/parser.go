@@ -25,6 +25,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
@@ -40,7 +41,7 @@ import (
 //	HISTOGRAM→ MetricTypeHistogram (one metric per bucket + _sum + _count)
 //	SUMMARY  → MetricTypeSummary   (one metric per quantile + _sum + _count)
 func parsePrometheusText(r io.Reader) ([]collector.Metric, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.LegacyValidation)
 	families, err := parser.TextToMetricFamilies(r)
 	if err != nil {
 		// TextToMetricFamilies returns a partial result alongside the error;

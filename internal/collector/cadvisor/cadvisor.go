@@ -40,13 +40,6 @@ import (
 
 const collectorName = "cadvisor"
 
-func init() {
-	// prometheus/common v0.67+ requires an explicit validation scheme.
-	// Without this, TextParser.TextToMetricFamilies panics with
-	// "Invalid name validation scheme requested: unset".
-	model.NameValidationScheme = model.LegacyValidation
-}
-
 // CAdvisorCollector scrapes container metrics from a cAdvisor Prometheus endpoint.
 // It implements the collector.Collector interface.
 type CAdvisorCollector struct {
@@ -213,8 +206,9 @@ func (c *CAdvisorCollector) Collect(ctx context.Context) ([]collector.Metric, er
 }
 
 // parsePrometheusText parses Prometheus text format from a reader.
+// Uses LegacyValidation to support traditional metric names (e.g., container_cpu_usage_seconds_total).
 func parsePrometheusText(r io.Reader) (map[string]*dto.MetricFamily, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.LegacyValidation)
 	return parser.TextToMetricFamilies(r)
 }
 
