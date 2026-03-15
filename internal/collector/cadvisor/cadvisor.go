@@ -31,6 +31,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -38,6 +39,13 @@ import (
 )
 
 const collectorName = "cadvisor"
+
+func init() {
+	// prometheus/common v0.67+ requires an explicit validation scheme.
+	// Without this, TextParser.TextToMetricFamilies panics with
+	// "Invalid name validation scheme requested: unset".
+	model.NameValidationScheme = model.LegacyValidation
+}
 
 // CAdvisorCollector scrapes container metrics from a cAdvisor Prometheus endpoint.
 // It implements the collector.Collector interface.
