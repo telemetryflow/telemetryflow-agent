@@ -203,6 +203,15 @@ spec:
               mountPath: /host/root
               readOnly: true
               mountPropagation: HostToContainer
+            # Host log mounts for Fluent Bit / native log collector
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlogcontainers
+              mountPath: /var/log/containers
+              readOnly: true
+            - name: fluentbit-storage
+              mountPath: /tmp/tfo-agent-fluentbit
 
           securityContext:
             runAsUser: 0 # required to read /proc and /sys for node metrics
@@ -231,3 +240,12 @@ spec:
         - name: root
           hostPath:
             path: /
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+        - name: fluentbit-storage
+          emptyDir:
+            sizeLimit: 200Mi

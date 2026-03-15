@@ -37,6 +37,20 @@ config:
       enabled: true
       port: 9091
 
+    # Fluent Bit for node-level log collection
+    fluent_bit:
+      enabled: false
+      config_dir: /tmp/tfo-agent-fluentbit
+      tail:
+        enabled: true
+        paths: ["/var/log/syslog", "/var/log/messages"]
+        multiline_parser: "docker,cri"
+      systemd:
+        enabled: true
+        units: [kubelet, docker, containerd]
+      kubernetes:
+        enabled: false
+
 kubernetes:
   config:
     collectors:
@@ -48,6 +62,11 @@ kubernetes:
         node_taints: true
         workload_generations: true
         metrics_api: true
+        pod_logs: true
+        pod_logs_tail_lines: 100
+        node_logs: true
+        node_logs_tail_lines: 200
+        node_log_sources: [kubelet, kube-proxy, containerd]
         # Extended metrics — full observability without external tools
         apiserver_metrics: true
         coredns_metrics: true

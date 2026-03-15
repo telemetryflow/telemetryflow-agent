@@ -41,6 +41,30 @@ data:
         vmstat: false
         sockstat: false
 
+      # Native log collector (file tailing + journald)
+      logs:
+        enabled: false
+        paths: []
+
+      # Fluent Bit log collector (production-grade, bundled in image)
+      fluent_bit:
+        enabled: true
+        config_dir: /tmp/tfo-agent-fluentbit
+        flush_interval: 5
+        log_level: info
+        storage_enabled: true
+        health_check: true
+        restart_on_crash: true
+        tail:
+          enabled: true
+          paths: []
+          multiline_parser: "docker,cri"
+        systemd:
+          enabled: true
+          units: [kubelet, docker, containerd]
+        kubernetes:
+          enabled: false
+
       # kubernetes is handled by the separate K8s Collector Deployment (tfo-agent-k8s)
       kubernetes:
         enabled: false
@@ -125,6 +149,9 @@ data:
         pdb: true
         pod_logs: true
         pod_logs_tail_lines: 100
+        node_logs: true
+        node_logs_tail_lines: 200
+        node_log_sources: [kubelet, kube-proxy, containerd]
         # Extended metrics — replaces Prometheus + kube-state-metrics + cAdvisor
         apiserver_metrics: true
         coredns_metrics: true

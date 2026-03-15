@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fluent Bit Bundled in Docker Image** (`Dockerfile`): Multi-stage build copies `fluent-bit` binary (~15MB) from official `fluent/fluent-bit:3.2` image into the agent container
+  - No external sidecar or binary installation needed — `fluent-bit` available at `/usr/local/bin/fluent-bit`
+  - Enabled by default for K8S deployments (`fluent_bit.enabled: true` in K8S configs, Helm values, manifests)
+  - Docker Compose / VM deployments default to `enabled: false` (native log collector used)
+  - `/tmp/tfo-agent-fluentbit/` directory pre-created for config generation and storage buffering
+- **Fluent Bit Subprocess Collector** (`internal/collector/fluentbit/`): Production-grade log collection via embedded Fluent Bit, replacing the native file tailer when enabled
+  - `collector.go`: Implements `collector.Collector` interface — manages Fluent Bit lifecycle, auto-restart on crash, self-monitoring metrics
+  - `generator.go`: Dynamic config generation — converts TFO-Agent YAML to `fluent-bit.conf` with INPUT (tail, systemd, K8s containers), FILTER (kubernetes metadata, multiline), OUTPUT (OpenTelemetry to TFO Platform)
+  - `process.go`: Subprocess manager — spawns `fluent-bit -c <config>` with `daemon off`, SIGTERM graceful shutdown, health check via `/api/v1/health`, circular stderr buffer for diagnostics
+  - `parsers.go`: Built-in parser definitions — Docker JSON, CRI regex, syslog-rfc5424/3164, multiline parsers for Java stack traces, Python tracebacks, Go panics
+  - Mutual exclusion: `fluent_bit.enabled=true` replaces native `logs` collector; falls back to native if binary not found
+  - K8s auto-detection: Automatically enables kubernetes filter + `/var/log/containers/*.log` when `KUBERNETES_SERVICE_HOST` env is set
+  - Configurable via `collectors.fluent_bit` YAML section: binary_path, tail paths, systemd units, K8s metadata enrichment, storage buffering, health check, restart policy
+  - Self-monitoring metrics: `tfo.fluentbit.running`, `tfo.fluentbit.pid`, `tfo.fluentbit.restart_count`, `tfo.fluentbit.uptime_seconds`, `tfo.fluentbit.healthy`
 - **K8s Node Log Collection** (`internal/collector/kubernetes/node_logs.go`): New collector that retrieves kubelet, kube-proxy, and containerd logs from every K8s node
   - Uses K8s API server node proxy endpoint: `GET /api/v1/nodes/{name}/proxy/logs/{source}.log`
   - Configurable via `node_logs: true`, `node_logs_tail_lines: 200`, `node_log_sources: [kubelet, kube-proxy, containerd]`

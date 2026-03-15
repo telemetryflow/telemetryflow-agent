@@ -38,6 +38,33 @@ collectors:
     coredns_service: "kube-dns.kube-system.svc.cluster.local:9153"
     container_extended_metrics: true
     pv_io_stats: true
+    # Pod & node logs
+    pod_logs: true
+    pod_logs_tail_lines: 100
+    node_logs: true
+    node_logs_tail_lines: 200
+    node_log_sources: [kubelet, kube-proxy, containerd]
+
+  # Fluent Bit — production-grade log collection (replaces native logs)
+  fluent_bit:
+    enabled: false # enable when fluent-bit binary is available
+    config_dir: /tmp/tfo-agent-fluentbit
+    flush_interval: 5
+    log_level: info
+    storage_enabled: true
+    health_check: true
+    restart_on_crash: true
+    tail:
+      enabled: true
+      paths: ["/var/log/syslog", "/var/log/messages"]
+      multiline_parser: "docker,cri"
+    systemd:
+      enabled: true
+      units: [kubelet, docker, containerd]
+    kubernetes:
+      enabled: false # auto-detected
+      log_path: /var/log/containers/*.log
+      merge_log: true
 
   prometheus_scraper:
     enabled: true

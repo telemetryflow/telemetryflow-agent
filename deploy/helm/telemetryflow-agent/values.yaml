@@ -221,6 +221,34 @@ config:
       vmstat: false
       sockstat: false
 
+    # Native log collector (file tailing + journald)
+    logs:
+      enabled: false
+      paths: []
+      include_patterns: []
+      exclude_patterns: []
+
+    # Fluent Bit log collector (production-grade, bundled in image)
+    fluent_bit:
+      enabled: true
+      config_dir: /tmp/tfo-agent-fluentbit
+      flush_interval: 5
+      log_level: info
+      storage_enabled: true
+      health_check: true
+      restart_on_crash: true
+      tail:
+        enabled: true
+        paths: []
+        multiline_parser: "docker,cri"
+      systemd:
+        enabled: true
+        units: [kubelet, docker, containerd]
+      kubernetes:
+        enabled: false
+        log_path: /var/log/containers/*.log
+        merge_log: true
+
     # Kubernetes cluster monitoring — toggled OFF for DaemonSet via env var
     kubernetes:
       enabled: false
@@ -296,6 +324,9 @@ kubernetes:
         pod_logs: true
         pod_logs_tail_lines: 100
         pod_logs_namespaces: []
+        node_logs: true
+        node_logs_tail_lines: 200
+        node_log_sources: [kubelet, kube-proxy, containerd]
         exclude_namespaces:
           - kube-system
         # Extended metrics — TFO Agent collects directly (replaces Prometheus stack)

@@ -22,7 +22,12 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Stage 1: Builder
+# Stage 1: Fluent Bit binary (from official image)
+# -----------------------------------------------------------------------------
+FROM fluent/fluent-bit:3.2 AS fluent-bit
+
+# -----------------------------------------------------------------------------
+# Stage 2: Builder
 # -----------------------------------------------------------------------------
 FROM golang:1.26-alpine AS builder
 
@@ -60,7 +65,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 RUN /tfo-agent version
 
 # -----------------------------------------------------------------------------
-# Stage 2: Runtime
+# Stage 3: Runtime
 # -----------------------------------------------------------------------------
 FROM alpine:3.23
 
@@ -102,14 +107,25 @@ RUN mkdir -p \
     /etc/tfo-agent \
     /var/lib/tfo-agent/buffer \
     /var/log/tfo-agent \
+    /tmp/tfo-agent-fluentbit/storage \
     && chown -R telemetryflow:telemetryflow \
     /etc/tfo-agent \
     /var/lib/tfo-agent \
-    /var/log/tfo-agent
+    /var/log/tfo-agent \
+    /tmp/tfo-agent-fluentbit
 
-# Copy binary from builder
+# Copy TFO-Agent binary from builder
 COPY --from=builder /tfo-agent /usr/local/bin/tfo-agent
 RUN chmod +x /usr/local/bin/tfo-agent
+
+# Copy Fluent Bit binary and default configs from official image
+# Enables production-grade log collection (CRI/Docker parsers, K8s metadata,
+# multiline stack traces, filesystem buffering) without external sidecar.
+# ~15MB addition. Activated via collectors.fluent_bit.enabled: true
+COPY --from=fluent-bit /fluent-bit/bin/fluent-bit /usr/local/bin/fluent-bit
+COPY --from=fluent-bit /fluent-bit/etc/fluent-bit.conf /etc/fluent-bit/fluent-bit.conf
+COPY --from=fluent-bit /fluent-bit/etc/parsers.conf /etc/fluent-bit/parsers.conf
+RUN chmod +x /usr/local/bin/fluent-bit
 
 # Copy default configuration
 COPY configs/tfo-agent.yaml /etc/tfo-agent/tfo-agent.yaml
@@ -128,7 +144,8 @@ WORKDIR /home/telemetryflow
 # 4318 - OTLP HTTP receiver
 # 8888 - Prometheus metrics (self-observability)
 # 13133 - Health check endpoint
-EXPOSE 4317 4318 8888 13133
+# 2020 - Fluent Bit health/metrics (when fluent_bit.health_check enabled)
+EXPOSE 4317 4318 8888 13133 2020
 
 # =============================================================================
 # Health Check

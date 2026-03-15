@@ -272,6 +272,71 @@ collectors:
     exclude_patterns: []
 
   # ===========================================================================
+  # Fluent Bit Log Collector (production-grade, replaces native logs collector)
+  # ===========================================================================
+  # Embeds Fluent Bit as a managed subprocess for production-grade log collection.
+  # When enabled, replaces the native logs collector above.
+  # Provides: CRI/Docker parsers, K8s metadata enrichment, multiline support,
+  # filesystem buffering with backpressure, and offset database tracking.
+  # Requires: fluent-bit binary on PATH or configured via binary_path.
+  fluent_bit:
+    enabled: false
+    binary_path: "" # auto-detect from PATH
+    config_dir: /tmp/tfo-agent-fluentbit
+    flush_interval: 5 # seconds
+    log_level: info # debug, info, warn, error
+    storage_enabled: true # filesystem buffering for backpressure
+    storage_path: "" # default: config_dir/storage
+    health_check: true
+    health_port: 2020
+    restart_on_crash: true
+    restart_delay: 5s
+    max_restarts: 0 # 0 = unlimited
+    # File tailing (replaces native FileTailer)
+    tail:
+      enabled: true
+      paths: []
+      # - /var/log/syslog
+      # - /var/log/messages
+      # - /var/log/auth.log
+      exclude_paths: []
+      multiline_parser: "docker,cri"
+      db_path: "" # default: config_dir/tail-N.db
+      read_from_head: false
+      refresh_interval: 10 # seconds
+      rotate_wait: 5 # seconds
+    # Systemd journal (replaces native JournaldCollector)
+    systemd:
+      enabled: true
+      units:
+        - kubelet
+        - docker
+        - containerd
+        # - sshd
+        # - nginx
+      strip_underscores: true
+    # Kubernetes container logs + metadata enrichment
+    kubernetes:
+      enabled: false # auto-detected when KUBERNETES_SERVICE_HOST is set
+      log_path: /var/log/containers/*.log
+      merge_log: true # parse JSON log body into top-level fields
+      keep_log: false # drop original log field after merge
+      k8s_logging_parser: true # honor pod annotation log parser
+    # Advanced: custom Fluent Bit INPUT sections
+    # custom_inputs:
+    #   - properties:
+    #       name: tcp
+    #       listen: 0.0.0.0
+    #       port: 5170
+    #       format: json
+    # Advanced: custom Fluent Bit FILTER sections
+    # custom_filters:
+    #   - properties:
+    #       name: grep
+    #       match: "*"
+    #       regex: log error
+
+  # ===========================================================================
   # Node Exporter Collector (prometheus/node_exporter replacement)
   # ===========================================================================
   # Collects detailed system metrics equivalent to Prometheus node_exporter.

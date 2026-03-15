@@ -33,6 +33,7 @@ import (
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
+	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
@@ -244,11 +245,38 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		collectors = append(collectors, sysCollector)
 	}
 
-	// Add log collector if enabled (file tailing + journald)
-	if cfg.Collector.Logs.Enabled {
+	// Add log collector: Fluent Bit (preferred) or native (fallback).
+	// Mutual exclusion — Fluent Bit replaces native when both are enabled.
+	if cfg.Collector.FluentBit.Enabled {
+		fbCol, err := fluentbitcollector.NewFluentBitCollector(
+			cfg.Collector.FluentBit,
+			cfg.TelemetryFlow,
+			agentID,
+			logger,
+		)
+		if err != nil {
+			logger.Warn("Failed to create Fluent Bit collector, falling back to native log collector",
+				zap.Error(err),
+			)
+			// Fall back to native log collector
+			if cfg.Collector.Logs.Enabled {
+				logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
+				collectors = append(collectors, logCol)
+				logger.Info("Native log collector enabled (Fluent Bit fallback)")
+			}
+		} else {
+			collectors = append(collectors, fbCol)
+			logger.Info("Fluent Bit log collector enabled",
+				zap.String("binary", cfg.Collector.FluentBit.BinaryPath),
+				zap.Bool("kubernetes", cfg.Collector.FluentBit.Kubernetes.Enabled),
+				zap.Bool("systemd", cfg.Collector.FluentBit.Systemd.Enabled),
+				zap.Int("tail_paths", len(cfg.Collector.FluentBit.Tail.Paths)),
+			)
+		}
+	} else if cfg.Collector.Logs.Enabled {
 		logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
 		collectors = append(collectors, logCol)
-		logger.Info("Log collector enabled",
+		logger.Info("Native log collector enabled",
 			zap.Int("paths", len(cfg.Collector.Logs.Paths)),
 			zap.Bool("journald", cfg.Collector.Logs.Journald.Enabled),
 		)

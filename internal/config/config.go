@@ -218,8 +218,13 @@ type CollectorConfig struct {
 	// Kubernetes contains Kubernetes metrics collector settings
 	Kubernetes KubernetesCollectorConfig `mapstructure:"kubernetes"`
 
-	// Logs contains log collector settings
+	// Logs contains native log collector settings (file tailing + journald)
 	Logs LogCollectorConfig `mapstructure:"logs"`
+
+	// FluentBit contains Fluent Bit subprocess log collector settings.
+	// When enabled, replaces the native Logs collector with production-grade
+	// Fluent Bit capabilities (CRI/Docker parsers, K8s metadata, multiline, filesystem buffering).
+	FluentBit FluentBitCollectorConfig `mapstructure:"fluent_bit"`
 
 	// NodeExporter contains node exporter metrics collector settings
 	NodeExporter NodeExporterConfig `mapstructure:"node_exporter"`
@@ -658,6 +663,96 @@ type JournaldConfig struct {
 
 	// Priorities is the journal priority filter (e.g., emerg, alert, crit, err, warning, info)
 	Priorities []string `mapstructure:"priorities"`
+}
+
+// FluentBitCollectorConfig contains Fluent Bit subprocess log collector settings.
+// When enabled, Fluent Bit replaces the native log collector with production-grade
+// log collection: CRI/Docker parsers, K8s metadata enrichment, multiline support,
+// filesystem buffering with backpressure, and offset database tracking.
+type FluentBitCollectorConfig struct {
+	// Enabled enables the Fluent Bit log collector (mutually exclusive with native Logs collector)
+	Enabled bool `mapstructure:"enabled"`
+
+	// BinaryPath is the path to the fluent-bit binary (auto-detected from PATH if empty)
+	BinaryPath string `mapstructure:"binary_path"`
+
+	// ConfigDir is the directory for generated config files (default: /tmp/tfo-agent-fluentbit)
+	ConfigDir string `mapstructure:"config_dir"`
+
+	// FlushInterval is the output flush interval in seconds (default: 5)
+	FlushInterval int `mapstructure:"flush_interval"`
+
+	// LogLevel is the Fluent Bit log verbosity (debug, info, warn, error; default: info)
+	LogLevel string `mapstructure:"log_level"`
+
+	// StorageEnabled enables filesystem buffering for backpressure handling
+	StorageEnabled bool `mapstructure:"storage_enabled"`
+
+	// StoragePath is the directory for filesystem buffer (default: ConfigDir/storage)
+	StoragePath string `mapstructure:"storage_path"`
+
+	// HealthCheck enables Fluent Bit's built-in HTTP health endpoint
+	HealthCheck bool `mapstructure:"health_check"`
+
+	// HealthPort is the port for the health endpoint (default: 2020)
+	HealthPort int `mapstructure:"health_port"`
+
+	// RestartOnCrash automatically restarts Fluent Bit if it crashes (default: true)
+	RestartOnCrash bool `mapstructure:"restart_on_crash"`
+
+	// RestartDelay is the delay before restarting after a crash (default: 5s)
+	RestartDelay time.Duration `mapstructure:"restart_delay"`
+
+	// MaxRestarts is the maximum number of restarts (0 = unlimited; default: 0)
+	MaxRestarts int `mapstructure:"max_restarts"`
+
+	// Tail configures file tailing inputs
+	Tail FluentBitTailConfig `mapstructure:"tail"`
+
+	// Systemd configures systemd journal input
+	Systemd FluentBitSystemdConfig `mapstructure:"systemd"`
+
+	// Kubernetes configures K8s container log collection and metadata enrichment
+	Kubernetes FluentBitKubernetesConfig `mapstructure:"kubernetes"`
+
+	// CustomInputs allows adding arbitrary Fluent Bit INPUT sections
+	CustomInputs []FluentBitCustomSection `mapstructure:"custom_inputs"`
+
+	// CustomFilters allows adding arbitrary Fluent Bit FILTER sections
+	CustomFilters []FluentBitCustomSection `mapstructure:"custom_filters"`
+}
+
+// FluentBitTailConfig configures Fluent Bit tail (file) input plugin.
+type FluentBitTailConfig struct {
+	Enabled         bool     `mapstructure:"enabled"`
+	Paths           []string `mapstructure:"paths"` // glob patterns (e.g., /var/log/*.log)
+	ExcludePaths    []string `mapstructure:"exclude_paths"`
+	MultilineParser string   `mapstructure:"multiline_parser"` // e.g., "docker,cri"
+	DBPath          string   `mapstructure:"db_path"`          // offset tracking database
+	ReadFromHead    bool     `mapstructure:"read_from_head"`
+	RefreshInterval int      `mapstructure:"refresh_interval"` // seconds (default: 10)
+	RotateWait      int      `mapstructure:"rotate_wait"`      // seconds (default: 5)
+}
+
+// FluentBitSystemdConfig configures Fluent Bit systemd (journal) input plugin.
+type FluentBitSystemdConfig struct {
+	Enabled          bool     `mapstructure:"enabled"`
+	Units            []string `mapstructure:"units"`             // systemd units to follow
+	StripUnderscores bool     `mapstructure:"strip_underscores"` // remove leading _ from journal fields
+}
+
+// FluentBitKubernetesConfig configures Fluent Bit K8s container log collection.
+type FluentBitKubernetesConfig struct {
+	Enabled          bool   `mapstructure:"enabled"`            // auto-detect from KUBERNETES_SERVICE_HOST
+	LogPath          string `mapstructure:"log_path"`           // default: /var/log/containers/*.log
+	MergeLog         bool   `mapstructure:"merge_log"`          // parse JSON log body into top-level fields
+	KeepLog          bool   `mapstructure:"keep_log"`           // keep original log field after merge
+	K8sLoggingParser bool   `mapstructure:"k8s_logging_parser"` // honor pod annotation log parser
+}
+
+// FluentBitCustomSection allows adding arbitrary Fluent Bit config sections.
+type FluentBitCustomSection struct {
+	Properties map[string]string `mapstructure:"properties"`
 }
 
 // ProcessCollectorConfig contains process collector settings
@@ -1816,6 +1911,34 @@ func DefaultConfig() *Config {
 			Logs: LogCollectorConfig{
 				Enabled: false,
 				Paths:   []string{},
+			},
+			FluentBit: FluentBitCollectorConfig{
+				Enabled:        false,
+				ConfigDir:      "/tmp/tfo-agent-fluentbit",
+				FlushInterval:  5,
+				LogLevel:       "info",
+				StorageEnabled: true,
+				HealthCheck:    true,
+				HealthPort:     2020,
+				RestartOnCrash: true,
+				RestartDelay:   5 * time.Second,
+				Tail: FluentBitTailConfig{
+					Enabled:         true,
+					MultilineParser: "docker,cri",
+					RefreshInterval: 10,
+					RotateWait:      5,
+				},
+				Systemd: FluentBitSystemdConfig{
+					Enabled:          true,
+					Units:            []string{"kubelet", "docker", "containerd"},
+					StripUnderscores: true,
+				},
+				Kubernetes: FluentBitKubernetesConfig{
+					Enabled:          false, // auto-detected at runtime
+					LogPath:          "/var/log/containers/*.log",
+					MergeLog:         true,
+					K8sLoggingParser: true,
+				},
 			},
 			NodeExporter: NodeExporterConfig{
 				Enabled:                false,

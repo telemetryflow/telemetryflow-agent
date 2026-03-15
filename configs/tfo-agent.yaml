@@ -247,6 +247,10 @@ collectors:
     pod_logs: true # Collect recent log lines from each running container
     pod_logs_tail_lines: 100 # Log lines per container per collection cycle
     pod_logs_namespaces: [] # Restrict pod log collection to these namespaces (empty = same as namespace filter)
+    # Node logs — kubelet, kube-proxy, containerd logs from each K8s node
+    node_logs: true # Collect node-level system service logs
+    node_logs_tail_lines: 200 # Log lines per node source per collection cycle
+    node_log_sources: [kubelet, kube-proxy, containerd] # Node log sources to collect
     # Extended metrics — TFO Agent replaces Prometheus + kube-state-metrics + cAdvisor
     apiserver_metrics: true # Scrape kube-apiserver /metrics endpoint
     coredns_metrics: true # Scrape CoreDNS /metrics endpoint
@@ -271,6 +275,43 @@ collectors:
     # - /var/log/messages
     include_patterns: []
     exclude_patterns: []
+
+  # ===========================================================================
+  # Fluent Bit Log Collector (production-grade, replaces native logs collector)
+  # ===========================================================================
+  # Embeds Fluent Bit as a managed subprocess for production-grade log collection.
+  # When enabled, replaces the native logs collector above.
+  fluent_bit:
+    enabled: false
+    binary_path: "" # auto-detect from PATH
+    config_dir: /tmp/tfo-agent-fluentbit
+    flush_interval: 5
+    log_level: info
+    storage_enabled: true
+    health_check: true
+    health_port: 2020
+    restart_on_crash: true
+    restart_delay: 5s
+    max_restarts: 0
+    tail:
+      enabled: true
+      paths: []
+      # - /var/log/syslog
+      # - /var/log/messages
+      multiline_parser: "docker,cri"
+      read_from_head: false
+      refresh_interval: 10
+      rotate_wait: 5
+    systemd:
+      enabled: true
+      units: [kubelet, docker, containerd]
+      strip_underscores: true
+    kubernetes:
+      enabled: false # auto-detected from KUBERNETES_SERVICE_HOST
+      log_path: /var/log/containers/*.log
+      merge_log: true
+      keep_log: false
+      k8s_logging_parser: true
 
   # ===========================================================================
   # Node Exporter Collector (prometheus/node_exporter replacement)

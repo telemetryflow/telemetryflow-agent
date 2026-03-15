@@ -162,6 +162,15 @@ spec:
               mountPath: /host/rootfs
               readOnly: true
               mountPropagation: HostToContainer
+            # Host log mounts for Fluent Bit / native log collector
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlogcontainers
+              mountPath: /var/log/containers
+              readOnly: true
+            - name: fluentbit-storage
+              mountPath: /tmp/tfo-agent-fluentbit
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -182,6 +191,14 @@ spec:
         - name: rootfs
           hostPath:
             path: /
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlogcontainers
+          hostPath:
+            path: /var/log/containers
+        - name: fluentbit-storage
+          emptyDir: {}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
