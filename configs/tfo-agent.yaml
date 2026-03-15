@@ -254,7 +254,7 @@ collectors:
     # Extended metrics — TFO Agent replaces Prometheus + kube-state-metrics + cAdvisor
     apiserver_metrics: true # Scrape kube-apiserver /metrics endpoint
     coredns_metrics: true # Scrape CoreDNS /metrics endpoint
-    coredns_service: "kube-dns.kube-system.svc.cluster.local:9153" # CoreDNS service address
+    coredns_service: "coredns.kube-system.svc.cluster.local:9153" # CoreDNS service address
     container_extended_metrics: true # cpu_throttled, memory_working_set, oom (via Kubelet /stats/summary + cAdvisor)
     pv_io_stats: true # PV usage + IOPS from Kubelet volume stats
     # Sync resource state to TFO backend (populates PostgreSQL K8s entities)

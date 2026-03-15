@@ -42,7 +42,7 @@ func collectCoreDNSMetrics(
 	logger *zap.Logger,
 ) (*CoreDNSMetrics, error) {
 	if coreDNSService == "" {
-		coreDNSService = "kube-dns.kube-system.svc.cluster.local:9153"
+		coreDNSService = "coredns.kube-system.svc.cluster.local:9153"
 	}
 
 	// Try scraping via the Kubernetes API proxy first (works from outside the cluster too).

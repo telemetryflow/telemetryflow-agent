@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Extended K8s Metrics Config Fields** (`collectors.kubernetes`): Five new config fields enabling TFO Agent to replace Prometheus, kube-state-metrics, and cAdvisor as external dependencies
   - `apiserver_metrics: true` — Scrape kube-apiserver `/metrics` endpoint for request rates, latency, error rates, work queue depth, CPU/memory usage
   - `coredns_metrics: true` — Scrape CoreDNS `/metrics` endpoint for DNS request rates, cache hit rates, duration p99, upstream requests, error rates
-  - `coredns_service` — CoreDNS service address (default: `kube-dns.kube-system.svc.cluster.local:9153`)
+  - `coredns_service` — CoreDNS service address (default: `coredns.kube-system.svc.cluster.local:9153`)
   - `container_extended_metrics: true` — Collect per-container CPU throttling, memory working set, and OOM kill detection via Kubelet `/stats/summary` and cAdvisor
   - `pv_io_stats: true` — Collect PersistentVolume usage, IOPS, and throughput from Kubelet volume stats API
 - **cAdvisor TLS & Auth Support** (`internal/collector/cadvisor/cadvisor.go`): cAdvisor collector now supports HTTPS kubelet endpoints
