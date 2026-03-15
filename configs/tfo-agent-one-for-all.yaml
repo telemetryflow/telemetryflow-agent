@@ -35,7 +35,7 @@ collectors:
     # Extended metrics — full observability without external tools
     apiserver_metrics: true
     coredns_metrics: true
-    coredns_service: "coredns.kube-system.svc.cluster.local:9153"
+    coredns_service: "" # Auto-discover via pod labels (supports vanilla k8s, EKS, GKE, AKS, RKE2, k3s)
     container_extended_metrics: true
     pv_io_stats: true
     # Pod & node logs

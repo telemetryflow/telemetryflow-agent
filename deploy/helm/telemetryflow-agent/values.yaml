@@ -332,7 +332,7 @@ kubernetes:
         # Extended metrics — TFO Agent collects directly (replaces Prometheus stack)
         apiserver_metrics: true # Scrape kube-apiserver /metrics
         coredns_metrics: true # Scrape CoreDNS /metrics
-        coredns_service: "coredns.kube-system.svc.cluster.local:9153"
+        coredns_service: "" # Auto-discover via pod labels (supports vanilla k8s, EKS, GKE, AKS, RKE2, k3s)
         container_extended_metrics: true # cpu_throttled, memory_working_set, oom (via Kubelet)
         pv_io_stats: true # PV usage + IOPS (via Kubelet volume stats)
         # KSM gaps (new — all default false, enabled by oneForAll.enabled)

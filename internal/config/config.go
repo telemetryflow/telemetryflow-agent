@@ -1906,7 +1906,7 @@ func DefaultConfig() *Config {
 				ExcludeNamespaces: []string{"kube-system"},
 				ApiServerMetrics:  true,
 				CoreDNSMetrics:    true,
-				CoreDNSService:    "coredns.kube-system.svc.cluster.local:9153",
+				CoreDNSService:    "", // Auto-discover via pod labels
 			},
 			Logs: LogCollectorConfig{
 				Enabled: false,
