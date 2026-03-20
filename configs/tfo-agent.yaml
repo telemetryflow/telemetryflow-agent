@@ -14,7 +14,7 @@
 #   TELEMETRYFLOW_API_KEY_SECRET  - API Key Secret for authentication (format: tfs_xxx)
 #   TELEMETRYFLOW_ENDPOINT        - TFO backend base URL
 #                                     gRPC:  tfo-collector:4317
-#                                     HTTP:  http://tfo-backend:3000/api/v2/monitoring
+#                                     HTTP:  http://tfo-backend:3000/api/v2
 #   TELEMETRYFLOW_AGENT_ID        - Unique agent ID (optional, auto-generated if unset)
 #   TELEMETRYFLOW_AGENT_NAME      - Human-readable agent name (optional)
 #   TELEMETRYFLOW_ENVIRONMENT     - Deployment environment tag, e.g. production (optional)
@@ -26,7 +26,7 @@
 # Example .env file:
 #   TELEMETRYFLOW_API_KEY_ID=tfk_your_key_id
 #   TELEMETRYFLOW_API_KEY_SECRET=tfs_your_key_secret
-#   TELEMETRYFLOW_ENDPOINT=http://tfo-backend:3000/api/v2/monitoring   # HTTP mode
+#   TELEMETRYFLOW_ENDPOINT=http://tfo-backend:3000/api/v2   # HTTP mode
 #   # TELEMETRYFLOW_ENDPOINT=tfo-collector:4317                        # gRPC mode
 #
 # =============================================================================
@@ -42,10 +42,10 @@ telemetryflow:
   api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
   # TFO backend endpoint — format depends on protocol:
   #   grpc: bare host:port     (e.g., tfo-collector:4317)
-  #   http: full HTTP base URL (e.g., http://tfo-backend:3000/api/v2/monitoring)
+  #   http: full HTTP base URL (e.g., http://tfo-backend:3000/api/v2)
   # Used for agent heartbeat/registration and as OTLP base URL when no
   # per-signal endpoint override is configured in exporter.otlp.*.endpoint.
-  endpoint: "${TELEMETRYFLOW_ENDPOINT:-http://localhost:3000/api/v2/monitoring}"
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-http://localhost:3000/api/v2}"
   # Protocol: grpc (OTLP native) or http (REST + OTLP/HTTP)
   protocol: http
   # TLS settings for backend connection

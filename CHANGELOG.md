@@ -110,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Default endpoint config** (`configs/tfo-agent.yaml`): Corrected default `TELEMETRYFLOW_ENDPOINT` from `http://localhost:3000/api/v2/monitoring` to `http://localhost:3000/api/v2` — aligns with all Kubernetes Helm templates, Docker Compose, and platform config files which consistently use `/api/v2` as base URL. Agent API paths already include `/monitoring/` prefix, so the previous default caused double `/monitoring` when using the built-in fallback
 - **Config env var expansion** (`internal/config/loader.go`): Viper-based config loader now calls `os.ExpandEnv()` on YAML content before parsing, resolving `${VAR}` placeholders in config values (e.g., `${NODE_IP}` in cAdvisor endpoint). Previously, env var references in config values were passed as literal strings, causing URL parse failures
 - **cAdvisor kubelet HTTPS** (`internal/collector/cadvisor/cadvisor.go`): HTTP client now respects `insecure_skip_verify` config and includes ServiceAccount bearer token in requests. Previously, HTTPS kubelet endpoints failed with `x509: certificate signed by unknown authority` and `403 Forbidden`
 - **cAdvisor Prometheus parser** (`internal/collector/cadvisor/cadvisor.go`): Switched to `LegacyValidation` parser to support traditional `container_*` and `machine_*` metric names; optional `metric_names` allowlist for selective collection

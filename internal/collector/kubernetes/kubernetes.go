@@ -267,6 +267,17 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 	}
 
+	// --- Network Policies ---
+	{
+		npMetrics, nps, err := collectNetworkPolicies(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect network policy state", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, npMetrics...)
+			state.NetworkPolicies = nps
+		}
+	}
+
 	// --- Events ---
 	if k.cfg.Events {
 		metrics, events, err := collectEvents(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
