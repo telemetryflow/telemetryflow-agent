@@ -39,6 +39,7 @@ type ClusterState struct {
 	Services         []ServiceState          `json:"services,omitempty"`
 	Endpoints        []EndpointState         `json:"endpoints,omitempty"`
 	Ingresses        []IngressState          `json:"ingresses,omitempty"`
+	NetworkPolicies  []NetworkPolicyState    `json:"network_policies,omitempty"`
 	PVs              []PVState               `json:"pvs,omitempty"`
 	PVCs             []PVCState              `json:"pvcs,omitempty"`
 	Events           []EventState            `json:"events,omitempty"`
@@ -409,6 +410,45 @@ type EventState struct {
 	Count          int32  `json:"count"`
 	FirstTimestamp int64  `json:"first_timestamp"` // Unix millis
 	LastTimestamp  int64  `json:"last_timestamp"`  // Unix millis
+}
+
+// NetworkPolicyState represents a Kubernetes NetworkPolicy resource.
+type NetworkPolicyState struct {
+	Name             string              `json:"name"`
+	Namespace        string              `json:"namespace"`
+	PolicyTypes      []string            `json:"policy_types,omitempty"` // Ingress, Egress
+	PodSelector      map[string]string   `json:"pod_selector,omitempty"`
+	IngressRuleCount int                 `json:"ingress_rule_count"`
+	EgressRuleCount  int                 `json:"egress_rule_count"`
+	IngressRules     []NetworkPolicyRule `json:"ingress_rules,omitempty"`
+	EgressRules      []NetworkPolicyRule `json:"egress_rules,omitempty"`
+	Labels           map[string]string   `json:"labels,omitempty"`
+	CreatedAt        int64               `json:"created_at,omitempty"` // Unix millis
+}
+
+// NetworkPolicyRule represents a single ingress or egress rule.
+type NetworkPolicyRule struct {
+	Ports []NetworkPolicyPort `json:"ports,omitempty"`
+	Peers []NetworkPolicyPeer `json:"peers,omitempty"`
+}
+
+// NetworkPolicyPort represents a port allowed by a network policy.
+type NetworkPolicyPort struct {
+	Protocol string `json:"protocol"`
+	Port     string `json:"port,omitempty"` // port number or named port
+}
+
+// NetworkPolicyPeer represents a source/destination peer in a network policy.
+type NetworkPolicyPeer struct {
+	PodSelector       map[string]string     `json:"pod_selector,omitempty"`
+	NamespaceSelector map[string]string     `json:"namespace_selector,omitempty"`
+	IPBlock           *NetworkPolicyIPBlock `json:"ip_block,omitempty"`
+}
+
+// NetworkPolicyIPBlock represents a CIDR block in a network policy.
+type NetworkPolicyIPBlock struct {
+	CIDR   string   `json:"cidr"`
+	Except []string `json:"except,omitempty"`
 }
 
 // ResourceCounts holds per-namespace resource counts for the overview dashboard.
