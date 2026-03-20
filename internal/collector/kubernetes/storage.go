@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	"go.uber.org/zap"
+
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
@@ -53,6 +55,15 @@ func collectStorage(
 		capacity := parseMemory(*pv.Spec.Capacity.Storage())
 		phase := string(pv.Status.Phase)
 
+		// Reclaim policy
+		reclaimPolicy := string(pv.Spec.PersistentVolumeReclaimPolicy)
+
+		// Volume mode
+		volumeMode := "Filesystem"
+		if pv.Spec.VolumeMode != nil {
+			volumeMode = string(*pv.Spec.VolumeMode)
+		}
+
 		labels := map[string]string{
 			"cluster":       cluster,
 			"pv":            pv.Name,
@@ -64,21 +75,20 @@ func collectStorage(
 			collector.NewMetric("k8s.pv.capacity_bytes", float64(capacity), collector.MetricTypeGauge).
 				WithLabels(labels).WithUnit("bytes").
 				WithDescription("PersistentVolume capacity in bytes"),
+			collector.NewMetric("k8s.pv.phase", 1, collector.MetricTypeGauge).
+				WithLabels(labels).
+				WithDescription("PersistentVolume phase (label carries phase: Available, Bound, Released, Failed)"),
+			collector.NewMetric("k8s.pv.info", 1, collector.MetricTypeGauge).
+				WithLabels(labels).
+				WithLabel("reclaim_policy", reclaimPolicy).
+				WithLabel("volume_mode", volumeMode).
+				WithDescription("PersistentVolume info gauge (labels carry metadata)"),
 		)
 
 		// Access modes
 		var accessModes []string
 		for _, m := range pv.Spec.AccessModes {
 			accessModes = append(accessModes, string(m))
-		}
-
-		// Reclaim policy
-		reclaimPolicy := string(pv.Spec.PersistentVolumeReclaimPolicy)
-
-		// Volume mode
-		volumeMode := "Filesystem"
-		if pv.Spec.VolumeMode != nil {
-			volumeMode = string(*pv.Spec.VolumeMode)
 		}
 
 		// Claim ref
@@ -187,4 +197,73 @@ func collectStorage(
 	}
 
 	return metrics, pvStates, pvcStates, nil
+}
+
+// collectVolumeStats gathers per-PVC volume usage metrics from Kubelet /stats/summary.
+// This is the only source for live volume usage (used bytes, inodes) — the K8s API
+// only provides capacity via PV/PVC specs, not actual usage.
+func collectVolumeStats(
+	ctx context.Context,
+	fetcher KubeletProxyFunc,
+	nodeNames []string,
+	cfg Config,
+	cluster string,
+	logger *zap.Logger,
+) ([]collector.Metric, error) {
+	if fetcher == nil {
+		return nil, nil
+	}
+
+	var metrics []collector.Metric
+
+	for _, nodeName := range nodeNames {
+		summary, err := fetcher(ctx, nodeName)
+		if err != nil {
+			logger.Debug("Failed to fetch kubelet stats for volume stats",
+				zap.String("node", nodeName), zap.Error(err))
+			continue
+		}
+
+		for _, pod := range summary.Pods {
+			ns := pod.PodRef.Namespace
+			if !cfg.shouldCollectNamespace(ns) {
+				continue
+			}
+			for _, vol := range pod.Volumes {
+				if vol.PvcRef == nil {
+					continue
+				}
+				labels := map[string]string{
+					"cluster":   cluster,
+					"namespace": ns,
+					"pod":       pod.PodRef.Name,
+					"pvc":       vol.PvcRef.Name,
+					"volume":    vol.Name,
+				}
+				if vol.UsedBytes != nil {
+					metrics = append(metrics,
+						collector.NewMetric("k8s.volume.used_bytes", float64(*vol.UsedBytes), collector.MetricTypeGauge).
+							WithLabels(labels).WithUnit("bytes").
+							WithDescription("Volume used bytes from Kubelet summary"),
+					)
+				}
+				if vol.InodesUsed != nil {
+					metrics = append(metrics,
+						collector.NewMetric("k8s.volume.inodes_used", float64(*vol.InodesUsed), collector.MetricTypeGauge).
+							WithLabels(labels).
+							WithDescription("Volume inodes used from Kubelet summary"),
+					)
+				}
+				if vol.CapacityBytes != nil {
+					metrics = append(metrics,
+						collector.NewMetric("k8s.volume.capacity_bytes", float64(*vol.CapacityBytes), collector.MetricTypeGauge).
+							WithLabels(labels).WithUnit("bytes").
+							WithDescription("Volume capacity bytes from Kubelet summary"),
+					)
+				}
+			}
+		}
+	}
+
+	return metrics, nil
 }

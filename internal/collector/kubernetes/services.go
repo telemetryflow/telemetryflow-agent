@@ -29,32 +29,86 @@ import (
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-// collectServices gathers Service and Endpoints metrics.
+// collectServices gathers Service and Endpoints metrics and state.
 func collectServices(
 	ctx context.Context,
 	cs kubernetes.Interface,
 	cfg Config,
 	cluster string,
-) ([]collector.Metric, []ServiceState, error) {
+) ([]collector.Metric, []ServiceState, []EndpointState, error) {
 	svcList, err := cs.CoreV1().Services("").List(ctx, metav1.ListOptions{
 		LabelSelector: cfg.LabelSelector,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Pre-fetch endpoints
 	epList, _ := cs.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{})
-	epMap := make(map[string]int) // namespace/name → address count
+	epCountMap := make(map[string]int)              // namespace/name → address count
+	epStateMap := make(map[string][]EndpointSubset) // namespace/name → subsets
+	var endpointStates []EndpointState
+
 	if epList != nil {
 		for i := range epList.Items {
 			ep := &epList.Items[i]
+			if !cfg.shouldCollectNamespace(ep.Namespace) {
+				continue
+			}
 			key := ep.Namespace + "/" + ep.Name
 			count := 0
+			var subsets []EndpointSubset
 			for _, subset := range ep.Subsets {
 				count += len(subset.Addresses)
+
+				var addresses []EndpointAddress
+				for _, addr := range subset.Addresses {
+					ea := EndpointAddress{IP: addr.IP}
+					if addr.NodeName != nil {
+						ea.NodeName = *addr.NodeName
+					}
+					if addr.TargetRef != nil {
+						ea.TargetRef = addr.TargetRef.Name
+					}
+					addresses = append(addresses, ea)
+				}
+
+				var notReady []EndpointAddress
+				for _, addr := range subset.NotReadyAddresses {
+					ea := EndpointAddress{IP: addr.IP}
+					if addr.NodeName != nil {
+						ea.NodeName = *addr.NodeName
+					}
+					if addr.TargetRef != nil {
+						ea.TargetRef = addr.TargetRef.Name
+					}
+					notReady = append(notReady, ea)
+				}
+
+				var ports []EndpointPort
+				for _, p := range subset.Ports {
+					ports = append(ports, EndpointPort{
+						Name:     p.Name,
+						Port:     p.Port,
+						Protocol: string(p.Protocol),
+					})
+				}
+
+				subsets = append(subsets, EndpointSubset{
+					Addresses:         addresses,
+					NotReadyAddresses: notReady,
+					Ports:             ports,
+				})
 			}
-			epMap[key] = count
+			epCountMap[key] = count
+			epStateMap[key] = subsets
+
+			endpointStates = append(endpointStates, EndpointState{
+				Name:      ep.Name,
+				Namespace: ep.Namespace,
+				Subsets:   subsets,
+				CreatedAt: ep.CreationTimestamp.UnixMilli(),
+			})
 		}
 	}
 
@@ -73,7 +127,7 @@ func collectServices(
 
 		svcType := string(svc.Spec.Type)
 		key := svc.Namespace + "/" + svc.Name
-		endpointCount := epMap[key]
+		endpointCount := epCountMap[key]
 
 		// Aggregate
 		if svcCounts[svc.Namespace] == nil {
@@ -93,12 +147,40 @@ func collectServices(
 				WithDescription("Number of ready endpoints for this service"),
 		)
 
+		// Build ports
+		var ports []ServicePort
+		for _, p := range svc.Spec.Ports {
+			ports = append(ports, ServicePort{
+				Name:       p.Name,
+				Protocol:   string(p.Protocol),
+				Port:       p.Port,
+				TargetPort: p.TargetPort.String(),
+				NodePort:   p.NodePort,
+			})
+		}
+
+		// External IPs
+		externalIPs := svc.Spec.ExternalIPs
+		// Also check LoadBalancer ingress
+		for _, ing := range svc.Status.LoadBalancer.Ingress {
+			if ing.IP != "" {
+				externalIPs = append(externalIPs, ing.IP)
+			} else if ing.Hostname != "" {
+				externalIPs = append(externalIPs, ing.Hostname)
+			}
+		}
+
 		states = append(states, ServiceState{
 			Name:          svc.Name,
 			Namespace:     svc.Namespace,
 			Type:          svcType,
 			ClusterIP:     svc.Spec.ClusterIP,
+			ExternalIPs:   externalIPs,
+			Ports:         ports,
+			Selector:      svc.Spec.Selector,
+			Labels:        svc.Labels,
 			EndpointCount: endpointCount,
+			CreatedAt:     svc.CreationTimestamp.UnixMilli(),
 		})
 	}
 
@@ -115,5 +197,21 @@ func collectServices(
 		}
 	}
 
-	return metrics, states, nil
+	// Endpoint count metric per namespace (total)
+	nsEpCounts := make(map[string]int)
+	for _, epState := range endpointStates {
+		for _, sub := range epState.Subsets {
+			nsEpCounts[epState.Namespace] += len(sub.Addresses)
+		}
+	}
+	for ns, count := range nsEpCounts {
+		metrics = append(metrics,
+			collector.NewMetric("k8s.endpoint.total", float64(count), collector.MetricTypeGauge).
+				WithLabel("cluster", cluster).
+				WithLabel("namespace", ns).
+				WithDescription("Total endpoint addresses per namespace"),
+		)
+	}
+
+	return metrics, states, endpointStates, nil
 }

@@ -248,12 +248,22 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 
 	// --- Services ---
 	if k.cfg.Services {
-		metrics, svcs, err := collectServices(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		metrics, svcs, eps, err := collectServices(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
 		if err != nil {
 			k.logger.Warn("Failed to collect service metrics", zap.Error(err))
 		} else {
 			allMetrics = append(allMetrics, metrics...)
 			state.Services = svcs
+			state.Endpoints = eps
+		}
+
+		// Ingresses (collect alongside services since they share networking context)
+		ingMetrics, ings, err := collectIngresses(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect ingress state", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, ingMetrics...)
+			state.Ingresses = ings
 		}
 	}
 
@@ -344,6 +354,16 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		} else {
 			allMetrics = append(allMetrics, metrics...)
 			state.NetworkStats = netStats
+		}
+
+		// Volume stats (PVC usage from Kubelet /stats/summary)
+		if k.cfg.Storage {
+			volMetrics, err := collectVolumeStats(ctx, k.kubeletFetcher, nodeNames, k.cfg, k.cfg.ClusterName, k.logger)
+			if err != nil {
+				k.logger.Warn("Failed to collect volume stats", zap.Error(err))
+			} else {
+				allMetrics = append(allMetrics, volMetrics...)
+			}
 		}
 	}
 

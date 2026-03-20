@@ -62,6 +62,8 @@ func NewFakeClientset() *fake.Clientset {
 		// ConfigMaps
 		fakeConfigMap("default", "app-config"),
 		fakeConfigMap("monitoring", "prometheus-config"),
+		// Endpoints
+		fakeEndpoints("default", "app-svc", []string{"10.0.1.1", "10.0.1.2"}, []string{"10.0.1.3"}, 8080),
 		// Ingresses
 		fakeIngress("default", "app-ingress"),
 		// ResourceQuotas
@@ -340,15 +342,83 @@ func fakeConfigMap(namespace, name string) *corev1.ConfigMap {
 	}
 }
 
-func fakeIngress(namespace, name string) *networkingv1.Ingress {
-	return &networkingv1.Ingress{
+func fakeEndpoints(namespace, name string, readyIPs, notReadyIPs []string, port int32) *corev1.Endpoints {
+	var addresses []corev1.EndpointAddress
+	for _, ip := range readyIPs {
+		addresses = append(addresses, corev1.EndpointAddress{
+			IP:       ip,
+			NodeName: strPtr("worker-1"),
+			TargetRef: &corev1.ObjectReference{
+				Kind: "Pod",
+				Name: "app-abc123",
+			},
+		})
+	}
+	var notReady []corev1.EndpointAddress
+	for _, ip := range notReadyIPs {
+		notReady = append(notReady, corev1.EndpointAddress{
+			IP: ip,
+		})
+	}
+	return &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses:         addresses,
+				NotReadyAddresses: notReady,
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: port, Protocol: corev1.ProtocolTCP},
+				},
+			},
+		},
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func fakeIngress(namespace, name string) *networkingv1.Ingress {
+	pathType := networkingv1.PathTypePrefix
+	ingressClass := "nginx"
+	return &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{"app": "web"},
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/rewrite-target": "/",
+			},
+		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingressClass,
 			Rules: []networkingv1.IngressRule{
-				{Host: "example.com"},
+				{
+					Host: "example.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/api",
+									PathType: &pathType,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: "app-svc",
+											Port: networkingv1.ServiceBackendPort{Number: 8080},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			TLS: []networkingv1.IngressTLS{
+				{
+					Hosts:      []string{"example.com"},
+					SecretName: "tls-secret",
+				},
 			},
 		},
 	}

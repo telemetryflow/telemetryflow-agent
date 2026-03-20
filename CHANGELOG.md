@@ -24,10 +24,25 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.9] - 2026-03-15
+## [1.1.9] - 2026-03-20
 
 ### Added
 
+- **K8s Network Resources Collector** (`internal/collector/kubernetes/`): New sub-collectors for Services, Endpoints, and Ingresses
+  - `services.go`: Collects Service state — type, ClusterIP, external IPs, ports, selector, endpoint count; aggregates `k8s.service.count` per namespace and type (ClusterIP, NodePort, LoadBalancer, ExternalName)
+  - Pre-fetches all Endpoints resources for efficient correlation; tracks ready/not-ready addresses, ports, and protocols via `k8s.endpoint.count`, `k8s.endpoint.total`
+  - `ingresses.go`: Collects Ingress rules, TLS configuration, load balancer IPs; detects Ingress class via `IngressClassName` or annotation fallback; parses HTTP paths with path types (Exact, Prefix, ImplementationSpecific); returns `k8s.ingress.rule_count`, `k8s.ingress.tls_enabled`, `k8s.ingress.count`
+  - New data types: `ServiceState`, `ServicePort`, `EndpointState`, `EndpointSubset`, `EndpointAddress`, `EndpointPort`, `IngressState`, `IngressRule`, `IngressPath`, `IngressTLS`
+  - Configurable via `collectors.kubernetes.services: true`
+- **API Server Metrics Scraper** (`internal/collector/kubernetes/apiserver.go`): Scrapes kube-apiserver `/metrics` endpoint via Kubernetes API proxy
+  - Parses Prometheus text exposition format; extracts request totals by HTTP code and verb, average latency, error rates (5xx), per-instance CPU/memory usage, work queue depth
+  - New data types: `ApiServerMetrics`, `ApiServerInstanceMetrics`
+  - Metrics captured: `apiserver_request_total`, `apiserver_request_duration_seconds`, `process_cpu_seconds_total`, `process_resident_memory_bytes`, `workqueue_depth`
+- **CoreDNS Metrics Collector** (`internal/collector/kubernetes/coredns.go`): Multi-strategy CoreDNS metrics discovery and collection
+  - Strategy 1: Direct pod IP scraping at `http://<podIP>:9153/metrics`; Strategy 2: Kubernetes API server proxy fallback; Strategy 3: Direct service DNS resolution
+  - Supports all K8s distributions via multiple label selectors: `k8s-app=kube-dns`, `app.kubernetes.io/name=coredns`, `app.kubernetes.io/name=rke2-coredns`
+  - Aggregates from multiple CoreDNS pods; returns `CoreDNSMetrics`: health status, pod count, requests/sec, cache hit rate, avg duration, requests by rcode, upstream requests/sec, error rate, CPU/memory usage
+  - Configurable via `collectors.kubernetes.coredns_metrics: true` and `coredns_service` (auto-discovered via pod labels when empty)
 - **Fluent Bit Bundled in Docker Image** (`Dockerfile`): Multi-stage build copies `fluent-bit` binary (~15MB) from official `fluent/fluent-bit:4.2.3` image into the agent container
   - No external sidecar or binary installation needed — `fluent-bit` available at `/usr/local/bin/fluent-bit`
   - Enabled by default for K8S deployments (`fluent_bit.enabled: true` in K8S configs, Helm values, manifests)
@@ -71,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `poddisruptionbudgets` (policy API group) — required for PDB collector
   - `endpointslices` (discovery.k8s.io) — replaces deprecated v1 Endpoints
   - `/metrics/cadvisor` non-resource URL — required for cAdvisor scraping
+  - `services`, `endpoints` (core) — required for network resources collector
+  - `ingresses` (networking.k8s.io) — required for Ingress collector
+  - `nodes/metrics`, `nodes/stats`, `nodes/proxy` — required for kubelet summary API and Prometheus metrics scraping
+  - `events.k8s.io` — required for new events API
 
 - **Prometheus Remote Write Receiver (`internal/receiver/remotewrite/`)**: New push-based ingestion path accepting Prometheus `remote_write` traffic directly
   - `receiver.go`: HTTP server lifecycle with graceful start/stop and configurable port
@@ -93,6 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Config env var expansion** (`internal/config/loader.go`): Viper-based config loader now calls `os.ExpandEnv()` on YAML content before parsing, resolving `${VAR}` placeholders in config values (e.g., `${NODE_IP}` in cAdvisor endpoint). Previously, env var references in config values were passed as literal strings, causing URL parse failures
 - **cAdvisor kubelet HTTPS** (`internal/collector/cadvisor/cadvisor.go`): HTTP client now respects `insecure_skip_verify` config and includes ServiceAccount bearer token in requests. Previously, HTTPS kubelet endpoints failed with `x509: certificate signed by unknown authority` and `403 Forbidden`
+- **cAdvisor Prometheus parser** (`internal/collector/cadvisor/cadvisor.go`): Switched to `LegacyValidation` parser to support traditional `container_*` and `machine_*` metric names; optional `metric_names` allowlist for selective collection
+- **CoreDNS autodetect path** (`internal/collector/kubernetes/coredns.go`): Multi-strategy discovery resolves CoreDNS pods across distributions (vanilla, EKS, GKE, AKS, RKE2, k3s) using multiple label selectors; falls back gracefully through pod IP → API proxy → service DNS strategies
 - **eBPF build constraints**: Restored `//go:build linux` and `//go:build !linux` constraints to all 9 eBPF package files after bulk header replacement had stripped them
   - `types.go`, `gen.go`, `loader.go`, `helpers.go`, `config_linux.go`, `linux.go`, `hubble_linux.go` → `//go:build linux`
   - `linux_other.go`, `hubble_other.go` → `//go:build !linux`
@@ -516,20 +537,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date       | OTEL SDK | Description                                                                                                       |
-| ------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| 1.1.9   | 2026-03-12 | v1.40.0  | Prometheus Remote Write Receiver; KSM gap fields (5); license headers all .go files; eBPF build constraint fixes; Helm rename |
-| 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs |
-| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState |
-| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                   |
-| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                              |
-| 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                |
-| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls                       |
-| 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine)         |
-| 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)                  |
-| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                 |
-| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                                     |
-| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                                   |
+| Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                            |
+| ------- | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.9   | 2026-03-20 | v1.40.0  | K8s network resources (Services/Endpoints/Ingresses); API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); license headers; eBPF build constraint fixes; Helm rename |
+| 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                  |
+| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                      |
+| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                                                                                                                                        |
+| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                                                                                                                                                   |
+| 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                                                                                                                                     |
+| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls                                                                                                                                            |
+| 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine)                                                                                                                              |
+| 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)                                                                                                                                       |
+| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                                                                                                                                      |
+| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                                                                                                                                                          |
+| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                                                                                                                                                        |
 
 ## Upgrade Guide
 

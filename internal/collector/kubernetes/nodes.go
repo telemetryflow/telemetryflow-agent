@@ -244,12 +244,19 @@ func collectNodes(
 				// Node-level network I/O (sum all interfaces)
 				if summary.Node.Network != nil {
 					var totalRx, totalTx uint64
+					var totalRxDrop, totalTxDrop uint64
 					for _, iface := range summary.Node.Network.Interfaces {
 						if iface.RxBytes != nil {
 							totalRx += *iface.RxBytes
 						}
 						if iface.TxBytes != nil {
 							totalTx += *iface.TxBytes
+						}
+						if iface.RxErrors != nil {
+							totalRxDrop += *iface.RxErrors
+						}
+						if iface.TxErrors != nil {
+							totalTxDrop += *iface.TxErrors
 						}
 					}
 					state.NetworkRxBytes = &totalRx
@@ -259,6 +266,15 @@ func collectNodes(
 						collector.NewMetric("k8s.node.network.io", float64(totalIO), collector.MetricTypeGauge).
 							WithLabels(labels).WithUnit("bytes").
 							WithDescription("Node total network I/O bytes (rx+tx cumulative) from Kubelet summary"),
+						collector.NewMetric("k8s.node.network.receive_bytes", float64(totalRx), collector.MetricTypeCounter).
+							WithLabels(labels).WithUnit("bytes").
+							WithDescription("Node network bytes received from Kubelet summary"),
+						collector.NewMetric("k8s.node.network.transmit_bytes", float64(totalTx), collector.MetricTypeCounter).
+							WithLabels(labels).WithUnit("bytes").
+							WithDescription("Node network bytes transmitted from Kubelet summary"),
+						collector.NewMetric("k8s.node.network.receive_drop_total", float64(totalRxDrop), collector.MetricTypeCounter).
+							WithLabels(labels).
+							WithDescription("Node network receive errors/drops from Kubelet summary"),
 					)
 				}
 			} else if err != nil {

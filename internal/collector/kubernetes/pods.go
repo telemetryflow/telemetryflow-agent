@@ -96,6 +96,9 @@ func collectPods(
 			totalRestarts += cs.RestartCount
 		}
 
+		qosClass := string(pod.Status.QOSClass)
+		statusReason := pod.Status.Reason
+
 		metrics = append(metrics,
 			collector.NewMetric("k8s.pod.phase", phaseToFloat(pod.Status.Phase), collector.MetricTypeGauge).
 				WithLabels(labels).WithLabel("phase", phase).
@@ -103,7 +106,18 @@ func collectPods(
 			collector.NewMetric("k8s.pod.restart_count", float64(totalRestarts), collector.MetricTypeGauge).
 				WithLabels(labels).
 				WithDescription("Total container restart count"),
+			collector.NewMetric("k8s.pod.qos_class", 1, collector.MetricTypeGauge).
+				WithLabels(labels).WithLabel("qos_class", qosClass).
+				WithDescription("Pod QoS class (label carries class: Guaranteed, Burstable, BestEffort)"),
 		)
+
+		if statusReason != "" {
+			metrics = append(metrics,
+				collector.NewMetric("k8s.pod.status_reason", 1, collector.MetricTypeGauge).
+					WithLabels(labels).WithLabel("reason", statusReason).
+					WithDescription("Pod status reason (label carries reason: Evicted, NodeLost, etc.)"),
+			)
+		}
 
 		// Container-level metrics
 		var containerStates []ContainerState

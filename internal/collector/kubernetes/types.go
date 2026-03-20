@@ -37,6 +37,8 @@ type ClusterState struct {
 	Jobs             []WorkloadState         `json:"jobs,omitempty"`
 	CronJobs         []WorkloadState         `json:"cronjobs,omitempty"`
 	Services         []ServiceState          `json:"services,omitempty"`
+	Endpoints        []EndpointState         `json:"endpoints,omitempty"`
+	Ingresses        []IngressState          `json:"ingresses,omitempty"`
 	PVs              []PVState               `json:"pvs,omitempty"`
 	PVCs             []PVCState              `json:"pvcs,omitempty"`
 	Events           []EventState            `json:"events,omitempty"`
@@ -275,11 +277,87 @@ type WorkloadState struct {
 
 // ServiceState represents a Kubernetes service.
 type ServiceState struct {
-	Name          string `json:"name"`
-	Namespace     string `json:"namespace"`
-	Type          string `json:"type"` // ClusterIP, NodePort, LoadBalancer, ExternalName
-	ClusterIP     string `json:"cluster_ip,omitempty"`
-	EndpointCount int    `json:"endpoint_count"`
+	Name          string            `json:"name"`
+	Namespace     string            `json:"namespace"`
+	Type          string            `json:"type"` // ClusterIP, NodePort, LoadBalancer, ExternalName
+	ClusterIP     string            `json:"cluster_ip,omitempty"`
+	ExternalIPs   []string          `json:"external_ips,omitempty"`
+	Ports         []ServicePort     `json:"ports,omitempty"`
+	Selector      map[string]string `json:"selector,omitempty"`
+	Labels        map[string]string `json:"labels,omitempty"`
+	EndpointCount int               `json:"endpoint_count"`
+	CreatedAt     int64             `json:"created_at,omitempty"` // Unix millis
+}
+
+// ServicePort represents a port exposed by a service.
+type ServicePort struct {
+	Name       string `json:"name,omitempty"`
+	Protocol   string `json:"protocol"` // TCP, UDP, SCTP
+	Port       int32  `json:"port"`
+	TargetPort string `json:"target_port,omitempty"`
+	NodePort   int32  `json:"node_port,omitempty"`
+}
+
+// EndpointState represents a Kubernetes Endpoints resource.
+type EndpointState struct {
+	Name      string           `json:"name"`
+	Namespace string           `json:"namespace"`
+	Subsets   []EndpointSubset `json:"subsets,omitempty"`
+	CreatedAt int64            `json:"created_at,omitempty"` // Unix millis
+}
+
+// EndpointSubset represents a subset of endpoints with addresses and ports.
+type EndpointSubset struct {
+	Addresses         []EndpointAddress `json:"addresses,omitempty"`
+	NotReadyAddresses []EndpointAddress `json:"not_ready_addresses,omitempty"`
+	Ports             []EndpointPort    `json:"ports,omitempty"`
+}
+
+// EndpointAddress represents a single address within an endpoint subset.
+type EndpointAddress struct {
+	IP        string `json:"ip"`
+	NodeName  string `json:"node_name,omitempty"`
+	TargetRef string `json:"target_ref,omitempty"` // Pod name
+}
+
+// EndpointPort represents a port within an endpoint subset.
+type EndpointPort struct {
+	Name     string `json:"name,omitempty"`
+	Port     int32  `json:"port"`
+	Protocol string `json:"protocol"`
+}
+
+// IngressState represents a Kubernetes Ingress resource.
+type IngressState struct {
+	Name          string            `json:"name"`
+	Namespace     string            `json:"namespace"`
+	IngressClass  string            `json:"ingress_class,omitempty"`
+	Rules         []IngressRule     `json:"rules,omitempty"`
+	TLS           []IngressTLS      `json:"tls,omitempty"`
+	LoadBalancers []string          `json:"load_balancers,omitempty"` // LB IPs/hostnames
+	Labels        map[string]string `json:"labels,omitempty"`
+	Annotations   map[string]string `json:"annotations,omitempty"`
+	CreatedAt     int64             `json:"created_at,omitempty"` // Unix millis
+}
+
+// IngressRule represents an Ingress routing rule.
+type IngressRule struct {
+	Host  string        `json:"host,omitempty"`
+	Paths []IngressPath `json:"paths,omitempty"`
+}
+
+// IngressPath represents a path-to-backend mapping.
+type IngressPath struct {
+	Path        string `json:"path"`
+	PathType    string `json:"path_type,omitempty"` // Exact, Prefix, ImplementationSpecific
+	ServiceName string `json:"service_name"`
+	ServicePort string `json:"service_port"` // port name or number
+}
+
+// IngressTLS represents TLS configuration for an Ingress.
+type IngressTLS struct {
+	Hosts      []string `json:"hosts,omitempty"`
+	SecretName string   `json:"secret_name,omitempty"`
 }
 
 // PVClaimRef identifies the PVC bound to a PV.
@@ -389,6 +467,25 @@ type KubeletPodStats struct {
 	PodRef     KubeletPodRef           `json:"podRef"`
 	Network    *KubeletNetworkStats    `json:"network,omitempty"`
 	Containers []KubeletContainerStats `json:"containers,omitempty"`
+	Volumes    []KubeletVolumeStats    `json:"volume,omitempty"`
+}
+
+// KubeletVolumeStats holds per-volume stats from the Kubelet summary.
+type KubeletVolumeStats struct {
+	Name           string         `json:"name"`
+	PvcRef         *KubeletPvcRef `json:"pvcRef,omitempty"`
+	CapacityBytes  *uint64        `json:"capacityBytes,omitempty"`
+	UsedBytes      *uint64        `json:"usedBytes,omitempty"`
+	AvailableBytes *uint64        `json:"availableBytes,omitempty"`
+	Inodes         *uint64        `json:"inodes,omitempty"`
+	InodesUsed     *uint64        `json:"inodesUsed,omitempty"`
+	InodesFree     *uint64        `json:"inodesFree,omitempty"`
+}
+
+// KubeletPvcRef identifies the PVC backing a volume.
+type KubeletPvcRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 // KubeletContainerStats holds per-container stats from the Kubelet summary.
