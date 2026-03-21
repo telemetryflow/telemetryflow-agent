@@ -39,6 +39,12 @@ ports:
   otlpHttp: 4318
   metrics: 8888
   health: 13133
+  agentApi: 8889
+
+# -- Agent HTTP API server (real-time K8s queries: pod log streaming)
+agentApi:
+  enabled: true
+  port: 8889
 
 # -- ServiceAccount settings
 serviceAccount:

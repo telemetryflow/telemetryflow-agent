@@ -148,6 +148,15 @@ func collectPods(
 				MemoryLimit:             memLim,
 				EphemeralStorageRequest: ephReq,
 				EphemeralStorageLimit:   ephLim,
+				// Describe-level fields
+				VolumeMounts:    extractVolumeMounts(container.VolumeMounts),
+				Command:         container.Command,
+				Args:            container.Args,
+				WorkingDir:      container.WorkingDir,
+				LivenessProbe:   extractProbe(container.LivenessProbe),
+				ReadinessProbe:  extractProbe(container.ReadinessProbe),
+				StartupProbe:    extractProbe(container.StartupProbe),
+				ImagePullPolicy: string(container.ImagePullPolicy),
 			}
 
 			// Find container status
@@ -301,12 +310,26 @@ func collectPods(
 			Phase:        phase,
 			RestartCount: totalRestarts,
 			Labels:       pod.Labels,
+			Annotations:  pod.Annotations,
 			OwnerKind:    ownerKind,
 			OwnerName:    ownerName,
 			Containers:   containerStates,
 			IP:           pod.Status.PodIP,
 			QOSClass:     string(pod.Status.QOSClass),
 			Conditions:   podConditions,
+			// Describe-level fields
+			Tolerations:        extractTolerations(pod.Spec.Tolerations),
+			Volumes:            extractVolumes(pod.Spec.Volumes),
+			InitContainers:     extractInitContainers(pod),
+			ServiceAccountName: pod.Spec.ServiceAccountName,
+			Priority:           pod.Spec.Priority,
+			PriorityClassName:  pod.Spec.PriorityClassName,
+			DNSPolicy:          string(pod.Spec.DNSPolicy),
+			HostNetwork:        pod.Spec.HostNetwork,
+			NodeSelector:       pod.Spec.NodeSelector,
+		}
+		if pod.CreationTimestamp.Unix() > 0 {
+			state.CreatedAt = pod.CreationTimestamp.UnixMilli()
 		}
 		if startTime != nil {
 			t := startTime.Time

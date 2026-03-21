@@ -40,12 +40,25 @@ type Config struct {
 	Cache            CacheConfig            `mapstructure:"cache"`
 	Integrations     IntegrationsConfig     `mapstructure:"integrations"`
 	PrometheusServer PrometheusServerConfig `mapstructure:"prometheus_server"`
+	AgentAPI         AgentAPIConfig         `mapstructure:"agent_api"`
 
 	// OneForAll is a shorthand to enable all four new capabilities
 	OneForAll OneForAllConfig `mapstructure:"one_for_all"`
 
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
+}
+
+// AgentAPIConfig contains the Agent HTTP API server settings for real-time K8s queries.
+type AgentAPIConfig struct {
+	// Enabled enables the Agent HTTP API server
+	Enabled bool `mapstructure:"enabled"`
+
+	// Port is the HTTP port for the API server (default: 8889)
+	Port int `mapstructure:"port"`
+
+	// APIKey is the key used to authenticate requests (empty = no auth)
+	APIKey string `mapstructure:"api_key"`
 }
 
 // PrometheusServerConfig contains Prometheus /metrics endpoint settings

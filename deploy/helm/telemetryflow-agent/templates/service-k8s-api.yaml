@@ -1,0 +1,19 @@
+{{- if .Values.agentApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tfo-agent.fullname" . }}-k8s-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tfo-agent.k8sCollector.labels" . | nindent 4 }}
+    app.kubernetes.io/component: k8s-api
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "tfo-agent.k8sCollector.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: agent-api
+      port: {{ .Values.agentApi.port | default 8889 }}
+      targetPort: {{ .Values.agentApi.port | default 8889 }}
+      protocol: TCP
+{{- end }}

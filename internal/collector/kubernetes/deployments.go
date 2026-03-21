@@ -133,22 +133,30 @@ func collectDeployments(
 			selector = dep.Spec.Selector.MatchLabels
 		}
 
-		states = append(states, DeploymentState{
-			Name:                dep.Name,
-			Namespace:           dep.Namespace,
-			Replicas:            replicas,
-			ReadyReplicas:       dep.Status.ReadyReplicas,
-			AvailableReplicas:   dep.Status.AvailableReplicas,
-			UnavailableReplicas: dep.Status.UnavailableReplicas,
-			UpdatedReplicas:     dep.Status.UpdatedReplicas,
-			Labels:              dep.Labels,
-			Conditions:          conditions,
-			Strategy:            strategy,
-			Containers:          containers,
-			Selector:            selector,
-			Generation:          dep.Generation,
-			ObservedGeneration:  dep.Status.ObservedGeneration,
-		})
+		ds := DeploymentState{
+			Name:                    dep.Name,
+			Namespace:               dep.Namespace,
+			Replicas:                replicas,
+			ReadyReplicas:           dep.Status.ReadyReplicas,
+			AvailableReplicas:       dep.Status.AvailableReplicas,
+			UnavailableReplicas:     dep.Status.UnavailableReplicas,
+			UpdatedReplicas:         dep.Status.UpdatedReplicas,
+			Labels:                  dep.Labels,
+			Annotations:             dep.Annotations,
+			Conditions:              conditions,
+			Strategy:                strategy,
+			Containers:              containers,
+			Selector:                selector,
+			Generation:              dep.Generation,
+			ObservedGeneration:      dep.Status.ObservedGeneration,
+			MinReadySeconds:         dep.Spec.MinReadySeconds,
+			RevisionHistoryLimit:    dep.Spec.RevisionHistoryLimit,
+			ProgressDeadlineSeconds: dep.Spec.ProgressDeadlineSeconds,
+		}
+		if dep.CreationTimestamp.Unix() > 0 {
+			ds.CreatedAt = dep.CreationTimestamp.UnixMilli()
+		}
+		states = append(states, ds)
 	}
 
 	return metrics, states, nil

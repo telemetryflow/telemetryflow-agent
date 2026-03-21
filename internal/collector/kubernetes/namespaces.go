@@ -45,6 +45,9 @@ func collectNamespaces(
 	// Pre-fetch ResourceQuotas for all namespaces
 	rqMap := fetchResourceQuotas(ctx, cs, cfg)
 
+	// Pre-fetch LimitRanges for all namespaces
+	lrMap := fetchLimitRanges(ctx, cs, cfg)
+
 	var metrics []collector.Metric
 	var states []NamespaceState
 
@@ -72,7 +75,12 @@ func collectNamespaces(
 			Name:          ns.Name,
 			Phase:         phase,
 			Labels:        ns.Labels,
+			Annotations:   ns.Annotations,
 			ResourceQuota: rqMap[ns.Name],
+			LimitRanges:   lrMap[ns.Name],
+		}
+		if ns.CreationTimestamp.Unix() > 0 {
+			state.CreatedAt = ns.CreationTimestamp.UnixMilli()
 		}
 
 		states = append(states, state)
@@ -167,6 +175,54 @@ func fetchResourceQuotas(ctx context.Context, cs kubernetes.Interface, cfg Confi
 	}
 
 	return result
+}
+
+// fetchLimitRanges collects LimitRange resources per namespace.
+func fetchLimitRanges(ctx context.Context, cs kubernetes.Interface, cfg Config) map[string][]LimitRangeState {
+	result := make(map[string][]LimitRangeState)
+
+	lrList, err := cs.CoreV1().LimitRanges("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return result
+	}
+
+	for i := range lrList.Items {
+		lr := &lrList.Items[i]
+		if !cfg.shouldCollectNamespace(lr.Namespace) {
+			continue
+		}
+		lrs := LimitRangeState{Name: lr.Name}
+		for _, item := range lr.Spec.Limits {
+			lri := LimitRangeItemState{
+				Type: string(item.Type),
+			}
+			if len(item.Default) > 0 {
+				lri.Default = quantityMapToString(item.Default)
+			}
+			if len(item.DefaultRequest) > 0 {
+				lri.DefaultRequest = quantityMapToString(item.DefaultRequest)
+			}
+			if len(item.Max) > 0 {
+				lri.Max = quantityMapToString(item.Max)
+			}
+			if len(item.Min) > 0 {
+				lri.Min = quantityMapToString(item.Min)
+			}
+			lrs.Items = append(lrs.Items, lri)
+		}
+		result[lr.Namespace] = append(result[lr.Namespace], lrs)
+	}
+
+	return result
+}
+
+// quantityMapToString converts a ResourceList to map[string]string.
+func quantityMapToString(rl corev1.ResourceList) map[string]string {
+	m := make(map[string]string, len(rl))
+	for k, v := range rl {
+		m[string(k)] = v.String()
+	}
+	return m
 }
 
 // parseQuantityString parses a Kubernetes quantity string to CPU cores as float64.

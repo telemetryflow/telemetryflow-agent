@@ -492,6 +492,11 @@ func (k *KubernetesCollector) ClusterProvider() string {
 	return k.cfg.ClusterProvider
 }
 
+// Clientset returns the Kubernetes client interface for external use (e.g., Agent API server).
+func (k *KubernetesCollector) Clientset() kubernetes.Interface {
+	return k.clientset
+}
+
 // SetKubeletFetcher replaces the kubelet stats fetcher (used in tests).
 func (k *KubernetesCollector) SetKubeletFetcher(f KubeletProxyFunc) {
 	k.kubeletFetcher = f

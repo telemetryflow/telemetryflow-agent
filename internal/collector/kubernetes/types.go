@@ -22,6 +22,91 @@ package kubernetes
 
 import "time"
 
+// ── Describe-level types (Phase 1a: K8S SDK Features) ─────────────────────
+
+// TolerationState represents a pod toleration.
+type TolerationState struct {
+	Key               string `json:"key"`
+	Operator          string `json:"operator"` // Exists, Equal
+	Value             string `json:"value,omitempty"`
+	Effect            string `json:"effect,omitempty"` // NoSchedule, PreferNoSchedule, NoExecute
+	TolerationSeconds *int64 `json:"toleration_seconds,omitempty"`
+}
+
+// VolumeState represents a pod volume definition.
+type VolumeState struct {
+	Name   string            `json:"name"`
+	Type   string            `json:"type"`             // configMap, secret, emptyDir, persistentVolumeClaim, hostPath, projected, downwardAPI
+	Source map[string]string `json:"source,omitempty"` // type-specific fields (e.g. claimName, secretName, path)
+}
+
+// VolumeMountState represents a container volume mount.
+type VolumeMountState struct {
+	Name      string `json:"name"`
+	MountPath string `json:"mount_path"`
+	SubPath   string `json:"sub_path,omitempty"`
+	ReadOnly  bool   `json:"read_only"`
+}
+
+// NodeImageState represents a container image on a node.
+type NodeImageState struct {
+	Names     []string `json:"names"`
+	SizeBytes int64    `json:"size_bytes"`
+}
+
+// NodeAddressState represents a node address (InternalIP, ExternalIP, Hostname).
+type NodeAddressState struct {
+	Type    string `json:"type"`
+	Address string `json:"address"`
+}
+
+// NodeSystemInfoState holds node system info (OS, kernel, runtime versions).
+type NodeSystemInfoState struct {
+	MachineID               string `json:"machine_id"`
+	SystemUUID              string `json:"system_uuid"`
+	KernelVersion           string `json:"kernel_version"`
+	OSImage                 string `json:"os_image"`
+	ContainerRuntimeVersion string `json:"container_runtime_version"`
+	KubeletVersion          string `json:"kubelet_version"`
+	KubeProxyVersion        string `json:"kube_proxy_version"`
+	OperatingSystem         string `json:"operating_system"`
+	Architecture            string `json:"architecture"`
+}
+
+// LimitRangeItemState represents a single limit range item.
+type LimitRangeItemState struct {
+	Type           string            `json:"type"` // Pod, Container, PersistentVolumeClaim
+	Default        map[string]string `json:"default,omitempty"`
+	DefaultRequest map[string]string `json:"default_request,omitempty"`
+	Max            map[string]string `json:"max,omitempty"`
+	Min            map[string]string `json:"min,omitempty"`
+}
+
+// LimitRangeState represents a namespace LimitRange resource.
+type LimitRangeState struct {
+	Name  string                `json:"name"`
+	Items []LimitRangeItemState `json:"items"`
+}
+
+// PVCConditionState represents a PVC condition.
+type PVCConditionState struct {
+	Type    string `json:"type"`
+	Status  string `json:"status"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// ProbeState represents a container probe summary.
+type ProbeState struct {
+	Type                string `json:"type"` // httpGet, tcpSocket, exec, grpc
+	Detail              string `json:"detail,omitempty"`
+	InitialDelaySeconds int32  `json:"initial_delay_seconds,omitempty"`
+	PeriodSeconds       int32  `json:"period_seconds,omitempty"`
+	TimeoutSeconds      int32  `json:"timeout_seconds,omitempty"`
+	FailureThreshold    int32  `json:"failure_threshold,omitempty"`
+	SuccessThreshold    int32  `json:"success_threshold,omitempty"`
+}
+
 // ClusterState is the full cluster snapshot sent to the TFO backend for sync.
 type ClusterState struct {
 	ClusterName      string                  `json:"cluster_name"`
@@ -51,6 +136,7 @@ type ClusterState struct {
 	NodeLogs         []NodeLogEntry          `json:"node_logs,omitempty"`
 	ApiServerMetrics *ApiServerMetrics       `json:"apiserver_metrics,omitempty"`
 	CoreDNSMetrics   *CoreDNSMetrics         `json:"coredns_metrics,omitempty"`
+	AgentEndpoint    string                  `json:"agent_endpoint,omitempty"` // HTTP API URL for real-time queries
 }
 
 // ApiServerInstanceMetrics holds per-instance API Server metrics.
@@ -99,6 +185,7 @@ type NodeState struct {
 	Status                      string            `json:"status"` // Ready, NotReady
 	Roles                       []string          `json:"roles,omitempty"`
 	Labels                      map[string]string `json:"labels,omitempty"`
+	Annotations                 map[string]string `json:"annotations,omitempty"`
 	KubeletVersion              string            `json:"kubelet_version,omitempty"`
 	ContainerRuntime            string            `json:"container_runtime,omitempty"`
 	OS                          string            `json:"os,omitempty"`
@@ -127,6 +214,11 @@ type NodeState struct {
 	InternalIP                  string            `json:"internal_ip,omitempty"`
 	ExternalIP                  string            `json:"external_ip,omitempty"`
 	Taints                      []TaintState      `json:"taints,omitempty"`
+	// Describe-level fields
+	Images     []NodeImageState     `json:"images,omitempty"`
+	Addresses  []NodeAddressState   `json:"addresses,omitempty"`
+	SystemInfo *NodeSystemInfoState `json:"system_info,omitempty"`
+	CreatedAt  int64                `json:"created_at,omitempty"` // Unix millis
 }
 
 // PodState represents a single Kubernetes pod.
@@ -138,12 +230,24 @@ type PodState struct {
 	RestartCount int32             `json:"restart_count"`
 	StartTime    *time.Time        `json:"start_time,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty"`
+	Annotations  map[string]string `json:"annotations,omitempty"`
 	OwnerKind    string            `json:"owner_kind,omitempty"`
 	OwnerName    string            `json:"owner_name,omitempty"`
 	Containers   []ContainerState  `json:"containers,omitempty"`
 	IP           string            `json:"ip,omitempty"`
 	QOSClass     string            `json:"qos_class,omitempty"`
 	Conditions   map[string]bool   `json:"conditions,omitempty"` // PodScheduled, ContainersReady, Initialized, Ready
+	// Describe-level fields
+	Tolerations        []TolerationState `json:"tolerations,omitempty"`
+	Volumes            []VolumeState     `json:"volumes,omitempty"`
+	InitContainers     []ContainerState  `json:"init_containers,omitempty"`
+	ServiceAccountName string            `json:"service_account_name,omitempty"`
+	Priority           *int32            `json:"priority,omitempty"`
+	PriorityClassName  string            `json:"priority_class_name,omitempty"`
+	DNSPolicy          string            `json:"dns_policy,omitempty"`
+	HostNetwork        bool              `json:"host_network,omitempty"`
+	NodeSelector       map[string]string `json:"node_selector,omitempty"`
+	CreatedAt          int64             `json:"created_at,omitempty"` // Unix millis
 }
 
 // ContainerState represents a container within a pod.
@@ -166,6 +270,15 @@ type ContainerState struct {
 	// Last termination details (kube-state-metrics equivalent)
 	LastTerminationReason string `json:"last_termination_reason,omitempty"` // OOMKilled, Error, Completed, etc.
 	LastTerminationCode   *int32 `json:"last_termination_code,omitempty"`   // exit code of last terminated instance
+	// Describe-level fields
+	VolumeMounts    []VolumeMountState `json:"volume_mounts,omitempty"`
+	Command         []string           `json:"command,omitempty"`
+	Args            []string           `json:"args,omitempty"`
+	WorkingDir      string             `json:"working_dir,omitempty"`
+	LivenessProbe   *ProbeState        `json:"liveness_probe,omitempty"`
+	ReadinessProbe  *ProbeState        `json:"readiness_probe,omitempty"`
+	StartupProbe    *ProbeState        `json:"startup_probe,omitempty"`
+	ImagePullPolicy string             `json:"image_pull_policy,omitempty"`
 }
 
 // DeploymentStrategy represents the deployment strategy configuration.
@@ -191,12 +304,18 @@ type DeploymentState struct {
 	UnavailableReplicas int32                 `json:"unavailable_replicas"`
 	UpdatedReplicas     int32                 `json:"updated_replicas"`
 	Labels              map[string]string     `json:"labels,omitempty"`
+	Annotations         map[string]string     `json:"annotations,omitempty"`
 	Conditions          map[string]bool       `json:"conditions,omitempty"`
 	Strategy            *DeploymentStrategy   `json:"strategy,omitempty"`
 	Containers          []DeploymentContainer `json:"containers,omitempty"`
 	Selector            map[string]string     `json:"selector,omitempty"`
 	Generation          int64                 `json:"generation,omitempty"`
 	ObservedGeneration  int64                 `json:"observed_generation,omitempty"`
+	// Describe-level fields
+	MinReadySeconds         int32  `json:"min_ready_seconds,omitempty"`
+	RevisionHistoryLimit    *int32 `json:"revision_history_limit,omitempty"`
+	ProgressDeadlineSeconds *int32 `json:"progress_deadline_seconds,omitempty"`
+	CreatedAt               int64  `json:"created_at,omitempty"` // Unix millis
 }
 
 // HPAState represents a HorizontalPodAutoscaler resource.
@@ -259,7 +378,11 @@ type NamespaceState struct {
 	Name          string                  `json:"name"`
 	Phase         string                  `json:"phase"` // Active, Terminating
 	Labels        map[string]string       `json:"labels,omitempty"`
+	Annotations   map[string]string       `json:"annotations,omitempty"`
 	ResourceQuota *NamespaceResourceQuota `json:"resource_quota,omitempty"`
+	// Describe-level fields
+	LimitRanges []LimitRangeState `json:"limit_ranges,omitempty"`
+	CreatedAt   int64             `json:"created_at,omitempty"` // Unix millis
 }
 
 // WorkloadState is a generic workload (StatefulSet, DaemonSet, ReplicaSet, Job, CronJob).
@@ -286,8 +409,14 @@ type ServiceState struct {
 	Ports         []ServicePort     `json:"ports,omitempty"`
 	Selector      map[string]string `json:"selector,omitempty"`
 	Labels        map[string]string `json:"labels,omitempty"`
+	Annotations   map[string]string `json:"annotations,omitempty"`
 	EndpointCount int               `json:"endpoint_count"`
 	CreatedAt     int64             `json:"created_at,omitempty"` // Unix millis
+	// Describe-level fields
+	SessionAffinity          string   `json:"session_affinity,omitempty"`        // None, ClientIP
+	ExternalTrafficPolicy    string   `json:"external_traffic_policy,omitempty"` // Cluster, Local
+	HealthCheckNodePort      int32    `json:"health_check_node_port,omitempty"`
+	LoadBalancerSourceRanges []string `json:"load_balancer_source_ranges,omitempty"`
 }
 
 // ServicePort represents a port exposed by a service.
@@ -377,6 +506,11 @@ type PVState struct {
 	ReclaimPolicy string      `json:"reclaim_policy,omitempty"`
 	VolumeMode    string      `json:"volume_mode,omitempty"`
 	ClaimRef      *PVClaimRef `json:"claim_ref,omitempty"`
+	// Describe-level fields
+	Labels       map[string]string `json:"labels,omitempty"`
+	Annotations  map[string]string `json:"annotations,omitempty"`
+	MountOptions []string          `json:"mount_options,omitempty"`
+	CreatedAt    int64             `json:"created_at,omitempty"` // Unix millis
 }
 
 // PVCResources represents the resource requests/limits of a PVC.
@@ -396,6 +530,11 @@ type PVCState struct {
 	VolumeName   string        `json:"volume_name,omitempty"`
 	VolumeMode   string        `json:"volume_mode,omitempty"`
 	Resources    *PVCResources `json:"resources,omitempty"`
+	// Describe-level fields
+	Labels      map[string]string   `json:"labels,omitempty"`
+	Annotations map[string]string   `json:"annotations,omitempty"`
+	Conditions  []PVCConditionState `json:"conditions,omitempty"`
+	CreatedAt   int64               `json:"created_at,omitempty"` // Unix millis
 }
 
 // EventState represents a Kubernetes event.

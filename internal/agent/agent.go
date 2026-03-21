@@ -29,6 +29,7 @@ import (
 
 	"go.uber.org/zap"
 
+	agentapi "github.com/telemetryflow/telemetryflow-agent/internal/api"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
@@ -58,6 +59,7 @@ type Agent struct {
 	k8sCollector     *kubernetes.KubernetesCollector // kept for registration retry
 	collectors       []collector.Collector
 	prometheusServer *exporter.PrometheusServer
+	agentAPIServer   *agentapi.Server
 
 	// State
 	mu      sync.RWMutex
@@ -367,6 +369,23 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		)
 	}
 
+	// Create Agent API server if enabled (for real-time K8s queries like pod log streaming)
+	var apiServer *agentapi.Server
+	if cfg.AgentAPI.Enabled && k8sCollector != nil {
+		apiServer = agentapi.NewServer(
+			agentapi.Config{
+				Enabled: cfg.AgentAPI.Enabled,
+				Port:    cfg.AgentAPI.Port,
+				APIKey:  cfg.AgentAPI.APIKey,
+			},
+			k8sCollector.Clientset(),
+			logger,
+		)
+		logger.Info("Agent API server enabled",
+			zap.Int("port", cfg.AgentAPI.Port),
+		)
+	}
+
 	return &Agent{
 		id:               agentID,
 		config:           cfg,
@@ -377,6 +396,7 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		k8sCollector:     k8sCollector,
 		collectors:       collectors,
 		prometheusServer: promServer,
+		agentAPIServer:   apiServer,
 	}, nil
 }
 
@@ -421,6 +441,15 @@ func (a *Agent) Run(ctx context.Context) error {
 		go func() {
 			if err := a.prometheusServer.Start(ctx); err != nil && err != context.Canceled {
 				errChan <- fmt.Errorf("prometheus server error: %w", err)
+			}
+		}()
+	}
+
+	// Start Agent API server (pod log streaming)
+	if a.agentAPIServer != nil {
+		go func() {
+			if err := a.agentAPIServer.Start(ctx); err != nil && err != context.Canceled {
+				errChan <- fmt.Errorf("agent API server error: %w", err)
 			}
 		}()
 	}
@@ -531,6 +560,19 @@ func (a *Agent) shutdown() error {
 			if err := a.prometheusServer.Stop(); err != nil {
 				errMu.Lock()
 				errs = append(errs, fmt.Errorf("prometheus server stop: %w", err))
+				errMu.Unlock()
+			}
+		}()
+	}
+
+	// Stop Agent API server
+	if a.agentAPIServer != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := a.agentAPIServer.Stop(); err != nil {
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("agent API server stop: %w", err))
 				errMu.Unlock()
 			}
 		}()

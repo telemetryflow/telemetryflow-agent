@@ -100,7 +100,7 @@ func collectStorage(
 			}
 		}
 
-		pvStates = append(pvStates, PVState{
+		pvs := PVState{
 			Name:          pv.Name,
 			StorageClass:  storageClass,
 			Capacity:      capacity,
@@ -109,7 +109,15 @@ func collectStorage(
 			ReclaimPolicy: reclaimPolicy,
 			VolumeMode:    volumeMode,
 			ClaimRef:      claimRef,
-		})
+			// Describe-level fields
+			Labels:       pv.Labels,
+			Annotations:  pv.Annotations,
+			MountOptions: pv.Spec.MountOptions,
+		}
+		if pv.CreationTimestamp.Unix() > 0 {
+			pvs.CreatedAt = pv.CreationTimestamp.UnixMilli()
+		}
+		pvStates = append(pvStates, pvs)
 	}
 
 	// --- PersistentVolumeClaims (namespaced) ---
@@ -183,7 +191,7 @@ func collectStorage(
 			}
 		}
 
-		pvcStates = append(pvcStates, PVCState{
+		pvcs := PVCState{
 			Name:         pvc.Name,
 			Namespace:    pvc.Namespace,
 			StorageClass: storageClass,
@@ -193,7 +201,23 @@ func collectStorage(
 			VolumeName:   pvc.Spec.VolumeName,
 			VolumeMode:   pvcVolumeMode,
 			Resources:    pvcResources,
-		})
+			// Describe-level fields
+			Labels:      pvc.Labels,
+			Annotations: pvc.Annotations,
+		}
+		// PVC conditions
+		for _, cond := range pvc.Status.Conditions {
+			pvcs.Conditions = append(pvcs.Conditions, PVCConditionState{
+				Type:    string(cond.Type),
+				Status:  string(cond.Status),
+				Reason:  cond.Reason,
+				Message: cond.Message,
+			})
+		}
+		if pvc.CreationTimestamp.Unix() > 0 {
+			pvcs.CreatedAt = pvc.CreationTimestamp.UnixMilli()
+		}
+		pvcStates = append(pvcStates, pvcs)
 	}
 
 	return metrics, pvStates, pvcStates, nil

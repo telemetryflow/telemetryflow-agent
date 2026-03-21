@@ -276,6 +276,11 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("prometheus_server.read_timeout", defaults.PrometheusServer.ReadTimeout)
 	v.SetDefault("prometheus_server.write_timeout", defaults.PrometheusServer.WriteTimeout)
 
+	// Agent API server
+	v.SetDefault("agent_api.enabled", false)
+	v.SetDefault("agent_api.port", 8889)
+	v.SetDefault("agent_api.api_key", "")
+
 	// Exporter
 	v.SetDefault("exporter.otlp.enabled", defaults.Exporter.OTLP.Enabled)
 	v.SetDefault("exporter.otlp.batch_size", defaults.Exporter.OTLP.BatchSize)
@@ -340,6 +345,11 @@ func (l *Loader) bindEnvVars(v *viper.Viper) {
 		// Prometheus server
 		"prometheus_server.enabled": "TELEMETRYFLOW_PROMETHEUS_ENABLED",
 		"prometheus_server.port":    "TELEMETRYFLOW_PROMETHEUS_PORT",
+
+		// Agent API server
+		"agent_api.enabled": "TELEMETRYFLOW_AGENT_API_ENABLED",
+		"agent_api.port":    "TELEMETRYFLOW_AGENT_API_PORT",
+		"agent_api.api_key": "TELEMETRYFLOW_AGENT_API_KEY",
 	}
 
 	for key, env := range envBindings {

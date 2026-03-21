@@ -21,6 +21,7 @@
 package kubernetes
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -129,4 +130,205 @@ func phaseToFloat(phase corev1.PodPhase) float64 {
 // parseResourceQuantity parses a Kubernetes quantity string (e.g. "500m", "2Gi").
 func parseResourceQuantity(s string) (resource.Quantity, error) {
 	return resource.ParseQuantity(s)
+}
+
+// ── Describe-level extraction helpers ─────────────────────────────────────
+
+// extractTolerations converts K8s tolerations to TolerationState slice.
+func extractTolerations(tolerations []corev1.Toleration) []TolerationState {
+	if len(tolerations) == 0 {
+		return nil
+	}
+	result := make([]TolerationState, 0, len(tolerations))
+	for _, t := range tolerations {
+		ts := TolerationState{
+			Key:      t.Key,
+			Operator: string(t.Operator),
+			Value:    t.Value,
+			Effect:   string(t.Effect),
+		}
+		if t.TolerationSeconds != nil {
+			ts.TolerationSeconds = t.TolerationSeconds
+		}
+		result = append(result, ts)
+	}
+	return result
+}
+
+// extractVolumes converts K8s volumes to VolumeState slice.
+func extractVolumes(volumes []corev1.Volume) []VolumeState {
+	if len(volumes) == 0 {
+		return nil
+	}
+	result := make([]VolumeState, 0, len(volumes))
+	for _, v := range volumes {
+		vs := VolumeState{
+			Name:   v.Name,
+			Source: make(map[string]string),
+		}
+		switch {
+		case v.ConfigMap != nil:
+			vs.Type = "configMap"
+			vs.Source["name"] = v.ConfigMap.Name
+		case v.Secret != nil:
+			vs.Type = "secret"
+			vs.Source["secretName"] = v.Secret.SecretName
+		case v.EmptyDir != nil:
+			vs.Type = "emptyDir"
+			if v.EmptyDir.Medium != "" {
+				vs.Source["medium"] = string(v.EmptyDir.Medium)
+			}
+		case v.PersistentVolumeClaim != nil:
+			vs.Type = "persistentVolumeClaim"
+			vs.Source["claimName"] = v.PersistentVolumeClaim.ClaimName
+		case v.HostPath != nil:
+			vs.Type = "hostPath"
+			vs.Source["path"] = v.HostPath.Path
+			if v.HostPath.Type != nil {
+				vs.Source["type"] = string(*v.HostPath.Type)
+			}
+		case v.Projected != nil:
+			vs.Type = "projected"
+		case v.DownwardAPI != nil:
+			vs.Type = "downwardAPI"
+		case v.CSI != nil:
+			vs.Type = "csi"
+			vs.Source["driver"] = v.CSI.Driver
+		default:
+			vs.Type = "unknown"
+		}
+		result = append(result, vs)
+	}
+	return result
+}
+
+// extractVolumeMounts converts K8s volume mounts to VolumeMountState slice.
+func extractVolumeMounts(mounts []corev1.VolumeMount) []VolumeMountState {
+	if len(mounts) == 0 {
+		return nil
+	}
+	result := make([]VolumeMountState, 0, len(mounts))
+	for _, m := range mounts {
+		result = append(result, VolumeMountState{
+			Name:      m.Name,
+			MountPath: m.MountPath,
+			SubPath:   m.SubPath,
+			ReadOnly:  m.ReadOnly,
+		})
+	}
+	return result
+}
+
+// extractInitContainers builds ContainerState slice from pod init containers.
+func extractInitContainers(pod *corev1.Pod) []ContainerState {
+	if len(pod.Spec.InitContainers) == 0 {
+		return nil
+	}
+	result := make([]ContainerState, 0, len(pod.Spec.InitContainers))
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		cs := ContainerState{
+			Name:            c.Name,
+			Image:           c.Image,
+			CPURequest:      parseCPU(*c.Resources.Requests.Cpu()),
+			CPULimit:        parseCPU(*c.Resources.Limits.Cpu()),
+			MemoryRequest:   parseMemory(*c.Resources.Requests.Memory()),
+			MemoryLimit:     parseMemory(*c.Resources.Limits.Memory()),
+			VolumeMounts:    extractVolumeMounts(c.VolumeMounts),
+			Command:         c.Command,
+			Args:            c.Args,
+			WorkingDir:      c.WorkingDir,
+			ImagePullPolicy: string(c.ImagePullPolicy),
+		}
+		// Find init container status
+		for _, ist := range pod.Status.InitContainerStatuses {
+			if ist.Name == c.Name {
+				cs.Ready = ist.Ready
+				cs.RestartCount = ist.RestartCount
+				cs.Status = containerStatus(ist)
+				break
+			}
+		}
+		result = append(result, cs)
+	}
+	return result
+}
+
+// extractProbe converts a K8s probe to a ProbeState summary.
+func extractProbe(probe *corev1.Probe) *ProbeState {
+	if probe == nil {
+		return nil
+	}
+	ps := &ProbeState{
+		InitialDelaySeconds: probe.InitialDelaySeconds,
+		PeriodSeconds:       probe.PeriodSeconds,
+		TimeoutSeconds:      probe.TimeoutSeconds,
+		FailureThreshold:    probe.FailureThreshold,
+		SuccessThreshold:    probe.SuccessThreshold,
+	}
+	switch {
+	case probe.HTTPGet != nil:
+		ps.Type = "httpGet"
+		ps.Detail = fmt.Sprintf("%s %s:%s%s", probe.HTTPGet.Scheme, probe.HTTPGet.Host, probe.HTTPGet.Port.String(), probe.HTTPGet.Path)
+	case probe.TCPSocket != nil:
+		ps.Type = "tcpSocket"
+		ps.Detail = probe.TCPSocket.Port.String()
+	case probe.Exec != nil:
+		ps.Type = "exec"
+		ps.Detail = strings.Join(probe.Exec.Command, " ")
+	case probe.GRPC != nil:
+		ps.Type = "grpc"
+		ps.Detail = fmt.Sprintf("port=%d", probe.GRPC.Port)
+	}
+	return ps
+}
+
+// extractNodeImages converts K8s node images to NodeImageState slice.
+// Limits to top 50 images by size to avoid excessive payload.
+func extractNodeImages(images []corev1.ContainerImage) []NodeImageState {
+	if len(images) == 0 {
+		return nil
+	}
+	limit := len(images)
+	if limit > 50 {
+		limit = 50
+	}
+	result := make([]NodeImageState, 0, limit)
+	for i := 0; i < limit; i++ {
+		result = append(result, NodeImageState{
+			Names:     images[i].Names,
+			SizeBytes: images[i].SizeBytes,
+		})
+	}
+	return result
+}
+
+// extractNodeAddresses converts K8s node addresses to NodeAddressState slice.
+func extractNodeAddresses(addresses []corev1.NodeAddress) []NodeAddressState {
+	if len(addresses) == 0 {
+		return nil
+	}
+	result := make([]NodeAddressState, 0, len(addresses))
+	for _, a := range addresses {
+		result = append(result, NodeAddressState{
+			Type:    string(a.Type),
+			Address: a.Address,
+		})
+	}
+	return result
+}
+
+// extractNodeSystemInfo converts K8s NodeSystemInfo to NodeSystemInfoState.
+func extractNodeSystemInfo(info corev1.NodeSystemInfo) *NodeSystemInfoState {
+	return &NodeSystemInfoState{
+		MachineID:               info.MachineID,
+		SystemUUID:              info.SystemUUID,
+		KernelVersion:           info.KernelVersion,
+		OSImage:                 info.OSImage,
+		ContainerRuntimeVersion: info.ContainerRuntimeVersion,
+		KubeletVersion:          info.KubeletVersion,
+		KubeProxyVersion:        info.KubeProxyVersion, //nolint:staticcheck // deprecated but still reported by nodes
+		OperatingSystem:         info.OperatingSystem,
+		Architecture:            info.Architecture,
+	}
 }

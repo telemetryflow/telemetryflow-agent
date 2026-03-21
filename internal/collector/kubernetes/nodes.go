@@ -142,6 +142,7 @@ func collectNodes(
 			Status:                      readyString(ready),
 			Roles:                       roles,
 			Labels:                      node.Labels,
+			Annotations:                 node.Annotations,
 			KubeletVersion:              node.Status.NodeInfo.KubeletVersion,
 			ContainerRuntime:            node.Status.NodeInfo.ContainerRuntimeVersion,
 			OS:                          node.Status.NodeInfo.OSImage,
@@ -157,6 +158,13 @@ func collectNodes(
 			Conditions:                  conditions,
 			InternalIP:                  internalIP,
 			ExternalIP:                  externalIP,
+			// Describe-level fields
+			Images:     extractNodeImages(node.Status.Images),
+			Addresses:  extractNodeAddresses(node.Status.Addresses),
+			SystemInfo: extractNodeSystemInfo(node.Status.NodeInfo),
+		}
+		if node.CreationTimestamp.Unix() > 0 {
+			state.CreatedAt = node.CreationTimestamp.UnixMilli()
 		}
 
 		// Collect node taints

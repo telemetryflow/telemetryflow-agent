@@ -107,6 +107,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `workload_generations: true` — Deployment/StatefulSet observed vs desired generation drift
 - **`collectors.remote_write_receiver` config section**: Added to all config files (`tfo-agent.yaml`, `tfo-agent.default.yaml`, `tfo-agent-one-for-all.yaml`), default: `enabled: false`, `port: 9091`
 - **Apache License 2.0 headers**: Full license boilerplate + package documentation added to all 187 `.go` files across all packages; property-based test files previously missing headers now covered
+- **K8s NetworkPolicy Collector** (`internal/collector/kubernetes/network_policies.go`): Full NetworkPolicy resource collection with ingress/egress rule detail
+  - Gathers all NetworkPolicy resources across namespaces; respects `shouldCollectNamespace` filter
+  - Extracts policy types (Ingress/Egress), pod selectors, ingress/egress rule counts
+  - Parses ingress rules: ports (protocol, port), peers (podSelector, namespaceSelector, IPBlock with CIDR and except ranges)
+  - Parses egress rules: same structure as ingress — ports + to-peers with full IPBlock support
+  - Emits `k8s.networkpolicy.count` gauge metric per namespace with cluster label
+  - New data types: `NetworkPolicyState`, `NetworkPolicyRule`, `NetworkPolicyPort`, `NetworkPolicyPeer`, `NetworkPolicyIPBlock`
+  - Added to `ClusterState.NetworkPolicies` for sync to TFO Platform
+  - Configurable via `collectors.kubernetes.network_policies: true`
+- **Network Flow Exporter** (`internal/exporter/network_flows.go`): New exporter that batches and sends pod-to-pod network flow events to the TFO Platform
+  - `NetworkFlowRecord` struct aligned with Cilium Hubble flow model: source/target namespace, pod, IP, port, labels, protocol, direction, verdict, bytes/packets, retransmits, RTT, HTTP status code, DNS query, external flag
+  - `NetworkFlowExporter` with thread-safe buffer, periodic flush loop (default: 10s), configurable max batch size (default: 500)
+  - POSTs `NetworkFlowBatch` to `/api/v2/monitoring/network-map/k8s/flows` with API key authentication headers
+  - Graceful shutdown with final flush of remaining buffered flows
+- **Ingress Collector Separated** (`internal/collector/kubernetes/ingresses.go`): Extracted Ingress collection into its own file for clarity
+  - Previously inlined; now a standalone `collectIngresses()` function returning `([]Metric, []IngressState, error)`
+  - Collects alongside Services since they share networking context
+- **Services Collector Enhanced** (`internal/collector/kubernetes/services.go`): Expanded to return full `EndpointState` objects alongside `ServiceState`
+  - `collectServices()` signature changed from `→ (metrics, []ServiceState, error)` to `→ (metrics, []ServiceState, []EndpointState, error)`
+  - Pre-fetched endpoints now produce full `EndpointSubset` with ready/not-ready addresses, node names, target refs, and ports
+  - Services now include `ServicePort` detail (name, protocol, port, target_port, node_port), external IPs from both spec and LoadBalancer status
+  - Added describe-level fields: `SessionAffinity`, `ExternalTrafficPolicy`, `HealthCheckNodePort`, `LoadBalancerSourceRanges`
+- **Node Network Metrics Expanded** (`internal/collector/kubernetes/nodes.go`): Three new node-level network metrics from Kubelet summary
+  - `k8s.node.network.receive_bytes` (Counter) — network bytes received per node
+  - `k8s.node.network.transmit_bytes` (Counter) — network bytes transmitted per node
+  - `k8s.node.network.receive_drop_total` (Counter) — network receive errors/drops per node
+  - Also now tracks `totalRxDrop` and `totalTxDrop` across all node interfaces
+- **Pod QoS & Status Metrics** (`internal/collector/kubernetes/pods.go`): Two new pod-level metrics
+  - `k8s.pod.qos_class` (Gauge, label: `qos_class`) — exposes pod QoS class (Guaranteed, Burstable, BestEffort)
+  - `k8s.pod.status_reason` (Gauge, label: `reason`) — exposes pod status reason when present (Evicted, NodeLost, etc.)
+- **Test Exports** (`internal/collector/kubernetes/exports.go`): New file exposing internal parse functions for unit testing
+  - `ParseApiServerMetricsExported()`, `ParseCoreDNSMetricsExported()`, `ParsePromLineExported()` — test-only wrappers
+- **K8s Unit Tests** (`tests/unit/domain/kubernetes/`): Four new test files for recently added sub-collectors
+  - `apiserver_test.go` — API Server metrics parser validation
+  - `coredns_test.go` — CoreDNS metrics parser validation
+  - `ingresses_test.go` — Ingress collection with rules, TLS, LoadBalancer IPs
+  - `services_test.go` — Service + Endpoint collection with describe-level fields
+- **Container Build Script** (`run-container.sh`): New unified container build/run script (221 lines) replacing the previous `run-build-container.sh`
 
 ### Fixed
 
@@ -124,6 +162,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Helm chart path**: Renamed `deploy/helm/tfo-agent/` → `deploy/helm/telemetryflow-agent/` for naming consistency with other TelemetryFlow Helm charts
 - **Platform monolith configs** (`config/tfo-agent/`): All three deployment configs (`tfo-agent.yaml`, `tfo-agent.k8s.yaml`, `tfo-agent.container.yaml`) updated with KSM gap fields and `remote_write_receiver` section
 - **All config files updated** (`configs/`, `deploy/`): Added extended K8s metrics fields (`apiserver_metrics`, `coredns_metrics`, `container_extended_metrics`, `pv_io_stats`) to all config variants — `configs/tfo-agent.yaml`, `configs/tfo-agent.default.yaml`, `configs/tfo-agent-one-for-all.yaml`, `deploy/helm/values.yaml`, `deploy/helm/values-one-for-all.yaml`, `deploy/kubernetes/configmap.yaml`
+- **K8s config**: Added `network_policies: true` to all config files under `collectors.kubernetes`
+- **`ClusterState` type**: Added `NetworkPolicies []NetworkPolicyState` field for platform sync
+- **RBAC ClusterRole**: Added `networkpolicies` (networking.k8s.io) resource permission for NetworkPolicy collector
+
+### Dependencies
+
+- `google.golang.org/grpc`: Bumped from v1.79.1 to v1.79.3
 
 ## [1.1.8] - 2026-03-09
 
@@ -540,7 +585,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                            |
 | ------- | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.1.9   | 2026-03-20 | v1.40.0  | K8s network resources (Services/Endpoints/Ingresses); API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); license headers; eBPF build constraint fixes; Helm rename |
+| 1.1.9   | 2026-03-20 | v1.47.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |
 | 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                  |
 | 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                      |
 | 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                                                                                                                                        |

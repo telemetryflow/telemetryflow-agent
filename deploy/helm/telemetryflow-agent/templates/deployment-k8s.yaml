@@ -93,6 +93,12 @@ spec:
               value: "true"
             - name: TELEMETRYFLOW_PROMETHEUS_PORT
               value: {{ .Values.ports.metrics | quote }}
+            {{- if .Values.agentApi.enabled }}
+            - name: TELEMETRYFLOW_AGENT_API_ENABLED
+              value: "true"
+            - name: TELEMETRYFLOW_AGENT_API_PORT
+              value: {{ .Values.agentApi.port | default 8889 | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -100,6 +106,11 @@ spec:
             - containerPort: {{ .Values.ports.metrics }}
               name: metrics
               protocol: TCP
+            {{- if .Values.agentApi.enabled }}
+            - containerPort: {{ .Values.agentApi.port | default 8889 }}
+              name: agent-api
+              protocol: TCP
+            {{- end }}
           # startupProbe: 90s budget for first-boot cluster auto-registration call
           startupProbe:
             httpGet:

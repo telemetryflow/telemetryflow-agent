@@ -179,8 +179,14 @@ func collectServices(
 			Ports:         ports,
 			Selector:      svc.Spec.Selector,
 			Labels:        svc.Labels,
+			Annotations:   svc.Annotations,
 			EndpointCount: endpointCount,
 			CreatedAt:     svc.CreationTimestamp.UnixMilli(),
+			// Describe-level fields
+			SessionAffinity:          string(svc.Spec.SessionAffinity),
+			ExternalTrafficPolicy:    string(svc.Spec.ExternalTrafficPolicy),
+			HealthCheckNodePort:      svc.Spec.HealthCheckNodePort,
+			LoadBalancerSourceRanges: svc.Spec.LoadBalancerSourceRanges,
 		})
 	}
 
