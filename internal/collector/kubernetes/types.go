@@ -136,7 +136,19 @@ type ClusterState struct {
 	NodeLogs         []NodeLogEntry          `json:"node_logs,omitempty"`
 	ApiServerMetrics *ApiServerMetrics       `json:"apiserver_metrics,omitempty"`
 	CoreDNSMetrics   *CoreDNSMetrics         `json:"coredns_metrics,omitempty"`
+	PVIOStats        []PVIOStats             `json:"pv_io_stats,omitempty"`
 	AgentEndpoint    string                  `json:"agent_endpoint,omitempty"` // HTTP API URL for real-time queries
+}
+
+// PVIOStats holds per-PV I/O and usage metrics derived from Kubelet volume stats.
+// The agent maps PVC volume usage data to the corresponding PV name using ClaimRef.
+type PVIOStats struct {
+	PVName         string `json:"pv_name"`
+	UsedBytes      *int64 `json:"used_bytes,omitempty"`
+	CapacityBytes  *int64 `json:"capacity_bytes,omitempty"`
+	InodesUsed     *int64 `json:"inodes_used,omitempty"`
+	Inodes         *int64 `json:"inodes,omitempty"`
+	AvailableBytes *int64 `json:"available_bytes,omitempty"`
 }
 
 // ApiServerInstanceMetrics holds per-instance API Server metrics.

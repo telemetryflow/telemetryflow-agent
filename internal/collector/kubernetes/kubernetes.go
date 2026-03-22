@@ -374,11 +374,15 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 
 		// Volume stats (PVC usage from Kubelet /stats/summary)
 		if k.cfg.Storage {
-			volMetrics, err := collectVolumeStats(ctx, k.kubeletFetcher, nodeNames, k.cfg, k.cfg.ClusterName, k.logger)
+			volMetrics, pvcData, err := collectVolumeStats(ctx, k.kubeletFetcher, nodeNames, k.cfg, k.cfg.ClusterName, k.logger)
 			if err != nil {
 				k.logger.Warn("Failed to collect volume stats", zap.Error(err))
 			} else {
 				allMetrics = append(allMetrics, volMetrics...)
+				// Map PVC volume usage to PV names for the sync payload
+				if len(pvcData) > 0 && len(state.PVs) > 0 {
+					state.PVIOStats = buildPVIOStats(state.PVs, pvcData)
+				}
 			}
 		}
 	}

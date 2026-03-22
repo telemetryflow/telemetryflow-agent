@@ -223,9 +223,21 @@ func collectStorage(
 	return metrics, pvStates, pvcStates, nil
 }
 
+// pvcVolumeData holds per-PVC volume usage collected from Kubelet /stats/summary.
+type pvcVolumeData struct {
+	namespace      string
+	pvcName        string
+	usedBytes      *int64
+	capacityBytes  *int64
+	availableBytes *int64
+	inodesUsed     *int64
+	inodes         *int64
+}
+
 // collectVolumeStats gathers per-PVC volume usage metrics from Kubelet /stats/summary.
 // This is the only source for live volume usage (used bytes, inodes) — the K8s API
 // only provides capacity via PV/PVC specs, not actual usage.
+// It also returns raw per-PVC data for building PV I/O stats via PVC→PV mapping.
 func collectVolumeStats(
 	ctx context.Context,
 	fetcher KubeletProxyFunc,
@@ -233,12 +245,13 @@ func collectVolumeStats(
 	cfg Config,
 	cluster string,
 	logger *zap.Logger,
-) ([]collector.Metric, error) {
+) ([]collector.Metric, []pvcVolumeData, error) {
 	if fetcher == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	var metrics []collector.Metric
+	var pvcData []pvcVolumeData
 
 	for _, nodeName := range nodeNames {
 		summary, err := fetcher(ctx, nodeName)
@@ -264,7 +277,17 @@ func collectVolumeStats(
 					"pvc":       vol.PvcRef.Name,
 					"volume":    vol.Name,
 				}
+
+				var pd pvcVolumeData
+				pd.namespace = vol.PvcRef.Namespace
+				if pd.namespace == "" {
+					pd.namespace = ns
+				}
+				pd.pvcName = vol.PvcRef.Name
+
 				if vol.UsedBytes != nil {
+					v := int64(*vol.UsedBytes)
+					pd.usedBytes = &v
 					metrics = append(metrics,
 						collector.NewMetric("k8s.volume.used_bytes", float64(*vol.UsedBytes), collector.MetricTypeGauge).
 							WithLabels(labels).WithUnit("bytes").
@@ -272,6 +295,8 @@ func collectVolumeStats(
 					)
 				}
 				if vol.InodesUsed != nil {
+					v := int64(*vol.InodesUsed)
+					pd.inodesUsed = &v
 					metrics = append(metrics,
 						collector.NewMetric("k8s.volume.inodes_used", float64(*vol.InodesUsed), collector.MetricTypeGauge).
 							WithLabels(labels).
@@ -279,15 +304,80 @@ func collectVolumeStats(
 					)
 				}
 				if vol.CapacityBytes != nil {
+					v := int64(*vol.CapacityBytes)
+					pd.capacityBytes = &v
 					metrics = append(metrics,
 						collector.NewMetric("k8s.volume.capacity_bytes", float64(*vol.CapacityBytes), collector.MetricTypeGauge).
 							WithLabels(labels).WithUnit("bytes").
 							WithDescription("Volume capacity bytes from Kubelet summary"),
 					)
 				}
+				if vol.AvailableBytes != nil {
+					v := int64(*vol.AvailableBytes)
+					pd.availableBytes = &v
+				}
+				if vol.Inodes != nil {
+					v := int64(*vol.Inodes)
+					pd.inodes = &v
+				}
+
+				pvcData = append(pvcData, pd)
 			}
 		}
 	}
 
-	return metrics, nil
+	return metrics, pvcData, nil
+}
+
+// buildPVIOStats maps PVC volume usage data to PV names using PVState.ClaimRef.
+// This bridges the gap between Kubelet (which reports by PVC) and the platform
+// (which queries by PV name).
+func buildPVIOStats(pvStates []PVState, pvcData []pvcVolumeData) []PVIOStats {
+	// Build PVC key (namespace/name) → pvcVolumeData lookup.
+	// If multiple pods mount the same PVC, take the first non-nil values.
+	pvcMap := make(map[string]*pvcVolumeData)
+	for i := range pvcData {
+		key := pvcData[i].namespace + "/" + pvcData[i].pvcName
+		if existing, ok := pvcMap[key]; ok {
+			// Merge: prefer non-nil
+			if existing.usedBytes == nil && pvcData[i].usedBytes != nil {
+				existing.usedBytes = pvcData[i].usedBytes
+			}
+			if existing.capacityBytes == nil && pvcData[i].capacityBytes != nil {
+				existing.capacityBytes = pvcData[i].capacityBytes
+			}
+			if existing.availableBytes == nil && pvcData[i].availableBytes != nil {
+				existing.availableBytes = pvcData[i].availableBytes
+			}
+			if existing.inodesUsed == nil && pvcData[i].inodesUsed != nil {
+				existing.inodesUsed = pvcData[i].inodesUsed
+			}
+			if existing.inodes == nil && pvcData[i].inodes != nil {
+				existing.inodes = pvcData[i].inodes
+			}
+		} else {
+			copy := pvcData[i]
+			pvcMap[key] = &copy
+		}
+	}
+
+	var result []PVIOStats
+	for _, pv := range pvStates {
+		if pv.ClaimRef == nil {
+			continue
+		}
+		key := pv.ClaimRef.Namespace + "/" + pv.ClaimRef.Name
+		pd, ok := pvcMap[key]
+		if !ok {
+			continue
+		}
+		stat := PVIOStats{PVName: pv.Name}
+		stat.UsedBytes = pd.usedBytes
+		stat.CapacityBytes = pd.capacityBytes
+		stat.AvailableBytes = pd.availableBytes
+		stat.InodesUsed = pd.inodesUsed
+		stat.Inodes = pd.inodes
+		result = append(result, stat)
+	}
+	return result
 }
