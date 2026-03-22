@@ -57,6 +57,10 @@ type KubernetesCollector struct {
 	// kubeletFetcher retrieves /stats/summary from each node's kubelet.
 	// nil means network collection is skipped (e.g. in unit tests).
 	kubeletFetcher KubeletProxyFunc
+
+	// cadvisorFetcher retrieves /metrics/cadvisor from each node's kubelet
+	// via the API server proxy. Used for CPU throttle metrics.
+	cadvisorFetcher CAdvisorProxyFunc
 }
 
 // NewKubernetesCollector creates a new Kubernetes collector.
@@ -89,11 +93,12 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 	}
 
 	return &KubernetesCollector{
-		cfg:            conf,
-		logger:         logger.Named(collectorName),
-		clientset:      cs,
-		metricsClient:  mc,
-		kubeletFetcher: newKubeletStatsFetcher(cs),
+		cfg:             conf,
+		logger:          logger.Named(collectorName),
+		clientset:       cs,
+		metricsClient:   mc,
+		kubeletFetcher:  newKubeletStatsFetcher(cs),
+		cadvisorFetcher: newCAdvisorProxyFetcher(cs),
 	}, nil
 }
 
@@ -188,7 +193,7 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 
 	// --- Pods ---
 	if k.cfg.Pods {
-		metrics, pods, err := collectPods(ctx, k.clientset, k.metricsClient, k.kubeletFetcher, k.cfg, k.cfg.ClusterName, k.logger)
+		metrics, pods, err := collectPods(ctx, k.clientset, k.metricsClient, k.kubeletFetcher, k.cadvisorFetcher, k.cfg, k.cfg.ClusterName, k.logger)
 		if err != nil {
 			k.logger.Warn("Failed to collect pod metrics", zap.Error(err))
 		} else {

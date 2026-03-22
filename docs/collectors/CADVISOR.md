@@ -94,6 +94,16 @@ cadvisor:
   labels: {} # extra labels added to all metrics
 ```
 
+## Relationship with Kubernetes Collector
+
+The **Kubernetes collector** independently fetches `container_cpu_cfs_throttled_seconds_total` from each node's cAdvisor endpoint via the API server proxy (`/api/v1/nodes/{name}/proxy/metrics/cadvisor`). This is used to populate the `k8s.pod.container.cpu_throttled` metric and the `CPUThrottled` field in the sync payload — no standalone cAdvisor collector configuration is needed for CPU throttle data.
+
+If you enable **both** the standalone cAdvisor collector and the Kubernetes collector:
+
+- The standalone cAdvisor collector sends raw `container_*` metrics through the OTLP pipeline.
+- The Kubernetes collector sends `k8s.pod.container.cpu_throttled` through the K8S sync pipeline.
+- There is no conflict — they serve different purposes and use different metric names.
+
 ## Notes
 
 - cAdvisor must be running separately (e.g. as a DaemonSet in Kubernetes, or `docker run google/cadvisor`).

@@ -77,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `coredns_service` — CoreDNS service address (default: `coredns.kube-system.svc.cluster.local:9153`)
   - `container_extended_metrics: true` — Collect per-container CPU throttling, memory working set, and OOM kill detection via Kubelet `/stats/summary` and cAdvisor
   - `pv_io_stats: true` — Collect PersistentVolume usage, IOPS, and throughput from Kubelet volume stats API
+- **K8s Container CPU Throttle Metrics** (`internal/collector/kubernetes/cadvisor_throttle.go`): Kubernetes collector now fetches CPU throttle data directly from cAdvisor via the API server proxy (`/api/v1/nodes/{name}/proxy/metrics/cadvisor`)
+  - Parses `container_cpu_cfs_throttled_seconds_total` from Prometheus text format per node
+  - Emits `k8s.pod.container.cpu_throttled` (Counter, unit: sec) with `cluster`, `namespace`, `pod`, `node`, `container` labels
+  - Populates `CPUThrottled` field in `ContainerState` sync payload — platform backend stores as `k8s.pod.container.cpu_throttled` in ClickHouse
+  - No standalone cAdvisor collector configuration required — built into the Kubernetes collector's pod collection cycle
+  - New types: `CAdvisorProxyFunc`, `containerThrottleKey`; new functions: `newCAdvisorProxyFetcher`, `fetchCPUThrottleMap`, `parseCPUThrottleMetrics`
+  - Skips infrastructure containers (POD/pause) and empty identifiers
 - **cAdvisor TLS & Auth Support** (`internal/collector/cadvisor/cadvisor.go`): cAdvisor collector now supports HTTPS kubelet endpoints
   - `InsecureSkipVerify` config field to skip TLS certificate verification for self-signed kubelet certs
   - `BearerTokenPath` config field for custom ServiceAccount token path (auto-detected from standard K8s mount if empty)

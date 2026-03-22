@@ -267,6 +267,7 @@ type ContainerState struct {
 	MemoryUsage             *int64   `json:"memory_usage,omitempty"`              // bytes (metrics-server)
 	MemoryWorkingSetBytes   *int64   `json:"memory_working_set_bytes,omitempty"`  // bytes (Kubelet summary — memory pressure indicator)
 	EphemeralStorageUsage   *int64   `json:"ephemeral_storage_usage,omitempty"`   // bytes (Kubelet summary: rootfs+logs)
+	CPUThrottled            *float64 `json:"cpu_throttled,omitempty"`             // seconds (cAdvisor: container_cpu_cfs_throttled_seconds_total)
 	// Last termination details (kube-state-metrics equivalent)
 	LastTerminationReason string `json:"last_termination_reason,omitempty"` // OOMKilled, Error, Completed, etc.
 	LastTerminationCode   *int32 `json:"last_termination_code,omitempty"`   // exit code of last terminated instance

@@ -38,6 +38,7 @@ func collectPods(
 	cs kubernetes.Interface,
 	mc metricsv.Interface,
 	kubeletFetcher KubeletProxyFunc,
+	cadvisorFetcher CAdvisorProxyFunc,
 	cfg Config,
 	cluster string,
 	logger *zap.Logger,
@@ -60,6 +61,13 @@ func collectPods(
 	var ephemeralMap map[string]map[string]kubeletContainerData // key: namespace/pod → container → data
 	if kubeletFetcher != nil {
 		ephemeralMap = fetchEphemeralStorageMap(ctx, podList, kubeletFetcher, logger)
+	}
+
+	// Pre-fetch CPU throttle seconds from cAdvisor (container_cpu_cfs_throttled_seconds_total).
+	// Neither metrics-server nor Kubelet /stats/summary provides this — cAdvisor is the only source.
+	var throttleMap map[string]map[string]float64 // key: namespace/pod → container → seconds
+	if cadvisorFetcher != nil {
+		throttleMap = fetchCPUThrottleMap(ctx, podList, cadvisorFetcher, logger)
 	}
 
 	// Aggregate pod counts per namespace+phase
@@ -285,6 +293,19 @@ func collectPods(
 								WithDescription("Container memory working set bytes from Kubelet summary (excludes reclaimable cache)"),
 						)
 					}
+				}
+			}
+
+			// cAdvisor enrichment: CPU throttle seconds.
+			// Neither metrics-server nor Kubelet /stats/summary provides this.
+			if tm, ok := throttleMap[podKey]; ok {
+				if throttledSec, ok2 := tm[container.Name]; ok2 && throttledSec > 0 {
+					cs.CPUThrottled = &throttledSec
+					metrics = append(metrics,
+						collector.NewMetric("k8s.pod.container.cpu_throttled", throttledSec, collector.MetricTypeCounter).
+							WithLabels(cLabels).WithUnit("sec").
+							WithDescription("Cumulative CPU throttled time from cAdvisor (container_cpu_cfs_throttled_seconds_total)"),
+					)
 				}
 			}
 

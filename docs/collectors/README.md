@@ -4,27 +4,28 @@ Documentation for all metric collectors in the TelemetryFlow Agent.
 
 ## Kubernetes Collector
 
-The Kubernetes collector uses three data sources:
+The Kubernetes collector uses four data sources:
 
-| Source                             | Used by                                                                                                  |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Kubernetes API server              | Nodes, Pods, Deployments, Workloads, Storage, HPA, PDB, Events, Resource Counts, Pod Logs                |
-| metrics-server (MetricsV1beta1)    | Node and pod/container CPU+memory usage                                                                  |
-| Kubelet `/stats/summary` (proxied) | Node CPU-ns, memory working set, filesystem, imageFs, network; Container ephemeral storage + working set |
+| Source                                 | Used by                                                                                                  |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Kubernetes API server                  | Nodes, Pods, Deployments, Workloads, Storage, HPA, PDB, Events, Resource Counts, Pod Logs                |
+| metrics-server (MetricsV1beta1)        | Node and pod/container CPU+memory usage                                                                  |
+| Kubelet `/stats/summary` (proxied)     | Node CPU-ns, memory working set, filesystem, imageFs, network; Container ephemeral storage + working set |
+| cAdvisor `/metrics/cadvisor` (proxied) | Container CPU throttle seconds (`container_cpu_cfs_throttled_seconds_total`)                             |
 
-| Document                                                       | Description                                                                 |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [KUBERNETES-NODES.md](KUBERNETES-NODES.md)                     | Node capacity, allocatable, usage, filesystem, network                      |
-| [KUBERNETES-PODS.md](KUBERNETES-PODS.md)                       | Pod phase, container resources, ephemeral storage, working set, termination |
-| [KUBERNETES-DEPLOYMENTS.md](KUBERNETES-DEPLOYMENTS.md)         | Deployment replica counts and rollout conditions                            |
-| [KUBERNETES-WORKLOADS.md](KUBERNETES-WORKLOADS.md)             | StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs                       |
-| [KUBERNETES-STORAGE.md](KUBERNETES-STORAGE.md)                 | PersistentVolumes and PersistentVolumeClaims                                |
-| [KUBERNETES-NETWORK.md](KUBERNETES-NETWORK.md)                 | Namespace-level network I/O from Kubelet summary                            |
-| [KUBERNETES-HPA.md](KUBERNETES-HPA.md)                         | HorizontalPodAutoscaler replicas and conditions                             |
-| [KUBERNETES-PDB.md](KUBERNETES-PDB.md)                         | PodDisruptionBudget health and disruption budget                            |
-| [KUBERNETES-EVENTS.md](KUBERNETES-EVENTS.md)                   | Kubernetes events and aggregate event counts                                |
-| [KUBERNETES-RESOURCE-COUNTS.md](KUBERNETES-RESOURCE-COUNTS.md) | Secrets, ConfigMaps, Ingresses per namespace                                |
-| [KUBERNETES-POD-LOGS.md](KUBERNETES-POD-LOGS.md)               | Pod container log collection                                                |
+| Document                                                       | Description                                                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [KUBERNETES-NODES.md](KUBERNETES-NODES.md)                     | Node capacity, allocatable, usage, filesystem, network                                    |
+| [KUBERNETES-PODS.md](KUBERNETES-PODS.md)                       | Pod phase, container resources, ephemeral storage, working set, CPU throttle, termination |
+| [KUBERNETES-DEPLOYMENTS.md](KUBERNETES-DEPLOYMENTS.md)         | Deployment replica counts and rollout conditions                                          |
+| [KUBERNETES-WORKLOADS.md](KUBERNETES-WORKLOADS.md)             | StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs                                     |
+| [KUBERNETES-STORAGE.md](KUBERNETES-STORAGE.md)                 | PersistentVolumes and PersistentVolumeClaims                                              |
+| [KUBERNETES-NETWORK.md](KUBERNETES-NETWORK.md)                 | Namespace-level network I/O from Kubelet summary                                          |
+| [KUBERNETES-HPA.md](KUBERNETES-HPA.md)                         | HorizontalPodAutoscaler replicas and conditions                                           |
+| [KUBERNETES-PDB.md](KUBERNETES-PDB.md)                         | PodDisruptionBudget health and disruption budget                                          |
+| [KUBERNETES-EVENTS.md](KUBERNETES-EVENTS.md)                   | Kubernetes events and aggregate event counts                                              |
+| [KUBERNETES-RESOURCE-COUNTS.md](KUBERNETES-RESOURCE-COUNTS.md) | Secrets, ConfigMaps, Ingresses per namespace                                              |
+| [KUBERNETES-POD-LOGS.md](KUBERNETES-POD-LOGS.md)               | Pod container log collection                                                              |
 
 ## Host Collectors
 

@@ -1,14 +1,15 @@
 # Kubernetes Pods Collector
 
-Collects pod-level phase, restart counts, container resource requests/limits/usage, ephemeral storage, memory working set, and termination state.
+Collects pod-level phase, restart counts, container resource requests/limits/usage, ephemeral storage, memory working set, CPU throttling, and termination state.
 
 ## Data Sources
 
-| Source                             | What it provides                                                                       |
-| ---------------------------------- | -------------------------------------------------------------------------------------- |
-| Kubernetes API (`/v1/pods`)        | Phase, conditions, owner references, container specs, restart counts, last termination |
-| metrics-server (`MetricsV1beta1`)  | Per-container CPU and memory usage                                                     |
-| Kubelet `/stats/summary` (proxied) | Per-container ephemeral storage (rootfs + logs) and memory working set                 |
+| Source                                 | What it provides                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| Kubernetes API (`/v1/pods`)            | Phase, conditions, owner references, container specs, restart counts, last termination |
+| metrics-server (`MetricsV1beta1`)      | Per-container CPU and memory usage                                                     |
+| Kubelet `/stats/summary` (proxied)     | Per-container ephemeral storage (rootfs + logs) and memory working set                 |
+| cAdvisor `/metrics/cadvisor` (proxied) | Per-container CPU throttle seconds (`container_cpu_cfs_throttled_seconds_total`)       |
 
 ## Metrics
 
@@ -52,6 +53,12 @@ Collects pod-level phase, restart counts, container resource requests/limits/usa
 | `k8s.pod.container.ephemeral_storage_usage` | Gauge | bytes | `cluster`, `namespace`, `pod`, `node`, `container` | Actual ephemeral storage usage (rootfs + logs)  |
 | `k8s.pod.container.memory_working_set`      | Gauge | bytes | `cluster`, `namespace`, `pod`, `node`, `container` | Memory working set (excludes reclaimable cache) |
 
+### Container Usage (cAdvisor)
+
+| Metric                            | Type    | Unit | Labels                                             | Description                                                                      |
+| --------------------------------- | ------- | ---- | -------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `k8s.pod.container.cpu_throttled` | Counter | sec  | `cluster`, `namespace`, `pod`, `node`, `container` | Cumulative CPU throttled time (from `container_cpu_cfs_throttled_seconds_total`) |
+
 ## State Fields (sent to platform)
 
 ### PodState
@@ -71,6 +78,7 @@ Collects pod-level phase, restart counts, container resource requests/limits/usa
 - `CPUUsage`, `MemoryUsage` (from metrics-server, optional pointers)
 - `EphemeralStorageUsage` (from Kubelet, optional pointer)
 - `MemoryWorkingSetBytes` (from Kubelet, optional pointer)
+- `CPUThrottled` (from cAdvisor, optional pointer — cumulative seconds)
 - `LastTerminationReason`, `LastTerminationCode`
 
 ## Notes
@@ -78,4 +86,5 @@ Collects pod-level phase, restart counts, container resource requests/limits/usa
 - Metrics with value 0 (no request/limit set) are not emitted to reduce cardinality.
 - Ephemeral storage usage = `rootfs.UsedBytes + logs.UsedBytes` per container from Kubelet `/stats/summary`.
 - metrics-server does **not** provide ephemeral storage or memory working set — Kubelet summary is the only source.
+- CPU throttle data (`container_cpu_cfs_throttled_seconds_total`) is only available from cAdvisor. The Kubernetes collector fetches it via the API server proxy at `/api/v1/nodes/{name}/proxy/metrics/cadvisor`. This is separate from the standalone cAdvisor collector — no duplicate configuration needed.
 - `k8s.pod.count` is an aggregate metric, not per-pod. Use it for namespace-level phase dashboards.
