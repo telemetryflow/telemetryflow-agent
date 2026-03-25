@@ -163,6 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **eBPF build constraints**: Restored `//go:build linux` and `//go:build !linux` constraints to all 9 eBPF package files after bulk header replacement had stripped them
   - `types.go`, `gen.go`, `loader.go`, `helpers.go`, `config_linux.go`, `linux.go`, `hubble_linux.go` → `//go:build linux`
   - `linux_other.go`, `hubble_other.go` → `//go:build !linux`
+- **Node network rx drop not synced** (`internal/collector/kubernetes/nodes.go`): `NodeState.NetworkRxDrop` field was declared but never populated during collection — now assigned from `totalRxDrop` alongside `NetworkRxBytes` and `NetworkTxBytes` in the Kubelet summary scrape loop
+- **PV I/O stats missing namespace** (`internal/collector/kubernetes/storage.go`): `PVIOStats` now includes `Namespace` from the PV's `ClaimRef`, enabling the platform backend to filter and group PV I/O data per namespace in dashboards and alerting rules
 
 ### Changed
 
@@ -171,6 +173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **All config files updated** (`configs/`, `deploy/`): Added extended K8s metrics fields (`apiserver_metrics`, `coredns_metrics`, `container_extended_metrics`, `pv_io_stats`) to all config variants — `configs/tfo-agent.yaml`, `configs/tfo-agent.default.yaml`, `configs/tfo-agent-one-for-all.yaml`, `deploy/helm/values.yaml`, `deploy/helm/values-one-for-all.yaml`, `deploy/kubernetes/configmap.yaml`
 - **K8s config**: Added `network_policies: true` to all config files under `collectors.kubernetes`
 - **`ClusterState` type**: Added `NetworkPolicies []NetworkPolicyState` field for platform sync
+- **`NodeState` type**: Added `NetworkRxDrop *uint64` field for cumulative network receive drops/errors from Kubelet summary
+- **`PVIOStats` type**: Added `Namespace string` field sourced from PV ClaimRef for per-namespace filtering
 - **RBAC ClusterRole**: Added `networkpolicies` (networking.k8s.io) resource permission for NetworkPolicy collector
 
 ### Dependencies

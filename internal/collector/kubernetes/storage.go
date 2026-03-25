@@ -371,7 +371,7 @@ func buildPVIOStats(pvStates []PVState, pvcData []pvcVolumeData) []PVIOStats {
 		if !ok {
 			continue
 		}
-		stat := PVIOStats{PVName: pv.Name}
+		stat := PVIOStats{PVName: pv.Name, Namespace: pv.ClaimRef.Namespace}
 		stat.UsedBytes = pd.usedBytes
 		stat.CapacityBytes = pd.capacityBytes
 		stat.AvailableBytes = pd.availableBytes

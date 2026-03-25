@@ -269,6 +269,7 @@ func collectNodes(
 					}
 					state.NetworkRxBytes = &totalRx
 					state.NetworkTxBytes = &totalTx
+					state.NetworkRxDrop = &totalRxDrop
 					totalIO := totalRx + totalTx
 					metrics = append(metrics,
 						collector.NewMetric("k8s.node.network.io", float64(totalIO), collector.MetricTypeGauge).

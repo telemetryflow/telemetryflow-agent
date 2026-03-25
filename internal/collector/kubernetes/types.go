@@ -144,6 +144,7 @@ type ClusterState struct {
 // The agent maps PVC volume usage data to the corresponding PV name using ClaimRef.
 type PVIOStats struct {
 	PVName         string `json:"pv_name"`
+	Namespace      string `json:"namespace,omitempty"`
 	UsedBytes      *int64 `json:"used_bytes,omitempty"`
 	CapacityBytes  *int64 `json:"capacity_bytes,omitempty"`
 	InodesUsed     *int64 `json:"inodes_used,omitempty"`
@@ -223,6 +224,7 @@ type NodeState struct {
 	ImageFSCapacityBytes        *uint64           `json:"image_fs_capacity_bytes,omitempty"`  // container image fs capacity (Kubelet summary)
 	NetworkRxBytes              *uint64           `json:"network_rx_bytes,omitempty"`         // cumulative network rx bytes (Kubelet summary)
 	NetworkTxBytes              *uint64           `json:"network_tx_bytes,omitempty"`         // cumulative network tx bytes (Kubelet summary)
+	NetworkRxDrop               *uint64           `json:"network_rx_drop,omitempty"`          // cumulative network rx drops/errors (Kubelet summary)
 	InternalIP                  string            `json:"internal_ip,omitempty"`
 	ExternalIP                  string            `json:"external_ip,omitempty"`
 	Taints                      []TaintState      `json:"taints,omitempty"`
