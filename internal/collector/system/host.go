@@ -21,6 +21,10 @@ package system
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -1141,7 +1145,209 @@ func detectVirtualization() (bool, string) {
 	return false, ""
 }
 
+// imdsClient is a short-timeout HTTP client for cloud metadata services.
+var imdsClient = &http.Client{Timeout: 2 * time.Second}
+
+// imdsGet fetches a single metadata value. Returns empty string on any failure.
+func imdsGet(url string, headers map[string]string) string {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return ""
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := imdsClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(body))
+}
+
+// fetchAWSIMDS queries EC2 Instance Metadata Service (IMDSv2 with fallback to v1).
+func fetchAWSIMDS() (instanceID, instanceType, region, zone string) {
+	// Try IMDSv2 first (token-based)
+	tokenReq, _ := http.NewRequest(http.MethodPut,
+		"http://169.254.169.254/latest/api/token", nil)
+	if tokenReq != nil {
+		tokenReq.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "60")
+		tokenResp, err := imdsClient.Do(tokenReq)
+		var headers map[string]string
+		if err == nil && tokenResp.StatusCode == http.StatusOK {
+			tokenBody, _ := io.ReadAll(io.LimitReader(tokenResp.Body, 256))
+			_ = tokenResp.Body.Close()
+			token := strings.TrimSpace(string(tokenBody))
+			headers = map[string]string{"X-aws-ec2-metadata-token": token}
+		} else {
+			if tokenResp != nil {
+				_ = tokenResp.Body.Close()
+			}
+			// Fall back to IMDSv1 (no token header)
+			headers = nil
+		}
+
+		const base = "http://169.254.169.254/latest/meta-data/"
+		instanceID = imdsGet(base+"instance-id", headers)
+		instanceType = imdsGet(base+"instance-type", headers)
+		zone = imdsGet(base+"placement/availability-zone", headers)
+		if zone != "" && len(zone) > 1 {
+			// Region = zone minus the trailing letter (e.g. us-east-2a → us-east-2)
+			region = zone[:len(zone)-1]
+		}
+	}
+	return
+}
+
+// fetchGCPIMDS queries Google Compute Engine metadata server.
+func fetchGCPIMDS() (instanceID, instanceType, region, zone string) {
+	headers := map[string]string{"Metadata-Flavor": "Google"}
+	const base = "http://metadata.google.internal/computeMetadata/v1/instance/"
+
+	instanceID = imdsGet(base+"id", headers)
+	// Returns e.g. "projects/123/machineTypes/e2-medium" — extract last segment
+	machineType := imdsGet(base+"machine-type", headers)
+	if parts := strings.Split(machineType, "/"); len(parts) > 0 {
+		instanceType = parts[len(parts)-1]
+	}
+	// Returns e.g. "projects/123/zones/us-central1-a" — extract last segment
+	fullZone := imdsGet(base+"zone", headers)
+	if parts := strings.Split(fullZone, "/"); len(parts) > 0 {
+		zone = parts[len(parts)-1]
+	}
+	if zone != "" {
+		// Region = zone minus last "-X" segment (e.g. us-central1-a → us-central1)
+		if idx := strings.LastIndex(zone, "-"); idx > 0 {
+			region = zone[:idx]
+		}
+	}
+	return
+}
+
+// azureInstanceMetadata holds the subset of Azure IMDS response we need.
+type azureInstanceMetadata struct {
+	Compute struct {
+		VMId     string `json:"vmId"`
+		VMSize   string `json:"vmSize"`
+		Location string `json:"location"`
+		Zone     string `json:"zone"`
+	} `json:"compute"`
+}
+
+// fetchAzureIMDS queries Azure Instance Metadata Service.
+func fetchAzureIMDS() (instanceID, instanceType, region, zone string) {
+	url := "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("Metadata", "true")
+	resp, err := imdsClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if err != nil {
+		return
+	}
+	var meta azureInstanceMetadata
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return
+	}
+	instanceID = meta.Compute.VMId
+	instanceType = meta.Compute.VMSize
+	region = meta.Compute.Location
+	zone = fmt.Sprintf("%s-%s", meta.Compute.Location, meta.Compute.Zone)
+	if meta.Compute.Zone == "" {
+		zone = ""
+	}
+	return
+}
+
+// fetchAlibabaIMDS queries Alibaba Cloud (Aliyun) ECS metadata server.
+// Endpoint: 100.100.100.200 (different from the standard 169.254.169.254 link-local).
+func fetchAlibabaIMDS() (instanceID, instanceType, region, zone string) {
+	const base = "http://100.100.100.200/latest/meta-data/"
+	instanceID = imdsGet(base+"instance-id", nil)
+	instanceType = imdsGet(base+"instance/instance-type", nil)
+	region = imdsGet(base+"region-id", nil)
+	zone = imdsGet(base+"zone-id", nil)
+	return
+}
+
+// fetchHuaweiIMDS queries Huawei Cloud ECS metadata server (OpenStack-compatible).
+func fetchHuaweiIMDS() (instanceID, instanceType, region, zone string) {
+	const base = "http://169.254.169.254/openstack/latest/meta_data.json"
+	req, err := http.NewRequest(http.MethodGet, base, nil)
+	if err != nil {
+		return
+	}
+	resp, err := imdsClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if err != nil {
+		return
+	}
+	var meta struct {
+		UUID             string `json:"uuid"`
+		AvailabilityZone string `json:"availability_zone"`
+		Meta             struct {
+			MeteringInstanceType string `json:"metering.instance_type"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return
+	}
+	instanceID = meta.UUID
+	instanceType = meta.Meta.MeteringInstanceType
+	zone = meta.AvailabilityZone
+	// Huawei zone format: "xx-xxxx-N[a]" (e.g. cn-north-4a) — region = zone minus trailing letter
+	if zone != "" {
+		region = zone
+		last := zone[len(zone)-1]
+		if last >= 'a' && last <= 'z' {
+			region = zone[:len(zone)-1]
+		}
+	}
+	return
+}
+
+// fetchDigitalOceanIMDS queries DigitalOcean Droplet metadata service.
+func fetchDigitalOceanIMDS() (instanceID, instanceType, region, zone string) {
+	const base = "http://169.254.169.254/metadata/v1/"
+	instanceID = imdsGet(base+"id", nil)
+	// DO calls it "size" (e.g. "s-1vcpu-1gb", "s-2vcpu-4gb")
+	instanceType = imdsGet(base+"dns/hostname", nil)
+	doRegion := imdsGet(base+"region", nil)
+	region = doRegion
+	zone = doRegion // DO regions are single-zone (e.g. "nyc1", "sfo3")
+
+	// Prefer the slug from interfaces/public/0/type or the size field
+	if size := imdsGet(base+"size", nil); size != "" {
+		instanceType = size
+	}
+	return
+}
+
 // detectCloudMetadata attempts to detect cloud provider and instance metadata
+// by checking host filesystem markers and querying the provider's IMDS endpoint.
 func detectCloudMetadata() (provider, instanceID, instanceType, region, zone string) {
 	// hostRoot is the mount point for the host filesystem inside the container.
 	// DaemonSet mounts host / → /host/root and sets TELEMETRYFLOW_HOST_ROOT=/host/root.
@@ -1162,66 +1368,153 @@ func detectCloudMetadata() (provider, instanceID, instanceType, region, zone str
 		return false
 	}
 
-	// AWS detection
+	// ---- Rancher / RKE / RKE2 / k3s detection (no IMDS) ----
+	// CATTLE_* vars are injected by Rancher into pods in the cattle-system namespace.
+	if os.Getenv("CATTLE_CLUSTER_AGENT_PORT") != "" || os.Getenv("CATTLE_SERVER") != "" {
+		provider = "rancher"
+		return
+	}
+	if hostStat("/var/lib/rancher/k3s") {
+		provider = "k3s"
+		return
+	}
+	if hostStat("/var/lib/rancher/rke2") {
+		provider = "rancher"
+		return
+	}
+	if hostStat("/var/lib/rancher") {
+		provider = "rancher"
+		return
+	}
+
+	// ---- AWS detection + IMDS ----
+	isAWS := false
 	if hostStat("/sys/hypervisor/uuid") {
 		if data, err := os.ReadFile("/sys/hypervisor/uuid"); err == nil {
 			if strings.HasPrefix(strings.ToLower(string(data)), "ec2") {
-				provider = "aws"
+				isAWS = true
 			}
 		}
 	}
 	if os.Getenv("AWS_REGION") != "" {
+		isAWS = true
+	}
+	if isAWS {
 		provider = "aws"
-		region = os.Getenv("AWS_REGION")
+		instanceID, instanceType, region, zone = fetchAWSIMDS()
+		// Fallback region from env if IMDS didn't return one
+		if region == "" {
+			region = os.Getenv("AWS_REGION")
+		}
+		return
 	}
 
-	// GCP detection
+	// ---- GCP detection + IMDS ----
+	isGCP := false
 	for _, p := range []string{"/sys/class/dmi/id/product_name", hostRoot + "/sys/class/dmi/id/product_name"} {
 		if data, err := os.ReadFile(p); err == nil {
 			if strings.Contains(strings.ToLower(string(data)), "google") {
-				provider = "gcp"
+				isGCP = true
 			}
 			break
 		}
 	}
 	if os.Getenv("GOOGLE_CLOUD_PROJECT") != "" {
+		isGCP = true
+	}
+	if isGCP {
 		provider = "gcp"
+		instanceID, instanceType, region, zone = fetchGCPIMDS()
+		return
 	}
 
-	// Azure detection
+	// ---- Azure detection + IMDS ----
+	isAzure := false
 	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
 		if data, err := os.ReadFile(p); err == nil {
 			if strings.Contains(strings.ToLower(string(data)), "microsoft") {
-				provider = "azure"
+				isAzure = true
 			}
 			break
 		}
 	}
-
-	// Rancher / RKE / RKE2 detection
-	// CATTLE_* vars are injected by Rancher into pods in the cattle-system namespace.
-	// For other namespaces we rely on host filesystem heuristics via hostRoot.
-	if os.Getenv("CATTLE_CLUSTER_AGENT_PORT") != "" || os.Getenv("CATTLE_SERVER") != "" {
-		provider = "rancher"
-		return provider, instanceID, instanceType, region, zone
-	}
-	// k3s lives under /var/lib/rancher/k3s (check before generic rancher path)
-	if hostStat("/var/lib/rancher/k3s") {
-		provider = "k3s"
-		return provider, instanceID, instanceType, region, zone
-	}
-	// RKE2
-	if hostStat("/var/lib/rancher/rke2") {
-		provider = "rancher"
-		return provider, instanceID, instanceType, region, zone
-	}
-	// RKE1 — /var/lib/rancher exists but neither k3s nor rke2 sub-dirs
-	if hostStat("/var/lib/rancher") {
-		provider = "rancher"
-		return provider, instanceID, instanceType, region, zone
+	if isAzure {
+		provider = "azure"
+		instanceID, instanceType, region, zone = fetchAzureIMDS()
+		return
 	}
 
-	return provider, instanceID, instanceType, region, zone
+	// ---- Alibaba Cloud (Aliyun) detection + IMDS ----
+	// Alibaba ECS uses a unique IMDS IP: 100.100.100.200.
+	// DMI product_name contains "Alibaba" on ECS instances.
+	isAlibaba := false
+	for _, p := range []string{"/sys/class/dmi/id/product_name", hostRoot + "/sys/class/dmi/id/product_name"} {
+		if data, err := os.ReadFile(p); err == nil {
+			if strings.Contains(strings.ToLower(string(data)), "alibaba") {
+				isAlibaba = true
+			}
+			break
+		}
+	}
+	if os.Getenv("ALIBABA_CLOUD_REGION_ID") != "" || os.Getenv("ALICLOUD_REGION") != "" {
+		isAlibaba = true
+	}
+	if isAlibaba {
+		provider = "alibaba"
+		instanceID, instanceType, region, zone = fetchAlibabaIMDS()
+		if region == "" {
+			region = os.Getenv("ALIBABA_CLOUD_REGION_ID")
+			if region == "" {
+				region = os.Getenv("ALICLOUD_REGION")
+			}
+		}
+		return
+	}
+
+	// ---- Huawei Cloud detection + IMDS ----
+	// Huawei ECS sys_vendor contains "HUAWEI".
+	isHuawei := false
+	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
+		if data, err := os.ReadFile(p); err == nil {
+			if strings.Contains(strings.ToLower(string(data)), "huawei") {
+				isHuawei = true
+			}
+			break
+		}
+	}
+	if os.Getenv("HUAWEICLOUD_REGION") != "" {
+		isHuawei = true
+	}
+	if isHuawei {
+		provider = "huawei"
+		instanceID, instanceType, region, zone = fetchHuaweiIMDS()
+		if region == "" {
+			region = os.Getenv("HUAWEICLOUD_REGION")
+		}
+		return
+	}
+
+	// ---- DigitalOcean detection + IMDS ----
+	// DO Droplets have sys_vendor "DigitalOcean".
+	isDO := false
+	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
+		if data, err := os.ReadFile(p); err == nil {
+			if strings.Contains(strings.ToLower(string(data)), "digitalocean") {
+				isDO = true
+			}
+			break
+		}
+	}
+	if os.Getenv("DIGITALOCEAN_TOKEN") != "" || os.Getenv("DO_REGION") != "" {
+		isDO = true
+	}
+	if isDO {
+		provider = "digitalocean"
+		instanceID, instanceType, region, zone = fetchDigitalOceanIMDS()
+		return
+	}
+
+	return
 }
 
 // GetSystemInfoStatic is a package-level function to get system info without a collector

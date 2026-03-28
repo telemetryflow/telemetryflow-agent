@@ -1,6 +1,6 @@
 # TelemetryFlow Agent - System Information Capabilities
 
-[![Version](https://img.shields.io/badge/Version-1.1.4-orange.svg)](../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.9-orange.svg)](../CHANGELOG.md)
 
 This document describes the comprehensive system information collected by the TelemetryFlow Agent during heartbeat and telemetry operations.
 
@@ -337,21 +337,67 @@ type NetworkInterfaceInfo struct {
 
 ## Cloud Metadata Detection
 
-| Field                 | Type   | Description                      |
-| --------------------- | ------ | -------------------------------- |
-| `cloud_provider`      | string | Cloud provider (aws, gcp, azure) |
-| `cloud_instance_id`   | string | Instance ID                      |
-| `cloud_instance_type` | string | Instance type (t3.micro)         |
-| `cloud_region`        | string | Cloud region                     |
-| `cloud_zone`          | string | Availability zone                |
+| Field                 | Type   | Description                   | Example                                                                                       |
+| --------------------- | ------ | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `cloud_provider`      | string | Cloud provider identifier     | `aws`, `gcp`, `azure`, `alibaba`, `huawei`, `digitalocean`                                    |
+| `cloud_instance_id`   | string | Instance/VM unique identifier | `i-0abc123def456`, `550e8400...`                                                              |
+| `cloud_instance_type` | string | Instance type / machine size  | `t3.medium`, `e2-standard-4`, `Standard_D2s_v3`, `ecs.g6.large`, `s3.medium.2`, `s-2vcpu-4gb` |
+| `cloud_region`        | string | Cloud region                  | `us-east-1`, `us-central1`, `eastus`, `cn-hangzhou`, `ap-southeast-1`, `nyc1`                 |
+| `cloud_zone`          | string | Availability zone             | `us-east-1a`, `us-central1-a`, `eastus-1`, `cn-hangzhou-b`                                    |
 
-**Detection Methods:**
+### Detection & IMDS Query Flow
 
-| Provider | Detection Method                             |
-| -------- | -------------------------------------------- |
-| AWS      | `/sys/hypervisor/uuid`, `AWS_REGION` env     |
-| GCP      | DMI product name, `GOOGLE_CLOUD_PROJECT` env |
-| Azure    | DMI sys_vendor                               |
+```mermaid
+flowchart TD
+    START[detectCloudMetadata] --> RANCHER{Rancher/k3s/RKE?}
+    RANCHER -->|CATTLE_* env or /var/lib/rancher| RET_RANCHER[provider=rancher/k3s]
+    RANCHER -->|No| AWS{AWS?}
+    AWS -->|/sys/hypervisor/uuid=ec2 or AWS_REGION| IMDS_AWS[fetchAWSIMDS<br/>169.254.169.254<br/>IMDSv2 + v1 fallback]
+    AWS -->|No| GCP{GCP?}
+    GCP -->|DMI=google or GOOGLE_CLOUD_PROJECT| IMDS_GCP[fetchGCPIMDS<br/>metadata.google.internal]
+    GCP -->|No| AZURE{Azure?}
+    AZURE -->|DMI sys_vendor=microsoft| IMDS_AZURE[fetchAzureIMDS<br/>169.254.169.254/metadata]
+    AZURE -->|No| ALIBABA{Alibaba?}
+    ALIBABA -->|DMI=alibaba or ALICLOUD_REGION| IMDS_ALI[fetchAlibabaIMDS<br/>100.100.100.200]
+    ALIBABA -->|No| HUAWEI{Huawei?}
+    HUAWEI -->|DMI sys_vendor=huawei or HUAWEICLOUD_REGION| IMDS_HW[fetchHuaweiIMDS<br/>169.254.169.254/openstack]
+    HUAWEI -->|No| DO{DigitalOcean?}
+    DO -->|DMI sys_vendor=digitalocean or DO env| IMDS_DO[fetchDigitalOceanIMDS<br/>169.254.169.254/metadata/v1]
+    DO -->|No| UNKNOWN[provider=empty]
+
+    IMDS_AWS --> RESULT[Return provider, instanceID,<br/>instanceType, region, zone]
+    IMDS_GCP --> RESULT
+    IMDS_AZURE --> RESULT
+    IMDS_ALI --> RESULT
+    IMDS_HW --> RESULT
+    IMDS_DO --> RESULT
+```
+
+### Provider Detection Methods
+
+| Provider         | DMI / Filesystem Detection                             | Env Var Fallback                             | IMDS Endpoint                                              |
+| ---------------- | ------------------------------------------------------ | -------------------------------------------- | ---------------------------------------------------------- |
+| **AWS**          | `/sys/hypervisor/uuid` starts with `ec2`               | `AWS_REGION`                                 | `169.254.169.254/latest/meta-data/` (IMDSv2 token + v1)    |
+| **GCP**          | `/sys/class/dmi/id/product_name` contains `google`     | `GOOGLE_CLOUD_PROJECT`                       | `metadata.google.internal/computeMetadata/v1/instance/`    |
+| **Azure**        | `/sys/class/dmi/id/sys_vendor` contains `microsoft`    | —                                            | `169.254.169.254/metadata/instance?api-version=2021-02-01` |
+| **Alibaba**      | `/sys/class/dmi/id/product_name` contains `alibaba`    | `ALIBABA_CLOUD_REGION_ID`, `ALICLOUD_REGION` | `100.100.100.200/latest/meta-data/`                        |
+| **Huawei**       | `/sys/class/dmi/id/sys_vendor` contains `huawei`       | `HUAWEICLOUD_REGION`                         | `169.254.169.254/openstack/latest/meta_data.json`          |
+| **DigitalOcean** | `/sys/class/dmi/id/sys_vendor` contains `digitalocean` | `DIGITALOCEAN_TOKEN`, `DO_REGION`            | `169.254.169.254/metadata/v1/`                             |
+| **Rancher**      | `CATTLE_*` env or `/var/lib/rancher/`                  | —                                            | None (no IMDS)                                             |
+| **k3s**          | `/var/lib/rancher/k3s` exists                          | —                                            | None (no IMDS)                                             |
+
+### IMDS Response Parsing Details
+
+| Provider         | Instance Type Source                    | Region Derivation                                         | Example Value     |
+| ---------------- | --------------------------------------- | --------------------------------------------------------- | ----------------- |
+| **AWS**          | `/meta-data/instance-type`              | Zone minus trailing letter (`us-east-2a` → `us-east-2`)   | `t3.medium`       |
+| **GCP**          | `/instance/machine-type` (last segment) | Zone minus last `-X` (`us-central1-a` → `us-central1`)    | `e2-standard-4`   |
+| **Azure**        | JSON `.compute.vmSize`                  | JSON `.compute.location`                                  | `Standard_D2s_v3` |
+| **Alibaba**      | `/meta-data/instance/instance-type`     | `/meta-data/region-id`                                    | `ecs.g6.large`    |
+| **Huawei**       | JSON `.meta.metering.instance_type`     | Zone minus trailing letter (`cn-north-4a` → `cn-north-4`) | `s3.medium.2`     |
+| **DigitalOcean** | `/metadata/v1/size`                     | `/metadata/v1/region`                                     | `s-2vcpu-4gb`     |
+
+> **Note:** All IMDS queries use a dedicated HTTP client with a 2-second timeout. Non-cloud nodes return immediately without blocking. DMI filesystem paths are checked with `TELEMETRYFLOW_HOST_ROOT` prefix for containerized deployments.
 
 ---
 

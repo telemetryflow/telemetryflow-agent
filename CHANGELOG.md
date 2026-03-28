@@ -153,6 +153,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `services_test.go` — Service + Endpoint collection with describe-level fields
 - **Container Build Script** (`run-container.sh`): New unified container build/run script (221 lines) replacing the previous `run-build-container.sh`
 
+### Added (2026-03-28)
+
+- **Cloud Instance Metadata (IMDS) Collection** (`internal/collector/system/host.go`): `detectCloudMetadata()` now queries each cloud provider's Instance Metadata Service to populate `instanceType`, `instanceID`, `region`, and `zone` — previously only the provider name was detected, leaving all other fields empty (`unknown` in the UI)
+  - **AWS EC2**: IMDSv2 token-based auth with IMDSv1 fallback; queries `169.254.169.254/latest/meta-data/` for instance-id, instance-type, placement/availability-zone; derives region from zone
+  - **GCP Compute Engine**: Queries `metadata.google.internal/computeMetadata/v1/instance/` with `Metadata-Flavor: Google` header; parses fully-qualified machine-type and zone paths (e.g. `projects/123/machineTypes/e2-medium` → `e2-medium`)
+  - **Azure VM**: Queries `169.254.169.254/metadata/instance?api-version=2021-02-01` with `Metadata: true` header; extracts vmId, vmSize, location, zone from JSON response
+  - **Alibaba Cloud ECS**: Queries unique IMDS IP `100.100.100.200/latest/meta-data/` for instance-id, instance-type, region-id, zone-id; env var fallback via `ALIBABA_CLOUD_REGION_ID` / `ALICLOUD_REGION`
+  - **Huawei Cloud ECS**: Queries OpenStack-compatible `169.254.169.254/openstack/latest/meta_data.json`; extracts uuid, `meta.metering.instance_type`, availability_zone; derives region from zone; env var fallback via `HUAWEICLOUD_REGION`
+  - **DigitalOcean Droplet**: Queries `169.254.169.254/metadata/v1/` for id, size (slug e.g. `s-2vcpu-4gb`), region; env var detection via `DIGITALOCEAN_TOKEN` / `DO_REGION`
+  - All IMDS queries use a dedicated 2-second timeout HTTP client to avoid blocking on non-cloud nodes
+  - Cloud detection via DMI filesystem markers (`/sys/class/dmi/id/product_name`, `sys_vendor`) with `TELEMETRYFLOW_HOST_ROOT` container mount prefix support
+  - New helper functions: `imdsGet()`, `fetchAWSIMDS()`, `fetchGCPIMDS()`, `fetchAzureIMDS()`, `fetchAlibabaIMDS()`, `fetchHuaweiIMDS()`, `fetchDigitalOceanIMDS()`
+
 ### Fixed
 
 - **Default endpoint config** (`configs/tfo-agent.yaml`): Corrected default `TELEMETRYFLOW_ENDPOINT` from `http://localhost:3000/api/v2/monitoring` to `http://localhost:3000/api/v2` — aligns with all Kubernetes Helm templates, Docker Compose, and platform config files which consistently use `/api/v2` as base URL. Agent API paths already include `/monitoring/` prefix, so the previous default caused double `/monitoring` when using the built-in fallback
