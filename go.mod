@@ -53,9 +53,9 @@ require (
 	// -------------------------------------------------------------------------
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.19.0 // OTLP log exporter (HTTP)
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0 // OTLP metric exporter (gRPC)
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.40.0 // OTLP metric exporter (HTTP)
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0 // OTLP metric exporter (HTTP)
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.40.0 // OTLP trace exporter (gRPC)
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.40.0 // OTLP trace exporter (HTTP)
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // OTLP trace exporter (HTTP)
 	go.opentelemetry.io/otel/metric v1.43.0 // OTEL metrics API
 	go.opentelemetry.io/otel/sdk v1.43.0 // OTEL SDK
 	go.opentelemetry.io/otel/sdk/log v0.19.0 // OTEL log SDK
@@ -134,7 +134,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.65.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
