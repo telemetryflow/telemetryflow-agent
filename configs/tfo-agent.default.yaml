@@ -389,6 +389,93 @@ collectors:
     # Specific disk paths to monitor (empty = all)
     disk_paths: []
 
+  # Amazon Aurora Database Monitoring
+  aurora:
+    enabled: false
+    collection_interval: 60s
+    topology_interval: 300s
+    pi_interval: 60s
+    enable_pi: false
+    cloudwatch_batch_size: 500
+    cloudwatch_rate_limit: 40
+    push_batch_size: 1000
+    push_flush_interval: 10s
+    clusters: []
+
+  # ===========================================================================
+  # TimescaleDB Monitoring Collector
+  # ===========================================================================
+  # Monitors TimescaleDB instances (hypertables, chunks, compression, continuous
+  # aggregates, jobs, retention policies, data nodes). Inherits PG connection
+  # settings and adds TimescaleDB-specific metric collection.
+  # Requires: timescaledb extension enabled on the target database.
+  timescaledb:
+    enabled: false
+    # Base PostgreSQL metrics collection interval
+    instance_interval: 10s
+    # Hypertable size/chunk interval collection
+    hypertable_interval: 60s
+    # Chunk-level detail collection
+    chunk_interval: 120s
+    # Job scheduler stats collection
+    job_interval: 60s
+    # Max pool connections per instance
+    max_connections: 3
+    instances: []
+    #  - name: "tsdb-production"
+    #    host: "tsdb-prod.example.com"
+    #    port: 5432
+    #    user: "tfo_monitor"
+    #    password: "${TSDB_PASSWORD}"
+    #    dbname: "telemetry"
+    #    sslmode: "require"
+    #    tags:
+    #      env: production
+
+  # ===========================================================================
+  # AWS RDS PostgreSQL Agent-Side Collector
+  # ===========================================================================
+  # Connects directly to RDS PostgreSQL instances over TLS using the RDS CA
+  # bundle and collects pg_stat_* metrics. Metrics are submitted to the TFO
+  # Platform via the agent-metrics API endpoint.
+  # Requires: pg_stat_statements extension enabled on the RDS instance.
+  rds_postgresql:
+    enabled: false
+    # How often to collect activity/status metrics
+    # (pg_stat_activity, pg_stat_database, pg_stat_bgwriter, pg_locks)
+    activity_interval: 15s
+    # How often to collect query analytics (pg_stat_statements)
+    query_interval: 60s
+    # How often to collect table statistics (pg_stat_user_tables)
+    table_stats_interval: 60s
+    # Maximum pool connections per instance
+    max_connections: 3
+    # Maximum number of top queries to report
+    top_queries_limit: 200
+    # Sub-collector toggles
+    collect_pg_stat_statements: true
+    collect_table_stats: true
+    collect_replication: true
+    # TFO Platform endpoint for metric submission (falls back to telemetryflow.endpoint)
+    # platform_endpoint: "http://localhost:3100"
+    # platform_api_key_id: "tfk_xxx"
+    # platform_api_key_secret: "tfs_xxx"
+    instances:
+      - name: "prod-rds-pg-primary"
+        instance_id: "prod-rds-pg"        # RDS DBInstanceIdentifier
+        host: "prod-rds-pg.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com"
+        port: 5432
+        user: "tfo_monitor"
+        password: "${RDS_PG_PASSWORD}"
+        dbname: "postgres"
+        region: "us-east-1"
+        # RDS CA bundle path (leave empty for auto-detection)
+        # rds_ca_bundle_path: "/etc/ssl/certs/rds-combined-ca-bundle.pem"
+        iam_auth: false
+        tags:
+          env: production
+          role: primary
+
   # Remote Write Receiver
   # Accepts Prometheus Remote Write (snappy-encoded protobuf) on a local port,
   # allowing external tools (Prometheus, Grafana Agent, etc.) to push metrics

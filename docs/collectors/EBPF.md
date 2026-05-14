@@ -2,7 +2,62 @@
 
 Collects deep kernel-level observability data using eBPF programs. Provides per-process syscall tracing, TCP/UDP network stats, file I/O, scheduler events, memory faults, TCP state transitions, and Cilium Hubble network flow metrics.
 
-## Platform Requirement
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph KERNEL ["Linux Kernel"]
+        EBPF[eBPF Programs]
+        MAPS[BPF Maps]
+    end
+
+    subgraph TFO ["TFO Agent — eBPF Collector"]
+        LOADER[bpf2go Loader]
+        READER[Map Reader]
+        AGG[Metric Aggregator]
+    end
+
+    subgraph CILIUM ["Cilium / Hubble"]
+        HUBBLE[Hubble gRPC Observer]
+    end
+
+    KERNEL_EVENTS[Syscalls / TCP / VFS / Scheduler] -->|Tracepoints| EBPF
+    EBPF --> MAPS
+    MAPS -->|Perf/Ring Buffer| READER
+    LOADER -->|Load .o objects| EBPF
+    READER --> AGG
+    AGG --> OTLP[OTLP Export Pipeline]
+    HUBBLE -->|gRPC Flows| AGG
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[eBPF Collector] --> B[Syscalls]
+    A --> C[Network]
+    A --> D[File I/O]
+    A --> E[Scheduler]
+    A --> F[Memory]
+    A --> G[TCP Events]
+    A --> H[Cilium Hubble]
+
+    B --> B1[count / latency / errors]
+
+    C --> C1[TCP connections]
+    C --> C2[TCP bytes / retransmits]
+    C --> C3[UDP packets]
+    C --> C4[TCP state transitions]
+
+    D --> D1[operations / bytes / latency]
+
+    E --> E1[context_switches]
+    E --> E2[run_queue_latency]
+    E --> E3[on-cpu_time]
+
+    F --> F1[page_faults]
+    F --> F2[major and minor faults]
+```
 
 **Linux only.** eBPF programs require a Linux kernel ≥ 5.4 and appropriate capabilities (CAP_BPF or CAP_SYS_ADMIN).
 

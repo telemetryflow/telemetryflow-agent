@@ -1,0 +1,61 @@
+# TelemetryFlow Agent - PostgreSQL Collector Configuration
+#
+# Example configuration for monitoring PostgreSQL instances.
+# Covers connections, transactions, bgwriter, WAL (PG14+),
+# replication, locks, vacuum, table/index stats, and query analytics.
+
+postgresql:
+  enabled: true
+
+  # Global intervals
+  instance_interval: 10s     # connections, transactions, bgwriter, locks
+  query_interval: 60s        # pg_stat_statements analytics
+  table_interval: 300s       # table and index statistics
+
+  # Global settings
+  max_connections: 3
+  collect_pg_stat_statements: true
+  collect_table_stats: true
+  collect_bloat_estimates: true
+  pgstattuple_enabled: false
+  top_queries_limit: 200
+  top_tables_limit: 500
+
+  instances:
+    # Primary instance
+    - name: "pg-primary"
+      host: "postgresql-primary.internal"
+      port: 5432
+      user: "postgres"
+      password: "${PG_PASSWORD}"
+      dbname: "postgres"
+      sslmode: "prefer"
+      tags:
+        env: "production"
+        role: "primary"
+
+    # Replica instance
+    - name: "pg-replica-1"
+      host: "postgresql-replica-1.internal"
+      port: 5432
+      user: "postgres"
+      password: "${PG_PASSWORD}"
+      dbname: "postgres"
+      sslmode: "prefer"
+      tags:
+        env: "production"
+        role: "replica"
+
+    # TLS-secured instance with client certs
+    # - name: "pg-secure"
+    #   host: "postgresql-secure.internal"
+    #   port: 5432
+    #   user: "monitor"
+    #   password: "${PG_PASSWORD}"
+    #   dbname: "postgres"
+    #   sslmode: "require"
+    #   ssl_root_cert: "/etc/ssl/pg-ca.pem"
+    #   ssl_cert: "/etc/ssl/pg-client.pem"
+    #   ssl_key: "/etc/ssl/pg-client.key"
+    #   tags:
+    #     env: "production"

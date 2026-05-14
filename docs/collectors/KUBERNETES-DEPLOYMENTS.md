@@ -6,6 +6,33 @@ Collects deployment replica counts and rollout condition metrics.
 
 Kubernetes API: `apps/v1/deployments` (all namespaces, filtered by namespace rules).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    K8S[Kubernetes API Server] -->|apps/v1/deployments| CLIENT[API Client]
+    CLIENT --> COLL[Deployment Collector]
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Deployments Collector] --> B[Replica Counts]
+    A --> C[Rollout Conditions]
+
+    B --> B1[Desired]
+    B --> B2[Ready]
+    B --> B3[Available]
+    B --> B4[Unavailable]
+    B --> B5[Updated]
+
+    C --> C1[Available]
+    C --> C2[Progressing]
+    C --> C3[ReplicaFailure]
+```
+
 ## Metrics
 
 ### Replica Counts

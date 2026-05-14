@@ -2,7 +2,56 @@
 
 Collects summary-level host metrics for the agent's own heartbeat and lightweight system monitoring. This collector is simpler than Node Exporter — it emits a small set of cross-platform metrics and provides rich `SystemInfo` for the platform's agent registration/heartbeat endpoint.
 
-## Metrics
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph HOST ["Host System"]
+        CPU[CPU]
+        MEM[Memory]
+        DISK[Disk]
+        NET[Network]
+    end
+
+    subgraph TFO ["TFO Agent — System Collector"]
+        GOPS[gopsutil]
+        COLL[Collectors]
+        HB[Heartbeat SystemInfo]
+    end
+
+    CPU -->|usage / cores| GOPS
+    MEM -->|total / used / available| GOPS
+    DISK -->|total / used / free| GOPS
+    NET -->|bytes / packets / errors| GOPS
+    GOPS --> COLL
+    GOPS --> HB
+    COLL --> OTLP[OTLP Export Pipeline]
+    HB -->|Registration payload| PLATFORM[TelemetryFlow Platform]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[System Collector] --> B[CPU]
+    A --> C[Memory]
+    A --> D[Disk]
+    A --> E[Network]
+    A --> F[SystemInfo]
+
+    B --> B1[usage percent]
+    B --> B2[core count]
+
+    C --> C1[total / used / available]
+    C --> C2[usage percent]
+
+    D --> D1[total / used / free per path]
+    D --> D2[usage percent]
+
+    E --> E1[bytes sent / recv]
+    E --> E2[packets / errors]
+    E --> E3[rate metrics]
+```
 
 ### CPU
 

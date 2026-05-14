@@ -1,0 +1,54 @@
+# TelemetryFlow Agent - eBPF Collector Configuration
+#
+# Example configuration for eBPF-based kernel observability.
+# Collects syscalls, network events, file I/O, TCP events,
+# and optionally Cilium/Hubble flow data.
+#
+# NOTE: Requires Linux kernel >= 5.4 and CAP_BPF / CAP_SYS_ADMIN.
+
+ebpf:
+  enabled: true
+
+  # Collection interval
+  interval: 15s
+
+  # eBPF metric categories
+  collect_syscalls: true
+  collect_network: true
+  collect_file_io: true
+  collect_scheduler: false    # higher overhead
+  collect_memory: false       # higher overhead
+  collect_tcp_events: true
+
+  # Process filtering
+  # process_filter:
+  #   - "my-app"
+  exclude_processes:
+    - "tfo-agent"
+    - "systemd"
+
+  # Sampling and buffers
+  sample_rate: 100            # 1:100 sampling
+  ring_buffer_size: 262144    # 256 KB
+  perf_buffer_size: 64
+
+  # BPF filesystem paths
+  btf_path: ""                # auto-detect
+  pin_path: "/sys/fs/bpf/tfo-agent"
+
+  # Additional labels
+  labels:
+    source: "ebpf"
+
+  # Cilium / Hubble integration (optional)
+  cilium:
+    enabled: false
+    hubble_address: "localhost:4245"
+    # hubble_tls_enabled: false
+    # hubble_tls_cert: "/etc/ssl/hubble-client.pem"
+    # hubble_tls_key: "/etc/ssl/hubble-client.key"
+    # hubble_tls_ca: "/etc/ssl/hubble-ca.pem"
+    collect_flows: true
+    collect_l7_flows: false
+    collect_drops: true
+    collect_policies: true

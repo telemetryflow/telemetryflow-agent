@@ -1,0 +1,38 @@
+# TelemetryFlow Agent - Log Collector Configuration
+#
+# Example configuration for file-based log collection.
+# Supports glob patterns, include/exclude regex filters,
+# multiline detection, and optional systemd journal input.
+
+logs:
+  enabled: true
+
+  # Collection interval
+  interval: 5s
+
+  # Log file paths (glob patterns)
+  paths:
+    - "/var/log/app/*.log"
+    - "/var/log/syslog"
+    # - "/var/log/nginx/access.log"
+
+  # Filtering
+  # include_patterns:
+  #   - "ERROR"
+  #   - "WARN"
+  # exclude_patterns:
+  #   - "healthcheck"
+
+  # Processing
+  max_line_size: 262144       # 256 KB
+  batch_size: 1000
+  # multiline_pattern: "^\\d{4}-\\d{2}-\\d{2}"
+
+  # systemd journal (Linux only)
+  journald:
+    enabled: false
+    # units:
+    #   - "my-app"
+    # priorities:
+    #   - "err"
+    #   - "warning"

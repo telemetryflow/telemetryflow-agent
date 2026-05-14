@@ -6,6 +6,40 @@ Collects per-container CPU, memory, network, disk I/O, and PID metrics from the 
 
 Docker Engine API via Unix socket (`/var/run/docker.sock`). Uses a single-shot `ContainerStats` call per container (no streaming).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    DOCKER[Docker Engine] -->|Unix Socket API| CLIENT[Docker Go SDK]
+    CLIENT --> PARSE[Stats Parser]
+    PARSE --> EMIT[Metric Emitter]
+    EMIT --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Docker Collector] --> B[Container State Summary]
+    A --> C[CPU Metrics]
+    A --> D[Memory Metrics]
+    A --> E[Network Metrics]
+    A --> F[Disk I/O Metrics]
+    A --> G[PID Metrics]
+
+    C --> C1[usage_percent]
+    C --> C2[usage_total]
+    C --> C3[throttled]
+
+    D --> D1[usage / working_set]
+    D --> D2[limit / max_usage]
+    D --> D3[rss / cache]
+
+    E --> E1[rx / tx_bytes]
+    E --> E2[rx / tx_packets]
+    E --> E3[rx / tx_errors]
+```
+
 ## Metrics
 
 ### Container State Summary (all containers)

@@ -1,0 +1,37 @@
+# TelemetryFlow Agent - Node Exporter Collector Configuration
+#
+# Example configuration for node-level infrastructure metrics.
+# Collects CPU, memory, disk I/O, filesystem, network, load,
+# thermal, conntrack, PSI, and more using gopsutil.
+
+node_exporter:
+  enabled: true
+
+  # Collection interval
+  interval: 15s
+
+  # Metric categories
+  cpu: true
+  memory: true
+  diskio: true
+  filesystem: true
+  network: true
+  loadavg: true
+  thermal: true
+  conntrack: true
+  psi: true
+  vmstat: true
+  sockstat: true
+  entropy: true
+  filedesc: true
+  stat: true
+  textfile: false
+
+  # Exclude filters (regex patterns)
+  filesystem_mount_exclude: "^/(dev|proc|sys|run)($|/)"
+  filesystem_type_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs)$"
+  network_device_exclude: "^(veth|docker|br-|lo).*$"
+  disk_device_exclude: "^(ram|loop|fd|sr)\\d+$"
+
+  # Textfile collector directory (for custom metrics)
+  textfile_path: "/var/lib/tfo-agent/textfile"

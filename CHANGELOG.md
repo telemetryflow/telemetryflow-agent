@@ -7,10 +7,10 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.9-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.10-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
 </div>
@@ -23,6 +23,65 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.10] - 2026-04-28
+
+### Added
+
+- **Amazon Aurora Collector** (`internal/collector/aurora/`): Cloud-native Aurora database monitoring via AWS SDK
+  - CloudWatch metrics collection using batch `GetMetricData` API with configurable batch size (default 500)
+  - Automatic cluster topology discovery via RDS `DescribeDBClusters` and `DescribeDBInstances` APIs
+  - Performance Insights data collection for PI-enabled instances (db.load, db.sql, db.wait_event, os metrics)
+  - Multi-cluster support with per-cluster AWS credential configuration
+  - IAM role assumption for cross-account monitoring via STS
+  - Exponential backoff with throttling detection for all AWS API calls
+  - Push-based metric export to TFO Platform `/api/v2/db-monitoring/aurora/metrics/ingest` endpoint
+  - Configurable collection intervals: CloudWatch (60s), topology (300s), PI (60s), push flush (10s)
+  - 60+ CloudWatch metric definitions across 9 categories: storage, replication, cache, latency, transactions, availability, backtrack, serverless, global, instance, volume
+- **ClickHouse Collector** (`internal/collector/clickhouse/`): New collector for ClickHouse database instances
+  - HTTP-based connection with JSONEachRow query format
+  - TLS support with custom CA and client certificates
+  - Configurable connect and query timeouts
+  - Per-instance database and authentication support
+- **MySQL/MariaDB Collector** (`internal/collector/mysql/`): Comprehensive MySQL and MariaDB database metrics collector
+  - Global status and variables collection
+  - InnoDB engine status parsing
+  - Replication status monitoring (MySQL and MariaDB multi-source)
+  - Galera cluster status
+  - Query analytics via performance_schema
+  - Schema metrics (table counts, sizes, index stats)
+  - MariaDB-specific: Aria engine, ColumnStore, Spider, query cache, thread pool, user stats
+  - Automatic flavor detection (MySQL, MariaDB, Percona)
+  - Connection pooling with exponential backoff
+- **TimescaleDB Test Exports** (`internal/collector/timescaledb/exports.go`): Exported wrappers for external test packages enabling unit tests to call `SafeDivExport`, `ParseFloatExport`, `MakeMetricExport`, `ResolveEnvVarsExport`, `CopyLabelsExport`, `NewConfigExport`, `InstanceLabelsExport`, `NewTsdbInstanceExport`
+- **TimescaleDB Unit Tests** (`tests/unit/domain/collector/timescaledb/`): 14 unit tests migrated from internal package to external test package (`timescaledb_test`) following project test conventions
+
+### Fixed
+
+- **Aurora collector build errors**: Fixed 4 compilation errors in new Aurora collector
+  - `collector.go`: Resolved `config` import name conflict between `aws-sdk-go-v2/config` and `internal/config` by aliasing AWS config import to `awsconfig`
+  - `cloudwatch.go`: Fixed incorrect nil checks and pointer dereferences for CloudWatch `MetricDataResult.Values` (`[]float64`, not `[]*float64`) and `Timestamps` (`[]time.Time`, not `[]*time.Time`)
+  - `performance_insights.go`: Fixed `MetricKeyDataPoints` field access — `DataPoints` is `[]DataPoint` (slice, not single field); consolidated dimension label logic for SQL and wait event groups
+  - `topology.go`: Fixed `*bool` type mismatch for `MultiAZ`/`StorageEncrypted` using `aws.ToBool()`; fixed `clusterInfoChanged` method receiver from `state` to `c`
+- **Lint compliance across all DB collectors**: Fixed all errcheck, govet, ineffassign, staticcheck, and unused warnings
+  - **errcheck** (16 fixes): All unchecked `Close()`, `Body.Close()`, `Disconnect()`, `rows.Close()` return values now properly handled with `defer func() { _ = ... }()` pattern across aurora, mongodb, mssql, postgresql, sqlite3
+  - **govet** (1 fix): Corrected `%d` format verb for `sql.NullInt64` args in mssql `agentjobs.go` — changed to `%v`
+  - **ineffassign** (2 fixes): Removed unused `metricName` variable in aurora/cloudwatch.go; fixed `caPaths` initialization in postgresql/rds_postgres.go
+  - **staticcheck** (1 fix): Removed empty `if cluster.DBClusterParameterGroup != nil {}` branch in aurora/topology.go
+  - **unused** (19 fixes): Removed unused `backoffDuration`/`lastError` fields from aurora `clusterState`; added `var _ =` suppression for reserved-but-unused functions in cockroachdb, mssql, timescaledb; added `//nolint:unused` for timescaledb snapshot types; removed unused `prevTime` field from sqlite3 `sqliteDatabase`
+- **Go 1.26.3 security update**: Updated toolchain from `go1.26.2` to `go1.26.3` to address 4 standard library vulnerabilities
+  - GO-2026-4982: XSS via meta content URL escaping in `html/template`
+  - GO-2026-4980: Escaper bypass leading to XSS in `html/template`
+  - GO-2026-4971: Panic in `net.Dial` and `net.LookupPort` when handling NUL byte on Windows
+  - GO-2026-4918: Infinite loop in HTTP/2 transport with bad `SETTINGS_MAX_FRAME_SIZE` in `net/http`
+- **OTel exporter alignment**: Upgraded 3 lagging OTel Go SDK exporter packages to latest v1.43.0/v0.19.0
+  - `otlpmetricgrpc` v1.40.0 → v1.43.0
+  - `otlptracegrpc` v1.40.0 → v1.43.0
+  - `otlploggrpc` v0.16.0 → v0.19.0
+- **MSSQL exports.go staticcheck conflict**: Changed `nil` context to `context.TODO()` to resolve conflicting staticcheck auto-fix suggestions
+- **Test file migration**: Moved co-located test files to `tests/` directory structure
+  - `internal/collector/timescaledb/timescaledb_test.go` → `tests/unit/domain/collector/timescaledb/timescaledb_test.go`
+  - `internal/collector/mysql/percona_test.go` removed (superseded by existing `tests/unit/domain/collector/mysql/percona_test.go`)
 
 ## [1.1.9] - 2026-03-20
 
@@ -607,20 +666,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                            |
-| ------- | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration                                                                              |
 | 1.1.9   | 2026-03-20 | v1.47.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |
-| 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                  |
-| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                      |
-| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                                                                                                                                        |
-| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                                                                                                                                                   |
-| 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                                                                                                                                     |
-| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls                                                                                                                                            |
-| 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine)                                                                                                                              |
-| 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)                                                                                                                                       |
-| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                                                                                                                                      |
-| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                                                                                                                                                          |
-| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                                                                                                                                                        |
+| 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                                                                                                                                                                |
+| 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                                                                                                                                                                    |
+| 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                                                                                                                                                                                                                                                                                      |
+| 1.1.5   | 2026-02-19 | v1.39.0  | Docker container collector, cAdvisor scraper, CPU fix macOS, tags/labels propagation                                                                                                                                                                                                                                                                                                 |
+| 1.1.4   | 2026-02-11 | v1.39.0  | eBPF collector (28 metrics), Cilium Hubble integration, 6 BPF programs, kernel-level observability                                                                                                                                                                                                                                                                                   |
+| 1.1.3   | 2026-02-04 | v1.39.0  | Network retransmit metrics, container name/image detection, page faults, IOPS, system calls                                                                                                                                                                                                                                                                                          |
+| 1.1.2   | 2026-01-03 | v1.39.0  | OSS observability (SigNoz, Coroot, HyperDX, OpenObserve, Netdata), APM (Dynatrace, Instana, ManageEngine)                                                                                                                                                                                                                                                                            |
+| 1.1.1   | 2024-12-29 | v1.39.0  | Enterprise integrations (GCP, Azure, Alibaba, Proxmox, VMware, Nutanix, Cisco, SNMP, MQTT, eBPF)                                                                                                                                                                                                                                                                                     |
+| 1.1.0   | 2024-12-27 | v1.39.0  | OTEL SDK standardization, aligned with TFO-Go-SDK & TFO-Collector                                                                                                                                                                                                                                                                                                                    |
+| 1.0.1   | 2024-12-17 | -        | Docker workflow, SBOM, multi-platform support                                                                                                                                                                                                                                                                                                                                        |
+| 1.0.0   | 2024-12-17 | -        | Initial release                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## Upgrade Guide
 

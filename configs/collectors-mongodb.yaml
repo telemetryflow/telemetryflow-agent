@@ -1,0 +1,44 @@
+# TelemetryFlow Agent - MongoDB Community Collector Configuration
+#
+# Example configuration for monitoring MongoDB Community Edition instances.
+# Supports standalone, replica set, and sharded cluster deployments.
+
+mongodb_community:
+  enabled: true
+
+  # Global intervals (override per-instance if needed)
+  interval: 10s           # serverStatus metrics collection
+  current_op_interval: 30s  # currentOp sampling
+  profile_interval: 60s     # slow query profiler sampling
+  collstats_interval: 300s  # collection/database/index stats
+  discover_databases: true  # auto-discover non-system databases
+
+  instances:
+    - name: "mongo-primary"
+      uri: "mongodb://mongodb-primary.internal:27017"
+      username: "${MONGO_USER}"
+      password: "${MONGO_PASSWORD}"
+      # TLS options (uncomment for TLS connections)
+      # tls_ca_file: "/etc/ssl/mongo-ca.pem"
+      # tls_cert_file: "/etc/ssl/mongo-client.pem"
+      # tls_key_file: "/etc/ssl/mongo-client.key"
+      # tls_insecure_skip_verify: false
+      tags:
+        env: "production"
+        role: "primary"
+
+    - name: "mongo-secondary-1"
+      uri: "mongodb://mongodb-secondary-1.internal:27017"
+      username: "${MONGO_USER}"
+      password: "${MONGO_PASSWORD}"
+      tags:
+        env: "production"
+        role: "secondary"
+
+    - name: "mongo-secondary-2"
+      uri: "mongodb://mongodb-secondary-2.internal:27017"
+      username: "${MONGO_USER}"
+      password: "${MONGO_PASSWORD}"
+      tags:
+        env: "production"
+        role: "secondary"

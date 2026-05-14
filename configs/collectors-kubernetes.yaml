@@ -1,0 +1,74 @@
+# TelemetryFlow Agent - Kubernetes Collector Configuration
+#
+# Example configuration for monitoring Kubernetes clusters.
+# Collects node, pod, deployment, service, storage, event,
+# HPA, PDB, resource quota, and log metrics via the Kubernetes API.
+
+kubernetes:
+  enabled: true
+
+  # Collection interval
+  interval: 30s
+
+  # Cluster connection
+  # kubeconfig: ""            # in-cluster: leave empty
+  # context: ""               # kubeconfig context (optional)
+  cluster_name: "production"
+  # cluster_provider: "eks"   # eks, gke, aks, or empty
+  # cluster_id: ""            # unique cluster identifier
+
+  # Namespace filtering
+  # namespaces:
+  #   - "default"
+  #   - "monitoring"
+  exclude_namespaces:
+    - "kube-system"
+  # label_selector: "app!=test"
+
+  # Resource collectors
+  nodes: true
+  pods: true
+  deployments: true
+  namespaces_collect: true
+  storage: true
+  services: true
+  workloads: true
+  events: true
+  resource_counts: true
+  network: true
+  metrics_api: true
+
+  # Advanced collectors
+  hpa: true
+  pdb: true
+  resource_quotas: true
+  limit_ranges: true
+  pod_conditions: true
+  node_taints: true
+  workload_generations: true
+
+  # Pod logs
+  pod_logs: true
+  pod_logs_tail_lines: 100
+  # pod_logs_namespaces:
+  #   - "default"
+
+  # Node logs
+  node_logs: true
+  node_logs_tail_lines: 200
+  node_log_sources:
+    - "kubelet"
+    - "kube-proxy"
+    - "containerd"
+
+  # Backend sync
+  sync_to_backend: true
+  sync_interval: 60s
+
+  # Control plane metrics
+  apiserver_metrics: true
+  coredns_metrics: true
+  # coredns_service: ""       # auto-discover if empty
+
+  # Kubelet connection
+  # kubelet_insecure_skip_verify: false

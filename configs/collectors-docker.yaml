@@ -1,0 +1,32 @@
+# TelemetryFlow Agent - Docker Collector Configuration
+#
+# Example configuration for monitoring Docker containers.
+# Collects CPU, memory, network, disk I/O, and PID stats
+# via the Docker Engine API.
+
+docker:
+  enabled: true
+
+  # Collection interval
+  interval: 15s
+
+  # Docker socket path
+  socket_path: "/var/run/docker.sock"
+
+  # Metric categories
+  cpu: true
+  memory: true
+  network: true
+  diskio: true
+  pids: true
+
+  # Container filtering
+  include_stopped: true
+  # include_containers:
+  #   - "my-app"
+  # exclude_containers:
+  #   - "temporary-container"
+
+  # Additional labels
+  labels:
+    source: "docker"

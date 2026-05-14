@@ -1,0 +1,47 @@
+# TelemetryFlow Agent - CockroachDB Collector Configuration
+#
+# Example configuration for monitoring CockroachDB nodes.
+# Uses the PostgreSQL wire protocol (pgx driver) to query
+# crdb_internal.* virtual tables.
+
+cockroachdb:
+  enabled: true
+
+  # Global intervals
+  instance_interval: 15s     # node, SQL, store metrics
+  query_interval: 60s        # statement statistics
+  range_interval: 30s        # range health metrics
+
+  # Global settings
+  max_connections: 3          # pool connections per instance
+  top_statements_limit: 200  # top statements to track
+
+  instances:
+    # Single-node development
+    - name: "crdb-dev"
+      host: "localhost"
+      sql_port: 26257
+      admin_port: 8080
+      user: "root"
+      password: ""
+      database: "system"
+      sslmode: "disable"
+      tags:
+        env: "development"
+
+    # Production cluster node
+    - name: "crdb-prod-01"
+      host: "crdb-node-01.internal"
+      sql_port: 26257
+      admin_port: 8080
+      user: "monitor"
+      password: "${CRDB_PASSWORD}"
+      database: "system"
+      sslmode: "require"
+      ssl_root_cert: "/etc/ssl/crdb-ca.pem"
+      ssl_cert: "/etc/ssl/crdb-client.pem"
+      ssl_key: "/etc/ssl/crdb-client.key"
+      cluster_name: "production"
+      tags:
+        env: "production"
+        cluster: "production"

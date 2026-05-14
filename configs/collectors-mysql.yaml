@@ -1,0 +1,65 @@
+# TelemetryFlow Agent - MySQL Collector Configuration
+#
+# Example configuration for monitoring MySQL, MariaDB, Percona,
+# and Galera Cluster instances.
+
+mysql:
+  enabled: true
+
+  # Global intervals
+  status_interval: 10s        # SHOW GLOBAL STATUS metrics
+  query_interval: 60s         # query analytics from performance_schema
+  schema_interval: 300s       # table/index statistics
+
+  instances:
+    # MySQL primary
+    - name: "mysql-primary"
+      host: "mysql-primary.internal"
+      port: 3306
+      username: "monitor"
+      password: "${MYSQL_PASSWORD}"
+      database: ""
+      max_open_conns: 3
+      tags:
+        env: "production"
+        role: "primary"
+
+    # MySQL replica
+    - name: "mysql-replica-1"
+      host: "mysql-replica-1.internal"
+      port: 3306
+      username: "monitor"
+      password: "${MYSQL_PASSWORD}"
+      database: ""
+      max_open_conns: 3
+      tags:
+        env: "production"
+        role: "replica"
+
+    # TLS-secured instance
+    # - name: "mysql-secure"
+    #   host: "mysql-secure.internal"
+    #   port: 3306
+    #   username: "monitor"
+    #   password: "${MYSQL_PASSWORD}"
+    #   database: ""
+    #   tls_enabled: true
+    #   tls_skip_verify: false
+    #   max_open_conns: 3
+
+    # Percona / Galera node
+    # - name: "percona-node-1"
+    #   host: "percona-1.internal"
+    #   port: 3306
+    #   username: "monitor"
+    #   password: "${PERCONA_PASSWORD}"
+    #   database: ""
+    #   max_open_conns: 3
+    #   include_databases:
+    #     - "myapp"
+    #   exclude_databases:
+    #     - "information_schema"
+    #     - "performance_schema"
+    #   tags:
+    #     env: "production"
+    #     variant: "percona"

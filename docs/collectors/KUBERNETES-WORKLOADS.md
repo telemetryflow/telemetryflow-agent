@@ -6,6 +6,33 @@ Collects replica and scheduling metrics for StatefulSets, DaemonSets, ReplicaSet
 
 Kubernetes API: `apps/v1` and `batch/v1` resources (all namespaces, namespace-filtered).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    K8S[Kubernetes API Server] -->|apps/v1| CLIENT[API Client]
+    K8S -->|batch/v1| CLIENT
+    CLIENT --> COLL[Workloads Collector]
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Workloads Collector] --> B[StatefulSets]
+    A --> C[DaemonSets]
+    A --> D[ReplicaSets]
+    A --> E[Jobs]
+    A --> F[CronJobs]
+
+    B --> B1[Desired / Ready Replicas]
+    C --> C1[Desired / Current / Ready]
+    D --> D1[Desired / Ready Replicas]
+    E --> E1[Active / Succeeded / Failed]
+    F --> F1[Active Jobs]
+```
+
 ## StatefulSet Metrics
 
 | Metric                           | Type  | Labels                                | Description           |

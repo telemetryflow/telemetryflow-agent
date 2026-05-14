@@ -12,6 +12,35 @@ GET /api/v1/nodes/{nodeName}/proxy/stats/summary
 
 The collector iterates all unique nodes derived from the current pod list, fetches the Kubelet summary for each node, and aggregates `rxBytes`, `txBytes`, `rxErrors`, `txErrors` across all pod network interfaces per namespace.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph K8S ["Kubernetes Cluster"]
+        N1[Node 1]
+        N2[Node N]
+    end
+
+    API[Kubernetes API Server] -->|proxy /stats/summary| N1
+    API -->|proxy /stats/summary| N2
+    N1 & N2 --> CLIENT[API Client]
+    CLIENT --> AGG[Per-Namespace Aggregator]
+    AGG --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Network Collector] --> B[Per-Namespace Aggregation]
+    A --> C[Node-Level Network]
+
+    B --> B1[receive_bytes]
+    B --> B2[transmit_bytes]
+
+    C --> C1[k8s.node.network.io]
+```
+
 ## Metrics
 
 | Metric                                 | Type  | Unit  | Labels                 | Description                                                             |

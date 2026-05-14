@@ -1,0 +1,29 @@
+# TelemetryFlow Agent - cAdvisor Collector Configuration
+#
+# Example configuration for monitoring cAdvisor container metrics.
+# Collects CPU, memory, network, disk I/O, and filesystem metrics
+# from the cAdvisor HTTP API.
+
+cadvisor:
+  enabled: true
+
+  # Collection interval
+  interval: 15s
+
+  # cAdvisor endpoint
+  endpoint: "http://localhost:8080"
+  metrics_path: "/metrics"
+  timeout: 10s
+
+  # TLS options (uncomment for HTTPS endpoints)
+  # insecure_skip_verify: false
+  # bearer_token_path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+  # Metric name filter (empty = collect all)
+  # metric_names:
+  #   - "container_cpu_usage_seconds_total"
+  #   - "container_memory_working_set_bytes"
+
+  # Additional labels
+  labels:
+    source: "cadvisor"

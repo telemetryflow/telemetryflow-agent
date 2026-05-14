@@ -6,6 +6,30 @@ Collects HorizontalPodAutoscaler replica bounds, current state, and scaling cond
 
 Kubernetes API: `autoscaling/v2/horizontalpodautoscalers` (all namespaces, namespace-filtered).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    K8S[Kubernetes API Server] -->|autoscaling/v2/HPA| CLIENT[API Client]
+    CLIENT --> COLL[HPA Collector]
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[HPA Collector] --> B[Replica Bounds]
+    A --> C[Scaling Conditions]
+
+    B --> B1[min / max]
+    B --> B2[current / desired]
+
+    C --> C1[AbleToScale]
+    C --> C2[ScalingActive]
+    C --> C3[ScalingLimited]
+```
+
 ## Metrics
 
 ### Replica Counts

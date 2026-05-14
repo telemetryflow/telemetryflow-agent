@@ -9,6 +9,31 @@ Kubernetes API:
 - `v1/persistentvolumes` (cluster-scoped — no namespace filter applied)
 - `v1/persistentvolumeclaims` (all namespaces — namespace filter applied)
 
+## Architecture
+
+```mermaid
+flowchart LR
+    K8S[Kubernetes API Server] -->|v1/persistentvolumes| CLIENT[API Client]
+    K8S -->|v1/persistentvolumeclaims| CLIENT
+    CLIENT --> COLL[Storage Collector]
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Storage Collector] --> B[PersistentVolumes]
+    A --> C[PersistentVolumeClaims]
+
+    B --> B1[Capacity]
+    B --> B2[Phase]
+
+    C --> C1[Capacity]
+    C --> C2[Phase]
+    C --> C3[Storage Class]
+```
+
 ## Metrics
 
 ### PersistentVolumes

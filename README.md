@@ -7,17 +7,17 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.9-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.10-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
 </div>
 
 ---
 
-Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.40.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
+Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.43.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
 
 This agent works as the **client-side counterpart** to the TelemetryFlow Backend Agent Module (NestJS), providing:
 
@@ -34,11 +34,11 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 graph LR
     subgraph "TelemetryFlow Ecosystem v1.3.5"
         subgraph "Instrumentation"
-            SDK[TFO-Go-SDK<br/>OTEL SDK v1.40.0]
+            SDK[TFO-Go-SDK<br/>OTEL SDK v1.43.0]
         end
 
         subgraph "Collection"
-            AGENT[TFO-Agent<br/>OTEL SDK v1.40.0]
+            AGENT[TFO-Agent<br/>OTEL SDK v1.43.0]
         end
 
         subgraph "Processing"
@@ -59,15 +59,15 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.9  | SDK v1.40.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.9  | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Agent**     | v1.1.10 | SDK v1.43.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.1.10 | SDK v1.43.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.1.8  | Collector v0.147.0 | Central telemetry collector |
 
 ## Features
 
 ### OpenTelemetry Core
 
-- **OpenTelemetry SDK v1.40.0**: Built on standard OTEL Go SDK (aligned with TFO-Go-SDK)
+- **OpenTelemetry SDK v1.43.0**: Built on standard OTEL Go SDK (aligned with TFO-Go-SDK)
 - **OTLP Export**: OpenTelemetry Protocol for metrics, logs, and traces
 - **Multi-Signal Support**: Metrics, logs, and traces collection
 
@@ -289,12 +289,21 @@ tfo-agent/
 │   ├── agent/             # Core agent lifecycle
 │   ├── buffer/            # Disk-backed retry buffer
 │   ├── collector/         # Metric collectors
+│   │   ├── aurora/        # Amazon Aurora CloudWatch/PI/RDS collector
 │   │   ├── cadvisor/      # cAdvisor Prometheus scraper collector
+│   │   ├── clickhouse/    # ClickHouse database collector
+│   │   ├── cockroachdb/   # CockroachDB database collector
 │   │   ├── docker/        # Docker container metrics collector
 │   │   ├── ebpf/          # eBPF kernel-level metrics collector
 │   │   ├── kubernetes/    # Kubernetes metrics collector
+│   │   ├── mongodb/       # MongoDB database collector
+│   │   ├── mssql/         # Microsoft SQL Server collector
+│   │   ├── mysql/         # MySQL/MariaDB/Percona collector
 │   │   ├── nodeexporter/  # Node Exporter metrics collector
-│   │   └── system/        # System metrics collector
+│   │   ├── postgresql/    # PostgreSQL/RDS PostgreSQL collector
+│   │   ├── sqlite3/       # SQLite3 database collector
+│   │   ├── system/        # System metrics collector
+│   │   └── timescaledb/   # TimescaleDB collector
 │   ├── config/            # Configuration management
 │   ├── exporter/          # OTLP data exporters
 │   └── version/           # Version and banner info
@@ -373,6 +382,22 @@ The cAdvisor collector scrapes Prometheus metrics from a running cAdvisor instan
 - Collects `container_*` and `machine_*` metric families
 - Supports counter, gauge, histogram, summary, and untyped metric types
 - Optional metric name allowlist for selective collection
+
+### Database Monitoring
+
+The agent provides native collectors for popular databases via direct connection or cloud SDK:
+
+| Collector         | Source                                          | Metrics                                                                                                                                                 |
+| ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Amazon Aurora** | AWS SDK (CloudWatch, RDS, Performance Insights) | 60+ CloudWatch metrics across storage, replication, cache, latency, transactions, availability, backtrack, serverless, global, instance, volume         |
+| **MySQL/MariaDB** | Direct connection                               | Global status, InnoDB, replication, Galera, query analytics, schema, MariaDB-specific (Aria, ColumnStore, Spider, query cache, thread pool, user stats) |
+| **PostgreSQL**    | Direct connection                               | pg_stat_activity, pg_stat_database, pg_stat_bgwriter, pg_stat_statements, table stats, replication                                                      |
+| **MSSQL**         | Direct connection                               | Wait stats, perf counters, index usage, tempdb, agent jobs, query store, file I/O                                                                       |
+| **MongoDB**       | Direct connection                               | Server status, replica set, sharding, query profiler, collection stats                                                                                  |
+| **ClickHouse**    | HTTP API                                        | System tables, query metrics, merge stats, replication queue                                                                                            |
+| **CockroachDB**   | Direct connection                               | SQL stats, range stats, store metrics, replication                                                                                                      |
+| **TimescaleDB**   | Direct connection                               | Hypertable stats, chunk stats, compression ratios, continuous aggregates, job health                                                                    |
+| **SQLite3**       | File access                                     | Page cache, WAL metrics, lock contention, integrity checks, table stats                                                                                 |
 
 ### eBPF Metrics (Linux-only)
 
@@ -460,21 +485,25 @@ make ci-test                 # Run with race detection (CI mode)
 
 #### Test Packages
 
-| Package                   | Description                 | Test Files |
-| ------------------------- | --------------------------- | ---------- |
-| `application`             | CLI commands, configuration | 3          |
-| `domain/agent`            | Agent lifecycle management  | 2          |
-| `domain/ebpf`             | eBPF collector              | 4          |
-| `domain/kubernetes`       | Kubernetes collector        | 1          |
-| `domain/nodeexporter`     | Node Exporter collector     | 1          |
-| `domain/plugin`           | Plugin registry             | 1          |
-| `domain/telemetry`        | Telemetry collection        | 2          |
-| `infrastructure/api`      | API client                  | 1          |
-| `infrastructure/buffer`   | Disk-backed buffer          | 1          |
-| `infrastructure/config`   | Configuration loader        | 1          |
-| `infrastructure/exporter` | OTLP exporters              | 3          |
-| `integrations`            | 3rd party integrations      | 36         |
-| `presentation/banner`     | Startup banner              | 1          |
+| Package                        | Description                 | Test Files |
+| ------------------------------ | --------------------------- | ---------- |
+| `application`                  | CLI commands, configuration | 3          |
+| `domain/agent`                 | Agent lifecycle management  | 2          |
+| `domain/collector/mysql`       | MySQL/MariaDB collector     | 3          |
+| `domain/collector/mongodb`     | MongoDB collector           | 3          |
+| `domain/collector/postgresql`  | PostgreSQL collector        | 3          |
+| `domain/collector/timescaledb` | TimescaleDB collector       | 1          |
+| `domain/ebpf`                  | eBPF collector              | 4          |
+| `domain/kubernetes`            | Kubernetes collector        | 1          |
+| `domain/nodeexporter`          | Node Exporter collector     | 1          |
+| `domain/plugin`                | Plugin registry             | 1          |
+| `domain/telemetry`             | Telemetry collection        | 2          |
+| `infrastructure/api`           | API client                  | 1          |
+| `infrastructure/buffer`        | Disk-backed buffer          | 1          |
+| `infrastructure/config`        | Configuration loader        | 1          |
+| `infrastructure/exporter`      | OTLP exporters              | 3          |
+| `integrations`                 | 3rd party integrations      | 36         |
+| `presentation/banner`          | Startup banner              | 1          |
 
 ## Systemd Service
 

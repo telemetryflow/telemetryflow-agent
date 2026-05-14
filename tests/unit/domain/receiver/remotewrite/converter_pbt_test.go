@@ -1,4 +1,4 @@
-// Package remotewrite property-based tests for the TimeSeries converter.
+// Package remotewrite_test contains property-based tests for the TimeSeries converter.
 //
 // Validates: Requirements 3.4, 3.12
 //
@@ -17,7 +17,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package remotewrite
+package remotewrite_test
 
 import (
 	"testing"
@@ -26,6 +26,8 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	remotewrite "github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
 )
 
 // TestConvertTimeSeriesLabelPreservation verifies that all labels in a
@@ -65,7 +67,7 @@ func TestConvertTimeSeriesLabelPreservation(t *testing.T) {
 			Samples: []prompb.Sample{{Value: 1.0, Timestamp: 0}},
 		}
 
-		metrics, err := convertTimeSeries(ts)
+		metrics, err := remotewrite.ConvertTimeSeriesExported(ts)
 		if err != nil {
 			return false
 		}
@@ -101,7 +103,7 @@ func TestConvertTimeSeriesNameExtraction(t *testing.T) {
 		},
 		Samples: []prompb.Sample{{Value: 42.0, Timestamp: 1000}},
 	}
-	metrics, err := convertTimeSeries(ts)
+	metrics, err := remotewrite.ConvertTimeSeriesExported(ts)
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "my_metric", metrics[0].Name)
@@ -115,7 +117,7 @@ func TestConvertTimeSeriesMissingName(t *testing.T) {
 		Labels:  []prompb.Label{{Name: "env", Value: "prod"}},
 		Samples: []prompb.Sample{{Value: 1.0}},
 	}
-	_, err := convertTimeSeries(ts)
+	_, err := remotewrite.ConvertTimeSeriesExported(ts)
 	assert.Error(t, err)
 }
 

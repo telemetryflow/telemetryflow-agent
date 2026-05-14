@@ -1,0 +1,64 @@
+# TelemetryFlow Agent - MSSQL Collector Configuration
+#
+# Example configuration for monitoring Microsoft SQL Server instances.
+# Supports on-premises, Azure SQL Database, Azure SQL Managed Instance,
+# and Amazon RDS for SQL Server.
+
+mssql:
+  enabled: true
+
+  # Global intervals
+  metrics_interval: 15s     # perf counters, waits, file I/O, TempDB
+  query_interval: 60s       # query analytics, Query Store, Azure SQL metrics
+  index_interval: 300s      # missing indexes, fragmentation
+
+  # Global settings
+  max_connections: 3        # pool connections per instance
+  top_queries_limit: 50     # top queries by elapsed time
+  collect_query_store: false # enable Query Store regression detection
+  collect_index_stats: true  # enable missing index + fragmentation
+  collect_ag_status: false   # enable AlwaysOn AG monitoring
+  collect_agent_jobs: false  # enable SQL Agent job monitoring
+
+  instances:
+    # On-premises SQL Server (default instance)
+    - name: "mssql-prod"
+      host: "sqlserver-prod.internal"
+      port: 1433
+      auth_type: "sql_server"
+      username: "${MSSQL_USER}"
+      password: "${MSSQL_PASSWORD}"
+      database: "master"
+      encrypt: "true"
+      trust_server_certificate: false
+      tags:
+        env: "production"
+        edition: "enterprise"
+
+    # Named instance
+    - name: "mssql-dev"
+      host: "sqlserver-dev.internal"
+      port: 1433
+      instance_name: "SQLEXPRESS"
+      auth_type: "sql_server"
+      username: "sa"
+      password: "${MSSQL_DEV_PASSWORD}"
+      database: "master"
+      encrypt: "true"
+      trust_server_certificate: true
+      tags:
+        env: "development"
+
+    # Azure SQL Database (engine edition 5)
+    - name: "azure-sqldb-prod"
+      host: "myserver.database.windows.net"
+      port: 1433
+      auth_type: "sql_server"
+      username: "${AZURE_SQL_ADMIN}"
+      password: "${AZURE_SQL_PASSWORD}"
+      database: "myappdb"
+      encrypt: "true"
+      trust_server_certificate: false
+      tags:
+        env: "production"
+        type: "azure-sqldb"

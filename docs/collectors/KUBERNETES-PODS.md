@@ -11,6 +11,50 @@ Collects pod-level phase, restart counts, container resource requests/limits/usa
 | Kubelet `/stats/summary` (proxied)     | Per-container ephemeral storage (rootfs + logs) and memory working set                 |
 | cAdvisor `/metrics/cadvisor` (proxied) | Per-container CPU throttle seconds (`container_cpu_cfs_throttled_seconds_total`)       |
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph K8S ["Kubernetes Cluster"]
+        API[Kubernetes API Server]
+        MS[metrics-server]
+        KL[Kubelet /stats/summary]
+        CAD[cAdvisor /metrics]
+    end
+
+    subgraph TFO ["TFO Agent — K8s Pods"]
+        CLIENT[API Client]
+        COLL[Pod Collector]
+    end
+
+    API -->|/v1/pods| CLIENT
+    MS -->|MetricsV1beta1| CLIENT
+    API -->|proxy| KL
+    API -->|proxy| CAD
+    KL & CAD --> CLIENT
+    CLIENT --> COLL
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[K8s Pods Collector] --> B[Pod Level]
+    A --> C[Container Status]
+    A --> D[Resource Requests & Limits]
+    A --> E[Container Usage]
+    A --> F[Container CPU Throttled]
+
+    B --> B1[Phase]
+    B --> B2[Restart Count]
+    B --> B3[Pod Count Aggregate]
+
+    E --> E1[CPU / Memory — metrics-server]
+    E --> E2[Ephemeral Storage — Kubelet]
+    E --> E3[Memory Working Set — Kubelet]
+```
+
 ## Metrics
 
 ### Pod Level

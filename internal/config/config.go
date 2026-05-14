@@ -248,11 +248,554 @@ type CollectorConfig struct {
 	// System contains system metrics collector settings
 	System SystemCollectorConfig `mapstructure:"system"`
 
+	// ClickHouse contains ClickHouse database monitoring collector settings
+	ClickHouse ClickHouseCollectorConfig `mapstructure:"clickhouse"`
+
+	// MySQL contains MySQL / MariaDB / Percona database monitoring collector settings
+	MySQL MySQLCollectorConfig `mapstructure:"mysql"`
+
+	// PostgreSQL contains PostgreSQL database monitoring collector settings
+	PostgreSQL PostgreSQLCollectorConfig `mapstructure:"postgresql"`
+
+	// SQLite3 contains SQLite3 database monitoring collector settings
+	SQLite3 SQLite3CollectorConfig `mapstructure:"sqlite3"`
+
+	// MongoDBCommunity contains MongoDB Community database monitoring collector settings
+	MongoDBCommunity MongoDBCommunityCollectorConfig `mapstructure:"mongodb_community"`
+
+	// CockroachDB contains CockroachDB database monitoring collector settings
+	CockroachDB CockroachDBCollectorConfig `mapstructure:"cockroachdb"`
+
+	// MSSQL contains Microsoft SQL Server database monitoring collector settings
+	MSSQL MSSQLCollectorConfig `mapstructure:"mssql"`
+
+	// TimescaleDB contains TimescaleDB database monitoring collector settings
+	TimescaleDB TimescaleDBCollectorConfig `mapstructure:"timescaledb"`
+
+	// Aurora contains Amazon Aurora database monitoring collector settings
+	Aurora AuroraCollectorConfig `mapstructure:"aurora"`
+
+	// RDSPostgreSQL contains AWS RDS PostgreSQL agent-side collector settings
+	RDSPostgreSQL RDSPostgreSQLCollectorConfig `mapstructure:"rds_postgresql"`
+
 	// PrometheusScraper contains Prometheus pull-based scraper settings
 	PrometheusScraper PrometheusScraperConfig `mapstructure:"prometheus_scraper"`
 
 	// RemoteWriteReceiver contains Prometheus remote_write push receiver settings
 	RemoteWriteReceiver RemoteWriteReceiverConfig `mapstructure:"remote_write_receiver"`
+}
+
+// ClickHouseCollectorConfig contains settings for monitoring external ClickHouse instances.
+type ClickHouseCollectorConfig struct {
+	// Enabled enables the ClickHouse monitoring collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Instances is the list of ClickHouse instances to monitor
+	Instances []ClickHouseInstanceConfig `mapstructure:"instances"`
+
+	// CollectionInterval is how often to collect system/storage metrics
+	CollectionInterval time.Duration `mapstructure:"collection_interval"`
+
+	// QueryLogInterval is how often to collect query log metrics
+	QueryLogInterval time.Duration `mapstructure:"query_log_interval"`
+
+	// MaxQueryLogRows is the maximum number of query log rows to fetch per cycle
+	MaxQueryLogRows int `mapstructure:"max_query_log_rows"`
+}
+
+// ClickHouseInstanceConfig contains connection settings for a single ClickHouse instance.
+type ClickHouseInstanceConfig struct {
+	// Name is a human-readable identifier for this instance
+	Name string `mapstructure:"name"`
+
+	// Host is the ClickHouse server hostname or IP address
+	Host string `mapstructure:"host"`
+
+	// HTTPPort is the HTTP interface port (default: 8123)
+	HTTPPort int `mapstructure:"http_port"`
+
+	// NativePort is the native TCP protocol port (default: 9000)
+	NativePort int `mapstructure:"native_port"`
+
+	// Username is the ClickHouse username
+	Username string `mapstructure:"username"`
+
+	// Password is the ClickHouse password
+	Password string `mapstructure:"password"`
+
+	// Database is the default database (used in system queries)
+	Database string `mapstructure:"database"`
+
+	// ClusterName is the ClickHouse cluster name (for replication metrics)
+	ClusterName string `mapstructure:"cluster_name"`
+
+	// ShardNum is the shard number within the cluster
+	ShardNum int `mapstructure:"shard_num"`
+
+	// ReplicaName is the replica name within the shard
+	ReplicaName string `mapstructure:"replica_name"`
+
+	// TLS contains TLS settings for the connection
+	TLS TLSConfig `mapstructure:"tls"`
+
+	// ConnectTimeout is the connection establishment timeout
+	ConnectTimeout time.Duration `mapstructure:"connect_timeout"`
+
+	// QueryTimeout is the per-query execution timeout
+	QueryTimeout time.Duration `mapstructure:"query_timeout"`
+}
+
+// MySQLCollectorConfig contains settings for monitoring MySQL / MariaDB / Percona Server instances.
+type MySQLCollectorConfig struct {
+	Enabled        bool                  `mapstructure:"enabled"`
+	Instances      []MySQLInstanceConfig `mapstructure:"instances"`
+	StatusInterval time.Duration         `mapstructure:"status_interval"`
+	QueryInterval  time.Duration         `mapstructure:"query_interval"`
+	SchemaInterval time.Duration         `mapstructure:"schema_interval"`
+}
+
+// MySQLInstanceConfig contains connection settings for a single MySQL instance.
+type MySQLInstanceConfig struct {
+	Name             string            `mapstructure:"name"`
+	Host             string            `mapstructure:"host"`
+	Port             int               `mapstructure:"port"`
+	Username         string            `mapstructure:"username"`
+	Password         string            `mapstructure:"password"`
+	Database         string            `mapstructure:"database"`
+	TLSEnabled       bool              `mapstructure:"tls_enabled"`
+	TLSSkipVerify    bool              `mapstructure:"tls_skip_verify"`
+	MaxOpenConns     int               `mapstructure:"max_open_conns"`
+	Tags             map[string]string `mapstructure:"tags"`
+	IncludeDatabases []string          `mapstructure:"include_databases"`
+	ExcludeDatabases []string          `mapstructure:"exclude_databases"`
+}
+
+// PostgreSQLCollectorConfig contains settings for monitoring PostgreSQL instances.
+type PostgreSQLCollectorConfig struct {
+	Enabled                 bool                       `mapstructure:"enabled"`
+	Instances               []PostgreSQLInstanceConfig `mapstructure:"instances"`
+	InstanceInterval        time.Duration              `mapstructure:"instance_interval"`
+	QueryInterval           time.Duration              `mapstructure:"query_interval"`
+	TableInterval           time.Duration              `mapstructure:"table_interval"`
+	MaxConnections          int                        `mapstructure:"max_connections"`
+	CollectPgStatStatements bool                       `mapstructure:"collect_pg_stat_statements"`
+	CollectTableStats       bool                       `mapstructure:"collect_table_stats"`
+	CollectBloatEstimates   bool                       `mapstructure:"collect_bloat_estimates"`
+	PgstattupleEnabled      bool                       `mapstructure:"pgstattuple_enabled"`
+	TopQueriesLimit         int                        `mapstructure:"top_queries_limit"`
+	TopTablesLimit          int                        `mapstructure:"top_tables_limit"`
+	Tags                    map[string]string          `mapstructure:"tags"`
+}
+
+// PostgreSQLInstanceConfig contains connection settings for a single PostgreSQL instance.
+type PostgreSQLInstanceConfig struct {
+	Name        string            `mapstructure:"name"`
+	Host        string            `mapstructure:"host"`
+	Port        int               `mapstructure:"port"`
+	User        string            `mapstructure:"user"`
+	Password    string            `mapstructure:"password"`
+	DBName      string            `mapstructure:"dbname"`
+	SSLMode     string            `mapstructure:"sslmode"`
+	SSLRootCert string            `mapstructure:"ssl_root_cert"`
+	SSLCert     string            `mapstructure:"ssl_cert"`
+	SSLKey      string            `mapstructure:"ssl_key"`
+	Tags        map[string]string `mapstructure:"tags"`
+}
+
+// SQLite3CollectorConfig contains settings for monitoring SQLite3 database files.
+type SQLite3CollectorConfig struct {
+	Enabled            bool                    `mapstructure:"enabled"`
+	Databases          []SQLite3DatabaseConfig `mapstructure:"databases"`
+	CollectionInterval time.Duration           `mapstructure:"collection_interval"`
+	TableStatsInterval time.Duration           `mapstructure:"table_stats_interval"`
+	ProcessInterval    time.Duration           `mapstructure:"process_interval"`
+	IntegrityInterval  time.Duration           `mapstructure:"integrity_interval"`
+	IntegrityTimeout   time.Duration           `mapstructure:"integrity_timeout"`
+	MaxDatabases       int                     `mapstructure:"max_databases"`
+	Tags               map[string]string       `mapstructure:"tags"`
+}
+
+// SQLite3DatabaseConfig contains settings for a single SQLite3 database file to monitor.
+type SQLite3DatabaseConfig struct {
+	Name        string            `mapstructure:"name"`
+	Path        string            `mapstructure:"path"`
+	GlobPattern string            `mapstructure:"glob_pattern"`
+	Tags        map[string]string `mapstructure:"tags"`
+}
+
+// MongoDBCommunityCollectorConfig contains settings for monitoring MongoDB Community instances.
+type MongoDBCommunityCollectorConfig struct {
+	Enabled           bool                             `mapstructure:"enabled"`
+	Instances         []MongoDBCommunityInstanceConfig `mapstructure:"instances"`
+	Interval          time.Duration                    `mapstructure:"interval"`
+	CurrentOpInterval time.Duration                    `mapstructure:"current_op_interval"`
+	ProfileInterval   time.Duration                    `mapstructure:"profile_interval"`
+	CollStatsInterval time.Duration                    `mapstructure:"collstats_interval"`
+	QueryInterval     time.Duration                    `mapstructure:"query_interval"`
+	ProfileLevel      int32                            `mapstructure:"profile_level"`
+	SlowMs            int32                            `mapstructure:"slow_ms"`
+	DiscoverDatabases bool                             `mapstructure:"discover_databases"`
+	Tags              map[string]string                `mapstructure:"tags"`
+}
+
+// MongoDBCommunityInstanceConfig contains connection settings for a single MongoDB instance.
+type MongoDBCommunityInstanceConfig struct {
+	Name                  string            `mapstructure:"name"`
+	URI                   string            `mapstructure:"uri"`
+	Username              string            `mapstructure:"username"`
+	Password              string            `mapstructure:"password"`
+	TLSCertFile           string            `mapstructure:"tls_cert_file"`
+	TLSKeyFile            string            `mapstructure:"tls_key_file"`
+	TLSCAFile             string            `mapstructure:"tls_ca_file"`
+	TLSInsecureSkipVerify bool              `mapstructure:"tls_insecure_skip_verify"`
+	Tags                  map[string]string `mapstructure:"tags"`
+}
+
+// CockroachDBCollectorConfig contains settings for monitoring CockroachDB instances.
+// CockroachDB is wire-compatible with PostgreSQL, so the agent uses pgx to connect
+// and queries crdb_internal.* virtual tables for cluster-level metrics.
+type CockroachDBCollectorConfig struct {
+	// Enabled enables the CockroachDB monitoring collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Instances is the list of CockroachDB nodes/clusters to monitor
+	Instances []CockroachDBInstanceConfig `mapstructure:"instances"`
+
+	// InstanceInterval is how often to collect node-level metrics (default: 15s)
+	InstanceInterval time.Duration `mapstructure:"instance_interval"`
+
+	// QueryInterval is how often to collect query analytics from crdb_internal.statement_statistics (default: 60s)
+	QueryInterval time.Duration `mapstructure:"query_interval"`
+
+	// RangeInterval is how often to collect range/replication metrics (default: 30s)
+	RangeInterval time.Duration `mapstructure:"range_interval"`
+
+	// MaxConnections is the maximum pool connections per instance (default: 3)
+	MaxConnections int `mapstructure:"max_connections"`
+
+	// TopStatementsLimit is the maximum number of top statements to report (default: 200)
+	TopStatementsLimit int `mapstructure:"top_statements_limit"`
+
+	// Tags are custom key-value tags applied to all metrics
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// CockroachDBInstanceConfig contains connection settings for a single CockroachDB node.
+type CockroachDBInstanceConfig struct {
+	// Name is a human-readable identifier for this instance/cluster
+	Name string `mapstructure:"name"`
+
+	// Host is the CockroachDB node hostname or IP address
+	Host string `mapstructure:"host"`
+
+	// SQLPort is the PostgreSQL wire-protocol SQL port (default: 26257)
+	SQLPort int `mapstructure:"sql_port"`
+
+	// AdminPort is the Admin UI HTTP port (default: 8080), used for Prometheus _status/vars
+	AdminPort int `mapstructure:"admin_port"`
+
+	// User is the CockroachDB SQL user
+	User string `mapstructure:"user"`
+
+	// Password is the CockroachDB SQL password
+	Password string `mapstructure:"password"`
+
+	// Database is the database to connect to (default: "system")
+	Database string `mapstructure:"database"`
+
+	// SSLMode is the SSL mode (disable, require, verify-ca, verify-full)
+	SSLMode string `mapstructure:"sslmode"`
+
+	// SSLRootCert is the path to the CA certificate
+	SSLRootCert string `mapstructure:"ssl_root_cert"`
+
+	// SSLCert is the path to the client certificate
+	SSLCert string `mapstructure:"ssl_cert"`
+
+	// SSLKey is the path to the client private key
+	SSLKey string `mapstructure:"ssl_key"`
+
+	// ClusterName is an optional cluster name override
+	ClusterName string `mapstructure:"cluster_name"`
+
+	// Tags are custom key-value tags for this instance
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// MSSQLCollectorConfig contains settings for monitoring Microsoft SQL Server instances.
+// The agent uses go-mssqldb to connect and queries sys.dm_os_* / sys.dm_exec_* DMVs.
+type MSSQLCollectorConfig struct {
+	// Enabled enables the MSSQL monitoring collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Instances is the list of SQL Server instances to monitor
+	Instances []MSSQLInstanceConfig `mapstructure:"instances"`
+
+	// MetricsInterval is how often to collect perf counters, waits, file I/O, TempDB (default: 15s)
+	MetricsInterval time.Duration `mapstructure:"metrics_interval"`
+
+	// QueryInterval is how often to collect query analytics and Query Store (default: 60s)
+	QueryInterval time.Duration `mapstructure:"query_interval"`
+
+	// IndexInterval is how often to collect index fragmentation and missing indexes (default: 300s)
+	IndexInterval time.Duration `mapstructure:"index_interval"`
+
+	// MaxConnections is the maximum pool connections per instance (default: 3)
+	MaxConnections int `mapstructure:"max_connections"`
+
+	// TopQueriesLimit is the maximum number of top queries to report (default: 50)
+	TopQueriesLimit int `mapstructure:"top_queries_limit"`
+
+	// CollectQueryStore enables Query Store regression detection (default: false)
+	CollectQueryStore bool `mapstructure:"collect_query_store"`
+
+	// CollectIndexStats enables missing index and fragmentation collection (default: true)
+	CollectIndexStats bool `mapstructure:"collect_index_stats"`
+
+	// CollectAGStatus enables AlwaysOn Availability Group monitoring (default: false)
+	CollectAGStatus bool `mapstructure:"collect_ag_status"`
+
+	// CollectAgentJobs enables SQL Server Agent job monitoring (default: false)
+	CollectAgentJobs bool `mapstructure:"collect_agent_jobs"`
+
+	// Tags are custom key-value tags applied to all metrics
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// MSSQLInstanceConfig contains connection settings for a single SQL Server instance.
+type MSSQLInstanceConfig struct {
+	// Name is a human-readable identifier for this instance
+	Name string `mapstructure:"name"`
+
+	// Host is the SQL Server hostname or IP address
+	Host string `mapstructure:"host"`
+
+	// Port is the SQL Server port (default: 1433)
+	Port int `mapstructure:"port"`
+
+	// InstanceName is the named instance (empty for default instance)
+	InstanceName string `mapstructure:"instance_name"`
+
+	// AuthType is the authentication type: sql_server, windows_ntlm, windows_kerberos
+	AuthType string `mapstructure:"auth_type"`
+
+	// Username is the SQL Server username
+	Username string `mapstructure:"username"`
+
+	// Password is the SQL Server password (supports ${ENV_VAR} resolution)
+	Password string `mapstructure:"password"`
+
+	// Database is the default database for connection (default: master)
+	Database string `mapstructure:"database"`
+
+	// Encrypt controls connection encryption (true/false/strict)
+	Encrypt string `mapstructure:"encrypt"`
+
+	// TrustServerCertificate trusts the server certificate without validation
+	TrustServerCertificate bool `mapstructure:"trust_server_certificate"`
+
+	// CollectionIntervalSeconds overrides the global metrics interval for this instance
+	CollectionIntervalSeconds int `mapstructure:"collection_interval_seconds"`
+
+	// QueryAnalyticsEnabled enables per-instance query analytics
+	QueryAnalyticsEnabled bool `mapstructure:"query_analytics_enabled"`
+
+	// IndexMonitoringEnabled enables per-instance index monitoring
+	IndexMonitoringEnabled bool `mapstructure:"index_monitoring_enabled"`
+
+	// AGMonitoringEnabled enables per-instance AG monitoring
+	AGMonitoringEnabled bool `mapstructure:"ag_monitoring_enabled"`
+
+	// Tags are custom key-value tags for this instance
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// TimescaleDBCollectorConfig contains settings for monitoring TimescaleDB instances.
+// Extends the PostgreSQL collector config with TimescaleDB-specific intervals.
+type TimescaleDBCollectorConfig struct {
+	Enabled            bool                        `mapstructure:"enabled"`
+	Instances          []TimescaleDBInstanceConfig `mapstructure:"instances"`
+	InstanceInterval   time.Duration               `mapstructure:"instance_interval"`
+	HypertableInterval time.Duration               `mapstructure:"hypertable_interval"`
+	ChunkInterval      time.Duration               `mapstructure:"chunk_interval"`
+	JobInterval        time.Duration               `mapstructure:"job_interval"`
+	MaxConnections     int                         `mapstructure:"max_connections"`
+	Tags               map[string]string           `mapstructure:"tags"`
+}
+
+// TimescaleDBInstanceConfig contains connection settings for a single TimescaleDB instance.
+type TimescaleDBInstanceConfig struct {
+	Name        string            `mapstructure:"name"`
+	Host        string            `mapstructure:"host"`
+	Port        int               `mapstructure:"port"`
+	User        string            `mapstructure:"user"`
+	Password    string            `mapstructure:"password"`
+	DBName      string            `mapstructure:"dbname"`
+	SSLMode     string            `mapstructure:"sslmode"`
+	SSLRootCert string            `mapstructure:"ssl_root_cert"`
+	SSLCert     string            `mapstructure:"ssl_cert"`
+	SSLKey      string            `mapstructure:"ssl_key"`
+	Tags        map[string]string `mapstructure:"tags"`
+}
+
+// AuroraCollectorConfig contains settings for monitoring Amazon Aurora clusters
+// via AWS SDK (RDS DescribeDBClusters, CloudWatch GetMetricData, Performance Insights).
+type AuroraCollectorConfig struct {
+	// Enabled enables the Aurora monitoring collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Clusters is the list of Aurora clusters to monitor
+	Clusters []AuroraClusterConfig `mapstructure:"clusters"`
+
+	// CollectionInterval is how often to collect CloudWatch metrics (default: 60s)
+	CollectionInterval time.Duration `mapstructure:"collection_interval"`
+
+	// TopologyInterval is how often to refresh cluster topology (default: 300s)
+	TopologyInterval time.Duration `mapstructure:"topology_interval"`
+
+	// PIInterval is how often to collect Performance Insights data (default: 60s)
+	PIInterval time.Duration `mapstructure:"pi_interval"`
+
+	// EnablePI enables Performance Insights data collection
+	EnablePI bool `mapstructure:"enable_pi"`
+
+	// CloudWatchBatchSize is the maximum number of metrics per GetMetricData request (default: 500)
+	CloudWatchBatchSize int `mapstructure:"cloudwatch_batch_size"`
+
+	// CloudWatchRateLimit is the maximum CloudWatch API calls per second (default: 40)
+	CloudWatchRateLimit int `mapstructure:"cloudwatch_rate_limit"`
+
+	// PushBatchSize is the maximum metrics per push batch (default: 1000)
+	PushBatchSize int `mapstructure:"push_batch_size"`
+
+	// PushFlushInterval is how often to flush the push buffer (default: 10s)
+	PushFlushInterval time.Duration `mapstructure:"push_flush_interval"`
+
+	// PushEndpoint overrides the TFO Platform endpoint for Aurora metrics push.
+	// When empty, metrics are available through the standard OTLP export pipeline.
+	PushEndpoint string `mapstructure:"push_endpoint"`
+
+	// PushAPIKeyID is the API key ID for push authentication
+	PushAPIKeyID string `mapstructure:"push_api_key_id"`
+
+	// PushAPIKeySecret is the API key secret for push authentication
+	PushAPIKeySecret string `mapstructure:"push_api_key_secret"`
+}
+
+// AuroraClusterConfig contains connection settings for a single Aurora cluster.
+type AuroraClusterConfig struct {
+	// ClusterID is the Aurora cluster identifier (DBClusterIdentifier)
+	ClusterID string `mapstructure:"cluster_id"`
+
+	// Region is the AWS region where the cluster resides
+	Region string `mapstructure:"region"`
+
+	// AccessKeyID is the AWS access key ID (optional, uses default credential chain if empty)
+	AccessKeyID string `mapstructure:"access_key_id"`
+
+	// SecretAccessKey is the AWS secret access key (optional)
+	SecretAccessKey string `mapstructure:"secret_access_key"`
+
+	// SessionToken is the AWS session token for temporary credentials (optional)
+	SessionToken string `mapstructure:"session_token"`
+
+	// RoleARN is the IAM role ARN to assume (optional, for cross-account monitoring)
+	RoleARN string `mapstructure:"role_arn"`
+
+	// Tags are custom key-value tags applied to all metrics from this cluster
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// RDSPostgreSQLCollectorConfig contains settings for monitoring AWS RDS PostgreSQL
+// instances via direct database connection from the agent. The agent connects to
+// the RDS endpoint using TLS with the RDS CA bundle and collects pg_stat_* metrics.
+type RDSPostgreSQLCollectorConfig struct {
+	// Enabled enables the RDS PostgreSQL monitoring collector
+	Enabled bool `mapstructure:"enabled"`
+
+	// Instances is the list of RDS PostgreSQL instances to monitor
+	Instances []RDSPostgreSQLInstanceConfig `mapstructure:"instances"`
+
+	// ActivityInterval is how often to collect activity/status metrics
+	// (pg_stat_activity, pg_stat_database, pg_stat_bgwriter, pg_locks) (default: 15s)
+	ActivityInterval time.Duration `mapstructure:"activity_interval"`
+
+	// QueryInterval is how often to collect query analytics
+	// (pg_stat_statements) (default: 60s)
+	QueryInterval time.Duration `mapstructure:"query_interval"`
+
+	// TableStatsInterval is how often to collect table statistics
+	// (pg_stat_user_tables) (default: 60s)
+	TableStatsInterval time.Duration `mapstructure:"table_stats_interval"`
+
+	// MaxConnections is the maximum pool connections per instance (default: 3)
+	MaxConnections int `mapstructure:"max_connections"`
+
+	// TopQueriesLimit is the maximum number of top queries to report (default: 200)
+	TopQueriesLimit int `mapstructure:"top_queries_limit"`
+
+	// CollectPgStatStatements enables pg_stat_statements collection (default: true)
+	CollectPgStatStatements bool `mapstructure:"collect_pg_stat_statements"`
+
+	// CollectTableStats enables pg_stat_user_tables collection (default: true)
+	CollectTableStats bool `mapstructure:"collect_table_stats"`
+
+	// CollectReplication enables pg_stat_replication collection (default: true)
+	CollectReplication bool `mapstructure:"collect_replication"`
+
+	// PlatformEndpoint is the TFO Platform URL for submitting agent metrics
+	PlatformEndpoint string `mapstructure:"platform_endpoint"`
+
+	// PlatformAPIKeyID is the API key ID for authenticating with the platform
+	PlatformAPIKeyID string `mapstructure:"platform_api_key_id"`
+
+	// PlatformAPIKeySecret is the API key secret for authenticating with the platform
+	PlatformAPIKeySecret string `mapstructure:"platform_api_key_secret"`
+
+	// Tags are custom key-value tags applied to all metrics
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// RDSPostgreSQLInstanceConfig contains connection settings for a single AWS RDS
+// PostgreSQL instance.
+type RDSPostgreSQLInstanceConfig struct {
+	// Name is a human-readable identifier for this RDS instance
+	Name string `mapstructure:"name"`
+
+	// InstanceID is the RDS instance identifier (DBInstanceIdentifier), used as
+	// the platform-side resource ID for metric submission
+	InstanceID string `mapstructure:"instance_id"`
+
+	// Host is the RDS endpoint hostname (e.g., mydb.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com)
+	Host string `mapstructure:"host"`
+
+	// Port is the PostgreSQL port (default: 5432)
+	Port int `mapstructure:"port"`
+
+	// User is the PostgreSQL username
+	User string `mapstructure:"user"`
+
+	// Password is the PostgreSQL password (supports ${ENV_VAR} resolution)
+	Password string `mapstructure:"password"`
+
+	// DBName is the database name to connect to (default: "postgres")
+	DBName string `mapstructure:"dbname"`
+
+	// Region is the AWS region of this RDS instance (e.g., us-east-1)
+	Region string `mapstructure:"region"`
+
+	// RDSCABundlePath is the path to the RDS CA certificate bundle.
+	// If empty, the agent will attempt to use the system CA bundle or download
+	// the AWS RDS combined CA bundle. Common paths:
+	//   - /etc/ssl/certs/rds-combined-ca-bundle.pem
+	//   - /etc/pki/tls/certs/rds-combined-ca-bundle.pem
+	RDSCABundlePath string `mapstructure:"rds_ca_bundle_path"`
+
+	// IAMAuth enables IAM database authentication (default: false)
+	IAMAuth bool `mapstructure:"iam_auth"`
+
+	// Tags are custom key-value tags applied to all metrics from this instance
+	Tags map[string]string `mapstructure:"tags"`
 }
 
 // CAdvisorCollectorConfig contains cAdvisor Prometheus scraper collector settings.
@@ -1989,6 +2532,99 @@ func DefaultConfig() *Config {
 				Memory:   true,
 				Disk:     true,
 				Network:  true,
+			},
+			ClickHouse: ClickHouseCollectorConfig{
+				Enabled:            false,
+				CollectionInterval: 15 * time.Second,
+				QueryLogInterval:   60 * time.Second,
+				MaxQueryLogRows:    10000,
+				Instances:          []ClickHouseInstanceConfig{},
+			},
+			MySQL: MySQLCollectorConfig{
+				Enabled:        false,
+				StatusInterval: 10 * time.Second,
+				QueryInterval:  60 * time.Second,
+				SchemaInterval: 300 * time.Second,
+				Instances:      []MySQLInstanceConfig{},
+			},
+			PostgreSQL: PostgreSQLCollectorConfig{
+				Enabled:                 false,
+				InstanceInterval:        10 * time.Second,
+				QueryInterval:           60 * time.Second,
+				TableInterval:           300 * time.Second,
+				MaxConnections:          3,
+				CollectPgStatStatements: true,
+				CollectTableStats:       true,
+				CollectBloatEstimates:   true,
+				PgstattupleEnabled:      false,
+				TopQueriesLimit:         200,
+				TopTablesLimit:          500,
+				Instances:               []PostgreSQLInstanceConfig{},
+			},
+			SQLite3: SQLite3CollectorConfig{
+				Enabled:            false,
+				CollectionInterval: 60 * time.Second,
+				TableStatsInterval: 300 * time.Second,
+				ProcessInterval:    120 * time.Second,
+				IntegrityInterval:  0,
+				IntegrityTimeout:   300 * time.Second,
+				MaxDatabases:       50,
+				Databases:          []SQLite3DatabaseConfig{},
+			},
+			CockroachDB: CockroachDBCollectorConfig{
+				Enabled:            false,
+				InstanceInterval:   15 * time.Second,
+				QueryInterval:      60 * time.Second,
+				RangeInterval:      30 * time.Second,
+				MaxConnections:     3,
+				TopStatementsLimit: 200,
+				Instances:          []CockroachDBInstanceConfig{},
+			},
+			Aurora: AuroraCollectorConfig{
+				Enabled:             false,
+				CollectionInterval:  60 * time.Second,
+				TopologyInterval:    300 * time.Second,
+				PIInterval:          60 * time.Second,
+				EnablePI:            false,
+				CloudWatchBatchSize: 500,
+				CloudWatchRateLimit: 40,
+				PushBatchSize:       1000,
+				PushFlushInterval:   10 * time.Second,
+				Clusters:            []AuroraClusterConfig{},
+			},
+			RDSPostgreSQL: RDSPostgreSQLCollectorConfig{
+				Enabled:                 false,
+				ActivityInterval:        15 * time.Second,
+				QueryInterval:           60 * time.Second,
+				TableStatsInterval:      60 * time.Second,
+				MaxConnections:          3,
+				TopQueriesLimit:         200,
+				CollectPgStatStatements: true,
+				CollectTableStats:       true,
+				CollectReplication:      true,
+				Instances:               []RDSPostgreSQLInstanceConfig{},
+			},
+			MSSQL: MSSQLCollectorConfig{
+				Enabled:           false,
+				MetricsInterval:   15 * time.Second,
+				QueryInterval:     60 * time.Second,
+				IndexInterval:     300 * time.Second,
+				MaxConnections:    3,
+				TopQueriesLimit:   50,
+				CollectQueryStore: false,
+				CollectIndexStats: true,
+				CollectAGStatus:   false,
+				CollectAgentJobs:  false,
+				Instances:         []MSSQLInstanceConfig{},
+			},
+			TimescaleDB: TimescaleDBCollectorConfig{
+				Enabled:            false,
+				InstanceInterval:   10 * time.Second,
+				HypertableInterval: 60 * time.Second,
+				ChunkInterval:      120 * time.Second,
+				JobInterval:        60 * time.Second,
+				MaxConnections:     3,
+				Instances:          []TimescaleDBInstanceConfig{},
 			},
 		},
 		PrometheusServer: PrometheusServerConfig{

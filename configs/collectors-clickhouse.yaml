@@ -1,0 +1,56 @@
+# TelemetryFlow Agent - ClickHouse Collector Configuration
+#
+# Example configuration for monitoring ClickHouse instances.
+# Collects system metrics, MergeTree stats, replication, disks,
+# dictionaries, and query logs via the HTTP interface.
+
+clickhouse:
+  enabled: true
+
+  # Global intervals
+  collection_interval: 15s    # system metrics, events, async metrics
+  query_log_interval: 60s     # query log analysis
+  max_query_log_rows: 10000   # max rows to scan from system.query_log
+
+  instances:
+    # Single node
+    - name: "ch-prod"
+      host: "clickhouse-prod.internal"
+      http_port: 8123
+      native_port: 9000
+      username: "default"
+      password: "${CH_PASSWORD}"
+      database: "default"
+      connect_timeout: 10s
+      query_timeout: 30s
+      tags:
+        env: "production"
+
+    # Cluster node (with shard/replica info)
+    - name: "ch-cluster-node-1"
+      host: "ch-node-1.internal"
+      http_port: 8123
+      native_port: 9000
+      username: "default"
+      password: "${CH_PASSWORD}"
+      database: "default"
+      cluster_name: "production_cluster"
+      shard_num: 1
+      replica_name: "replica1"
+      connect_timeout: 10s
+      query_timeout: 30s
+      tags:
+        env: "production"
+        cluster: "production_cluster"
+
+    # TLS-secured node
+    # - name: "ch-secure"
+    #   host: "clickhouse-secure.internal"
+    #   http_port: 8443
+    #   username: "default"
+    #   password: "${CH_PASSWORD}"
+    #   tls:
+    #     enabled: true
+    #     ca_file: "/etc/ssl/clickhouse-ca.pem"
+    #     cert_file: "/etc/ssl/clickhouse-client.pem"
+    #     key_file: "/etc/ssl/clickhouse-client.key"

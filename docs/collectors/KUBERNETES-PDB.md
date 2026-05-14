@@ -6,6 +6,29 @@ Collects PodDisruptionBudget health and disruption budget metrics.
 
 Kubernetes API: `policy/v1/poddisruptionbudgets` (all namespaces, namespace-filtered).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    K8S[Kubernetes API Server] -->|policy/v1/PDB| CLIENT[API Client]
+    CLIENT --> COLL[PDB Collector]
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[PDB Collector] --> B[Pod Health Counts]
+    A --> C[Disruption Budget]
+
+    B --> B1[current_healthy]
+    B --> B2[desired_healthy]
+    B --> B3[expected pods]
+
+    C --> C1[disruptions_allowed]
+```
+
 ## Metrics
 
 | Metric                         | Type  | Labels                        | Description                                 |

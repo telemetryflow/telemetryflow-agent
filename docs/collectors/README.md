@@ -47,6 +47,20 @@ The Kubernetes collector uses four data sources:
 | ------------------ | ------------------------------------------------------------------------------------- |
 | [EBPF.md](EBPF.md) | eBPF: syscalls, TCP/UDP, file I/O, scheduler, memory faults, TCP state, Cilium Hubble |
 
+## Database Monitoring Collectors
+
+| Collector                       | Source                                                                                                        | Description                                                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Amazon Aurora**               | AWS SDK (CloudWatch GetMetricData, RDS DescribeDBClusters/Instances, Performance Insights GetResourceMetrics) | 60+ CloudWatch metrics across storage, replication, cache, latency, transactions, availability; automatic topology discovery; PI-enabled instance collection; multi-cluster with IAM role assumption; push-based export to TFO Platform |
+| **MySQL/MariaDB/Percona**       | Direct database connection (Go SQL driver)                                                                    | Global status/variables, InnoDB engine parsing, replication (multi-source), Galera cluster, query analytics (performance_schema), schema metrics, MariaDB-specific (Aria, ColumnStore, Spider, query cache, thread pool, user stats)    |
+| **PostgreSQL / RDS PostgreSQL** | Direct database connection (pgx)                                                                              | pg_stat_activity, pg_stat_database, pg_stat_bgwriter, pg_stat_statements, table stats, replication status; RDS variant with TLS and CA bundle support                                                                                   |
+| **Microsoft SQL Server**        | Direct database connection (go-mssqldb)                                                                       | Wait stats categorization, performance counters, index usage/fragmentation, tempdb space, agent job status, query store top queries, database file I/O                                                                                  |
+| **MongoDB**                     | MongoDB driver                                                                                                | Server status, replica set status, sharding detection, query profiler (system.profile), collection/document stats, connection pool metrics                                                                                              |
+| **ClickHouse**                  | HTTP API (JSONEachRow)                                                                                        | System tables (queries, parts, merges, replication_queue, databases, tables), query metrics, merge performance                                                                                                                          |
+| **CockroachDB**                 | Direct database connection (pgx)                                                                              | SQL stats (crdb_internal.node_statement_statistics), range stats, store metrics, replication status                                                                                                                                     |
+| **TimescaleDB**                 | Direct database connection (pgx)                                                                              | Hypertable stats (dimensions, chunks, compression), chunk age bucketing, continuous aggregate refresh lag, background job health (stuck detection, failures), data node availability                                                    |
+| **SQLite3**                     | File-based (database/sql)                                                                                     | Page cache hit/miss, WAL metrics, lock contention, integrity checks, table row counts and page stats                                                                                                                                    |
+
 ## Metric Naming Conventions
 
 | Prefix                      | Collector                            |
@@ -57,3 +71,12 @@ The Kubernetes collector uses four data sources:
 | `container.*`               | Docker collector                     |
 | `container_*` / `machine_*` | cAdvisor (original Prometheus names) |
 | `ebpf.*`                    | eBPF collector                       |
+| `aurora.*`                  | Amazon Aurora collector              |
+| `db.mysql.*`                | MySQL/MariaDB collector              |
+| `db.postgresql.*`           | PostgreSQL collector                 |
+| `mssql.*`                   | Microsoft SQL Server collector       |
+| `db.mongodb.*`              | MongoDB collector                    |
+| `db.clickhouse.*`           | ClickHouse collector                 |
+| `db.cockroachdb.*`          | CockroachDB collector                |
+| `db.timescaledb.*`          | TimescaleDB collector                |
+| `db.sqlite3.*`              | SQLite3 collector                    |

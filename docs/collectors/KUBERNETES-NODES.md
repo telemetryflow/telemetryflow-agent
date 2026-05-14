@@ -10,6 +10,39 @@ Collects node-level capacity, allocatable resources, real-time usage, filesystem
 | metrics-server (`MetricsV1beta1`)                 | Live CPU cores and memory usage                                   |
 | Kubelet `/stats/summary` (proxied via API server) | CPU nanoseconds, memory working set, rootfs, imageFs, network I/O |
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph K8S ["Kubernetes Cluster"]
+        API[Kubernetes API Server]
+        MS[metrics-server]
+        KL[Kubelet /stats/summary]
+    end
+
+    subgraph TFO ["TFO Agent — K8s Nodes"]
+        CLIENT[API Client]
+        COLL[Node Collector]
+    end
+
+    API -->|/v1/nodes| CLIENT
+    MS -->|MetricsV1beta1| CLIENT
+    API -->|proxy /stats/summary| KL
+    KL --> CLIENT
+    CLIENT --> COLL
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[K8s Nodes Collector] --> B[Capacity & Allocatable]
+    A --> C[Status & Conditions]
+    A --> D[Usage — metrics-server]
+    A --> E[Kubelet Summary]
+```
+
 ## Metrics
 
 ### Capacity & Allocatable

@@ -17,7 +17,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package scraper
+package scraper_test
 
 import (
 	"bytes"
@@ -29,10 +29,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	scraper "github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 )
 
 // TestParsePrometheusTextRoundtrip verifies that for any set of counter/gauge
-// metrics serialized to Prometheus text format, parsePrometheusText returns
+// metrics serialized to Prometheus text format, ParsePrometheusTextExported returns
 // metrics with matching names and finite values.
 //
 // **Validates: Requirements 1.13**
@@ -70,7 +72,7 @@ func TestParsePrometheusTextRoundtrip(t *testing.T) {
 			return true
 		}
 
-		metrics, err := parsePrometheusText(&buf)
+		metrics, err := scraper.ParsePrometheusTextExported(&buf)
 		if err != nil {
 			return false
 		}
@@ -103,7 +105,7 @@ func TestParsePrometheusTextCounterNames(t *testing.T) {
 http_requests_total{method="GET",status="200"} 42
 http_requests_total{method="POST",status="500"} 7
 `
-	metrics, err := parsePrometheusText(strings.NewReader(input))
+	metrics, err := scraper.ParsePrometheusTextExported(strings.NewReader(input))
 	require.NoError(t, err)
 	assert.Len(t, metrics, 2)
 	for _, m := range metrics {

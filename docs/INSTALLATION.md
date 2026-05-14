@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Installation Guide
 
-- **Version:** 1.1.8
+- **Version:** 1.1.10
 - **OTEL SDK Version:** 1.40.0
 - **Last Updated:** January 2026
 
@@ -33,13 +33,13 @@ make build
 **Expected Output:**
 
 ```
-TelemetryFlow Agent v1.1.9 (OTEL SDK 1.40.0)
+TelemetryFlow Agent v1.1.10 (OTEL SDK 1.40.0)
 
   Build Information
   ─────────────────────────────────────────────
   Commit:      abc1234
   Branch:      main
-  Built:       2026-03-08T10:00:00Z
+  Built:       2026-05-08T10:00:00Z
   Go Version:  go1.26.0
   Platform:    darwin/arm64
 

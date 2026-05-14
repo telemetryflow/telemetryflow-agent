@@ -1,0 +1,47 @@
+# TelemetryFlow Agent - Aurora Collector Configuration
+#
+# Example configuration for monitoring Amazon Aurora PostgreSQL/MySQL clusters
+# via AWS CloudWatch, Performance Insights, and cluster topology discovery.
+
+aurora:
+  enabled: true
+
+  # Global intervals
+  collection_interval: 60s    # CloudWatch metrics collection
+  topology_interval: 300s     # cluster topology discovery
+  pi_interval: 60s            # Performance Insights sampling
+
+  # Performance Insights
+  enable_pi: false            # requires PI enabled on the cluster
+
+  # CloudWatch API tuning
+  cloudwatch_batch_size: 500  # metrics per API call
+  cloudwatch_rate_limit: 40   # max API calls per second
+
+  # Push integration (optional)
+  # push_endpoint: "https://api.telemetryflow.io/v1/ingest"
+  # push_api_key_id: "${TFO_API_KEY_ID}"
+  # push_api_key_secret: "${TFO_API_KEY_SECRET}"
+  push_batch_size: 1000
+  push_flush_interval: 10s
+
+  clusters:
+    # Aurora PostgreSQL cluster
+    - cluster_id: "aurora-pg-prod"
+      region: "us-east-1"
+      access_key_id: "${AWS_ACCESS_KEY_ID}"
+      secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+      # session_token: ""        # optional, for assumed roles
+      # role_arn: ""             # optional, IAM role ARN to assume
+      tags:
+        env: "production"
+        engine: "aurora-postgresql"
+
+    # Aurora MySQL cluster
+    - cluster_id: "aurora-mysql-prod"
+      region: "eu-west-1"
+      access_key_id: "${AWS_ACCESS_KEY_ID}"
+      secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+      tags:
+        env: "production"
+        engine: "aurora-mysql"

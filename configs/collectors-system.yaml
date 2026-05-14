@@ -1,0 +1,22 @@
+# TelemetryFlow Agent - System Collector Configuration
+#
+# Example configuration for host-level system metrics.
+# Collects CPU, memory, disk, and network stats using gopsutil.
+# This collector is enabled by default.
+
+system:
+  enabled: true
+
+  # Collection interval
+  interval: 15s
+
+  # Metric categories
+  cpu: true
+  memory: true
+  disk: true
+  network: true
+
+  # Disk paths to monitor (empty = all mounted paths)
+  # disk_paths:
+  #   - "/"
+  #   - "/data"

@@ -2,6 +2,56 @@
 
 Collects host-level OS metrics equivalent to Prometheus `node_exporter`. Uses `gopsutil` for cross-platform support and reads Linux `/proc`/`/sys` directly where needed.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph HOST ["Host OS"]
+        PROC["/proc filesystem"]
+        SYS["/sys filesystem"]
+        GOPS[gopsutil]
+    end
+
+    subgraph TFO ["TFO Agent — Node Exporter Collector"]
+        COLL[Collectors]
+        TEXT[Textfile Reader]
+    end
+
+    PROC --> COLL
+    SYS --> COLL
+    GOPS --> COLL
+    TEXT -->|*.prom files| COLL
+    COLL --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Node Exporter Collector] --> B[CPU]
+    A --> C[Memory]
+    A --> D[Disk I/O]
+    A --> E[Filesystem]
+    A --> F[Network]
+    A --> G[Load Average]
+    A --> H[Thermal]
+    A --> I[Textfile]
+
+    B --> B1[Per-core time breakdown]
+    B --> B2[CPU frequency]
+
+    C --> C1[Virtual memory]
+    C --> C2[Swap]
+
+    D --> D1[Per-device counters]
+
+    E --> E1[Size / Free / Inodes]
+
+    F --> F1[Per-interface I/O]
+    F --> F2[TCP states]
+    F --> F3[ARP entries]
+```
+
 ## Sub-collectors
 
 | Sub-collector | Config flag                | Description                               |

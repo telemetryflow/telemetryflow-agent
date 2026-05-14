@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Configuration Reference
 
-- **Version:** 1.1.8
+- **Version:** 1.1.10
 - **OTEL SDK Version:** 1.40.0
 - **Last Updated:** Februarry 2026
 
@@ -694,6 +694,85 @@ sudo systemctl reload tfo-agent
 - Receiver endpoints
 - TLS certificates
 - Buffer path
+
+---
+
+## MongoDB Community Collector
+
+The MongoDB Community collector monitors standalone, replica set, and sharded MongoDB Community Edition deployments.
+
+### Configuration
+
+```yaml
+mongodb_community:
+  enabled: true
+
+  # Collection intervals
+  interval: 10s # serverStatus metrics (default: 10s)
+  current_op_interval: 30s # currentOp sampling (default: 30s)
+  profile_interval: 60s # slow query profiler (default: 60s)
+  collstats_interval: 300s # collection/index stats (default: 300s)
+  discover_databases: true # auto-discover non-system databases
+
+  instances:
+    - name: "mongo-rs-0"
+      uri: "mongodb://mongo-0:27017"
+      username: "${MONGO_USER}"
+      password: "${MONGO_PASSWORD}"
+      tags:
+        env: "production"
+        role: "primary"
+```
+
+### Collected Metrics
+
+| Category         | Metrics                                                           | Interval |
+| ---------------- | ----------------------------------------------------------------- | -------- |
+| Connections      | current, available, total_created, active                         | 10s      |
+| Opcounters       | insert, query, update, delete, getmore, command (+ repl variants) | 10s      |
+| Memory           | resident_mb, virtual_mb, mapped_mb                                | 10s      |
+| Documents        | inserted, updated, deleted, returned                              | 10s      |
+| Cursors          | open.total, open.no_timeout, open.pinned, timed_out               | 10s      |
+| Network          | bytes_in, bytes_out, requests                                     | 10s      |
+| Asserts          | regular, warning, msg, user, rollovers                            | 10s      |
+| Global Lock      | current_queue (total/readers/writers), active_clients             | 10s      |
+| WiredTiger       | cache bytes, dirty, evictions, tickets, checkpoints               | 10s      |
+| Replication      | member_state, member_health, lag_seconds, oplog window            | 10s      |
+| Sharding         | total_shards, chunks_per_shard, balancer status                   | 10s      |
+| Operations       | active, waiting_for_lock, running_longer thresholds               | 30s      |
+| Query Profiler   | slow queries, fingerprint aggregation                             | 60s      |
+| Collection Stats | document_count, size_bytes, index stats                           | 300s     |
+| Database Stats   | document_count, data_size, storage_size, index_size               | 300s     |
+
+### TLS Configuration
+
+```yaml
+mongodb_community:
+  instances:
+    - name: "secure-mongo"
+      uri: "mongodb://mongo.prod:27017"
+      username: "${MONGO_USER}"
+      password: "${MONGO_PASSWORD}"
+      tls_ca_file: "/etc/ssl/mongo-ca.pem"
+      tls_cert_file: "/etc/ssl/mongo-client.pem"
+      tls_key_file: "/etc/ssl/mongo-client.key"
+      tls_insecure_skip_verify: false
+```
+
+### Alert Rules
+
+The platform includes 8 pre-configured alert rules for MongoDB:
+
+| Rule                         | Condition                     | Severity |
+| ---------------------------- | ----------------------------- | -------- |
+| Connection Pool Exhaustion   | connections.utilization > 90% | critical |
+| Replication Lag Critical     | lag_seconds > 30              | critical |
+| WiredTiger Cache Pressure    | cache.utilization > 95%       | warning  |
+| WiredTiger Ticket Exhaustion | tickets.available < 5         | critical |
+| Oplog Window Shrinking       | oplog.window_seconds < 3600   | warning  |
+| High Cursor Count            | cursors.open > 1000           | warning  |
+| Assert Rate Spike            | asserts.regular_rate > 10/min | warning  |
+| Global Lock Queue            | current_queue.total > 50      | warning  |
 
 ---
 

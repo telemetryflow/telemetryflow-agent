@@ -1,0 +1,73 @@
+# TelemetryFlow Agent - Fluent Bit Collector Configuration
+#
+# Example configuration for embedding Fluent Bit as a managed
+# subprocess for production-grade log collection.
+#
+# Supports tail, systemd, and Kubernetes log sources.
+
+fluent_bit:
+  enabled: true
+
+  # Fluent Bit binary (must be installed on the host)
+  binary_path: "fluent-bit"
+  config_dir: "/tmp/tfo-agent-fluentbit"
+
+  # Fluent Bit engine settings
+  flush_interval: 5
+  log_level: "info"
+  storage_enabled: true
+  storage_path: "/var/log/tfo-agent/flb-storage"
+
+  # Health monitoring
+  health_check: true
+  health_port: 2020
+
+  # Auto-restart on crash
+  restart_on_crash: true
+  restart_delay: 5s
+  max_restarts: 10
+
+  # Tail input — watch log files
+  tail:
+    enabled: true
+    paths:
+      - "/var/log/app/*.log"
+      - "/var/log/syslog"
+    # exclude_paths:
+    #   - "/var/log/app/debug.log"
+    multiline_parser: "docker,cri"
+    # db_path: "/var/log/tfo-agent/flb-tail.db"
+    read_from_head: false
+    refresh_interval: 10
+    rotate_wait: 5
+
+  # Systemd journal input (Linux only)
+  systemd:
+    enabled: true
+    units:
+      - "kubelet"
+      - "docker"
+      - "containerd"
+    strip_underscores: true
+
+  # Kubernetes container logs
+  kubernetes:
+    enabled: false
+    log_path: "/var/log/containers/*.log"
+    merge_log: true
+    keep_log: false
+    k8s_logging_parser: true
+
+  # Custom input sections (optional)
+  # custom_inputs:
+  #   - properties:
+  #       Name: "tail"
+  #       Path: "/var/log/custom/*.log"
+  #       Tag: "custom.*"
+
+  # Custom filter sections (optional)
+  # custom_filters:
+  #   - properties:
+  #       Name: "grep"
+  #       Match: "*"
+  #       Regex: "log ERROR"

@@ -11,6 +11,40 @@ Options used per container:
 - `TailLines`: last N lines (default: 100, configurable)
 - `Container`: per-container request
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph K8S ["Kubernetes Cluster"]
+        P1[Pod 1]
+        P2[Pod N]
+    end
+
+    API[Kubernetes API Server] -->|pod logs| P1
+    API -->|pod logs| P2
+    P1 & P2 --> CLIENT[API Client]
+    CLIENT --> FILTER[Running + Ready Filter]
+    FILTER --> LOGS[Log Forwarder]
+    LOGS --> PLATFORM[TelemetryFlow Platform]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Pod Logs Collector] --> B[Container Filtering]
+    A --> C[Log Collection]
+    A --> D[Log Forwarding]
+
+    B --> B1[Phase = Running]
+    B --> B2[Status = Ready]
+    B --> B3[Namespace Allowlist]
+
+    C --> C1[Tail N lines per container]
+
+    D --> D1[PodLogEntry to Platform]
+```
+
 ## Collection Criteria
 
 Only containers that meet **all** of the following are collected:

@@ -1,0 +1,56 @@
+# TelemetryFlow Agent - TimescaleDB Collector Configuration
+#
+# Example configuration for monitoring TimescaleDB instances.
+# Extends PostgreSQL metrics with hypertable, chunk, compression,
+# continuous aggregate, job, retention, data node, and tiering metrics.
+
+timescaledb:
+  enabled: true
+
+  # Global intervals
+  instance_interval: 10s     # connections, transactions, cache, locks, hypertables
+  hypertable_interval: 60s   # per-hypertable size and chunk stats
+  chunk_interval: 120s       # per-hypertable chunk breakdown
+  job_interval: 60s          # background job statistics
+
+  # Global settings
+  max_connections: 3
+
+  instances:
+    # TimescaleDB primary
+    - name: "tsdb-primary"
+      host: "timescaledb-primary.internal"
+      port: 5432
+      user: "postgres"
+      password: "${TSDB_PASSWORD}"
+      dbname: "postgres"
+      sslmode: "prefer"
+      tags:
+        env: "production"
+        role: "primary"
+
+    # TimescaleDB replica
+    - name: "tsdb-replica-1"
+      host: "timescaledb-replica-1.internal"
+      port: 5432
+      user: "postgres"
+      password: "${TSDB_PASSWORD}"
+      dbname: "postgres"
+      sslmode: "prefer"
+      tags:
+        env: "production"
+        role: "replica"
+
+    # TLS-secured instance
+    # - name: "tsdb-secure"
+    #   host: "timescaledb-secure.internal"
+    #   port: 5432
+    #   user: "monitor"
+    #   password: "${TSDB_PASSWORD}"
+    #   dbname: "postgres"
+    #   sslmode: "require"
+    #   ssl_root_cert: "/etc/ssl/tsdb-ca.pem"
+    #   ssl_cert: "/etc/ssl/tsdb-client.pem"
+    #   ssl_key: "/etc/ssl/tsdb-client.key"
+    #   tags:
+    #     env: "production"

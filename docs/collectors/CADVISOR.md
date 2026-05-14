@@ -8,6 +8,43 @@ HTTP GET to cAdvisor Prometheus endpoint (default: `http://localhost:8080/metric
 
 Parser: Prometheus text format (`expfmt.TextParser`).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    CAD[cAdvisor] -->|/metrics Prometheus format| PARSER[Prometheus Parser]
+    PARSER --> FILTER[Metric Filter]
+    FILTER -->|container_*, machine_*| EMIT[Metric Emitter]
+    EMIT --> OTLP[OTLP Export Pipeline]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[cAdvisor Collector] --> B[Container CPU]
+    A --> C[Container Memory]
+    A --> D[Container Network]
+    A --> E[Container Filesystem]
+    A --> F[Machine Metrics]
+
+    B --> B1[usage_seconds_total]
+    B --> B2[system/user seconds]
+    B --> B3[CFS throttling]
+
+    C --> C1[usage_bytes]
+    C --> C2[working_set_bytes]
+    C --> C3[rss / cache / swap]
+
+    D --> D1[rx/tx bytes]
+    D --> D2[rx/tx errors]
+    D --> D3[rx/tx dropped]
+
+    E --> E1[usage_bytes]
+    E --> E2[limit_bytes]
+    E --> E3[reads/writes bytes]
+```
+
 ## Metric Filtering
 
 By default, only metrics with the following prefixes are collected:

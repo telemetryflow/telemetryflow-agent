@@ -64,3 +64,8 @@ func convertTimeSeries(ts prompb.TimeSeries) ([]collector.Metric, error) {
 
 	return metrics, nil
 }
+
+// ConvertTimeSeriesExported is the exported version of convertTimeSeries for external tests.
+func ConvertTimeSeriesExported(ts prompb.TimeSeries) ([]collector.Metric, error) {
+	return convertTimeSeries(ts)
+}

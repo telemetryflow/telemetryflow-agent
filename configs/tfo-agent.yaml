@@ -366,6 +366,128 @@ collectors:
     # Specific disk paths to monitor (empty = all)
     disk_paths: []
 
+  # =============================================================================
+  # ClickHouse Database Monitoring Collector
+  # =============================================================================
+  # Collects system metrics, storage stats, replication health, and query-log
+  # summaries from external ClickHouse instances via the HTTP interface (port 8123).
+  # Metrics are emitted under the db.clickhouse.* namespace.
+  clickhouse:
+    enabled: false
+    # How often to collect system / storage / replication metrics
+    collection_interval: 15s
+    # How often to collect query_log summary metrics
+    query_log_interval: 60s
+    # Maximum rows to read from system.query_log per collection cycle
+    max_query_log_rows: 10000
+    instances:
+      # - name: "production-clickhouse"
+      #   host: "localhost"
+      #   http_port: 8123
+      #   native_port: 9000
+      #   username: "default"
+      #   password: ""
+      #   database: "default"
+      #   cluster_name: "default"
+      #   shard_num: 1
+      #   replica_name: "replica1"
+      #   tls:
+      #     enabled: false
+      #     skip_verify: false
+      #     # ca_file: /path/to/ca.crt
+      #     # cert_file: /path/to/client.crt
+      #     # key_file: /path/to/client.key
+  #   connect_timeout: 10s
+  #   query_timeout: 30s
+
+  # MySQL / MariaDB / Percona Server Database Monitoring
+  # Collects server status, InnoDB internals, replication, Galera, query analytics,
+  # and schema statistics from MySQL-family instances via SHOW commands and performance_schema.
+  # Metrics are emitted under the db.mysql.* namespace.
+  mysql:
+    enabled: false
+    status_interval: 10s
+    query_interval: 60s
+    schema_interval: 300s
+    instances:
+      # - name: "production-mysql-primary"
+      #   host: "localhost"
+      #   port: 3306
+      #   username: "monitoring"
+      #   password: "$ENV{MYSQL_PASSWORD}"
+      #   # database: ""  # optional, leave empty for no default DB
+      #   tls_enabled: false
+      #   tls_skip_verify: false
+      #   max_open_conns: 3
+      #   tags:
+      #     environment: "production"
+      #     role: "primary"
+      #   # include_databases: ["app_db", "analytics"]
+      #   # exclude_databases: ["test", "tmp"]
+
+  # SQLite3 Database Monitoring
+  # Monitors SQLite3 database files on the local filesystem.
+  # Opens databases in read-only mode and collects PRAGMA metrics,
+  # file sizes, cache hit ratios, table statistics, and integrity status.
+  # Metrics are emitted under the db.sqlite3.* namespace.
+  sqlite3:
+    enabled: false
+    collection_interval: 60s
+    table_stats_interval: 300s
+    process_interval: 120s
+    # integrity_interval: 0  # Disabled by default. Set to 3600s to enable periodic integrity checks.
+    # integrity_timeout: 300s
+    # max_databases: 50
+    databases:
+      # - name: "app-config"
+      #   path: "/var/data/sqlite/app.db"
+      #   tags:
+      #     environment: "production"
+      # - name: "analytics"
+      #   path: "/var/data/sqlite/analytics.sqlite3"
+      #   tags:
+      #     environment: "analytics"
+
+  # Amazon Aurora Database Monitoring
+  # Monitors Aurora clusters via AWS SDK (RDS, CloudWatch, Performance Insights).
+  # Discovers cluster topology, collects CloudWatch metrics, PI data,
+  # and pushes to the TFO Platform backend.
+  # Metrics are emitted under the aurora.* namespace.
+  aurora:
+    enabled: false
+    # How often to collect CloudWatch metrics (default: 60s)
+    collection_interval: 60s
+    # How often to refresh cluster topology (default: 300s)
+    topology_interval: 300s
+    # How often to collect Performance Insights data (default: 60s)
+    pi_interval: 60s
+    # Enable Performance Insights collection
+    enable_pi: false
+    # CloudWatch GetMetricData batch size (max 500 per request)
+    cloudwatch_batch_size: 500
+    # CloudWatch API rate limit (TPS, max 50 for GetMetricData)
+    cloudwatch_rate_limit: 40
+    # Push batch size for ring buffer
+    push_batch_size: 1000
+    # Push flush interval
+    push_flush_interval: 10s
+    # Push endpoint override (empty = use TelemetryFlow OTLP export)
+    # push_endpoint: "http://tfo-backend:3000"
+    # push_api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+    # push_api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+    clusters:
+      # - cluster_id: "my-aurora-cluster"
+      #   region: "us-east-1"
+      #   # Explicit AWS credentials (optional, uses default credential chain if empty)
+      #   # access_key_id: "${AWS_ACCESS_KEY_ID}"
+      #   # secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+      #   # session_token: ""
+      #   # IAM role ARN to assume (optional)
+      #   # role_arn: "arn:aws:iam::123456789012:role/AuroraMonitoringRole"
+      #   tags:
+      #     environment: "production"
+      #     team: "database"
+
   # Remote Write Receiver
   # Accepts Prometheus Remote Write (snappy-encoded protobuf) on a local port,
   # allowing external tools (Prometheus, Grafana Agent, etc.) to push metrics

@@ -1,0 +1,59 @@
+# TelemetryFlow Agent - Prometheus Scraper Collector Configuration
+#
+# Example configuration for scraping Prometheus-style /metrics endpoints.
+# Supports static targets, TLS, basic auth, bearer tokens,
+# and metric relabeling.
+
+prometheus_scraper:
+  enabled: true
+
+  scrape_jobs:
+    # Static target — application metrics
+    - job_name: "my-app"
+      enabled: true
+      static_targets:
+        - "localhost:8080"
+      scrape_interval: 15s
+      scrape_path: "/metrics"
+      scrape_timeout: 10s
+      honor_labels: false
+
+    # TLS-secured target with bearer token
+    # - job_name: "secure-service"
+    #   enabled: true
+    #   static_targets:
+    #     - "secure.internal:9090"
+    #   scrape_interval: 30s
+    #   scrape_path: "/metrics"
+    #   scrape_timeout: 15s
+    #   bearer_token_file: "/var/run/secrets/token"
+    #   tls_config:
+    #     enabled: true
+    #     skip_verify: false
+    #     ca_file: "/etc/ssl/ca.pem"
+
+    # Target with basic auth
+    # - job_name: "protected-service"
+    #   enabled: true
+    #   static_targets:
+    #     - "protected.internal:9090"
+    #   scrape_interval: 30s
+    #   scrape_path: "/metrics"
+    #   basic_auth:
+    #     username: "monitor"
+    #     password: "${SCRAPER_PASSWORD}"
+
+    # Target with metric relabeling
+    # - job_name: "filtered-metrics"
+    #   enabled: true
+    #   static_targets:
+    #     - "app.internal:9090"
+    #   scrape_interval: 15s
+    #   scrape_path: "/metrics"
+    #   metric_relabel_configs:
+    #     - source_labels: ["__name__"]
+    #       regex: "go_.*"
+    #       action: "drop"
+    #     - source_labels: ["__name__"]
+    #       regex: "my_app_.*"
+    #       action: "keep"

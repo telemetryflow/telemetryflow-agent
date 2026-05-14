@@ -6,6 +6,29 @@ Collects Kubernetes events and emits aggregate event count metrics by namespace 
 
 Kubernetes API: `v1/events` (all namespaces, namespace-filtered).
 
+## Architecture
+
+```mermaid
+flowchart LR
+    K8S[Kubernetes API Server] -->|v1/events| CLIENT[API Client]
+    CLIENT --> AGG[Event Aggregator]
+    AGG -->|k8s.event.count metric| OTLP[OTLP Export Pipeline]
+    AGG -->|Warning events| PLATFORM[TelemetryFlow Platform]
+```
+
+## Sub-collector Hierarchy
+
+```mermaid
+flowchart TD
+    A[Events Collector] --> B[Event Aggregation]
+    A --> C[Warning Forwarding]
+
+    B --> B1[k8s.event.count by namespace]
+    B --> B2[Event type: Normal vs Warning]
+
+    C --> C1[EventState to Platform]
+```
+
 ## Metrics
 
 | Metric            | Type  | Labels                         | Description                                          |

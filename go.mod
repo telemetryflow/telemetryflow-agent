@@ -2,10 +2,22 @@ module github.com/telemetryflow/telemetryflow-agent
 
 go 1.26
 
+toolchain go1.26.3
+
 // =============================================================================
 // Direct Dependencies
 // =============================================================================
 require (
+	// -------------------------------------------------------------------------
+	// AWS SDK v2 - Aurora Database Monitoring
+	// -------------------------------------------------------------------------
+	github.com/aws/aws-sdk-go-v2 v1.41.1 // AWS SDK v2 core
+	github.com/aws/aws-sdk-go-v2/config v1.32.7 // AWS SDK config loading
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.7 // AWS credential providers
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.45.2 // CloudWatch client
+	github.com/aws/aws-sdk-go-v2/service/pi v1.30.2 // Performance Insights client
+	github.com/aws/aws-sdk-go-v2/service/rds v1.97.2 // RDS client
+	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6 // STS for role assumption
 	// -------------------------------------------------------------------------
 	// eBPF & System Monitoring
 	// -------------------------------------------------------------------------
@@ -46,15 +58,15 @@ require (
 	// -------------------------------------------------------------------------
 	// OpenTelemetry Exporters - OTLP gRPC
 	// -------------------------------------------------------------------------
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.16.0 // OTLP log exporter (gRPC)
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.19.0 // OTLP log exporter (gRPC)
 
 	// -------------------------------------------------------------------------
 	// OpenTelemetry Exporters - OTLP HTTP
 	// -------------------------------------------------------------------------
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.19.0 // OTLP log exporter (HTTP)
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0 // OTLP metric exporter (gRPC)
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.43.0 // OTLP metric exporter (gRPC)
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.43.0 // OTLP metric exporter (HTTP)
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.40.0 // OTLP trace exporter (gRPC)
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // OTLP trace exporter (gRPC)
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0 // OTLP trace exporter (HTTP)
 	go.opentelemetry.io/otel/metric v1.43.0 // OTEL metrics API
 	go.opentelemetry.io/otel/sdk v1.43.0 // OTEL SDK
@@ -140,11 +152,11 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/term v0.41.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/term v0.42.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 // indirect
@@ -162,10 +174,23 @@ require (
 
 require (
 	github.com/golang/snappy v1.0.0
+	github.com/jackc/pgx/v5 v5.9.2
+	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/prometheus/prometheus v0.310.0
+	go.mongodb.org/mongo-driver/v2 v2.6.0
 )
 
 require (
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.17 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.30.9 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.13 // indirect
+	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
 	github.com/go-openapi/swag/conv v0.25.4 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
@@ -178,5 +203,18 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
+	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/klauspost/compress v1.18.3 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.2.0 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 )

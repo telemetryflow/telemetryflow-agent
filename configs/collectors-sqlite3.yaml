@@ -1,0 +1,38 @@
+# TelemetryFlow Agent - SQLite3 Collector Configuration
+#
+# Example configuration for monitoring SQLite3 database files.
+# Collects file metrics, PRAGMA statistics, cache/lock stats,
+# table-level statistics, and optional integrity checks.
+
+sqlite3:
+  enabled: true
+
+  # Global intervals
+  collection_interval: 60s    # file, PRAGMA, cache, lock metrics
+  table_stats_interval: 300s  # table enumeration and dbstat
+  process_interval: 120s      # process enumeration (Linux only)
+
+  # Integrity checks (disabled by default — can be slow)
+  integrity_interval: 0s      # set to e.g. 3600s to enable
+  integrity_timeout: 300s
+
+  # Limits
+  max_databases: 50
+
+  databases:
+    # Single database file
+    - name: "app-db"
+      path: "/data/app.db"
+      tags:
+        env: "production"
+
+    # Another database
+    - name: "analytics-db"
+      path: "/data/analytics.db"
+      tags:
+        env: "production"
+
+    # Auto-discover databases via glob pattern
+    # - glob_pattern: "/data/*.db"
+    #   tags:
+    #     env: "production"

@@ -31,15 +31,24 @@ import (
 
 	agentapi "github.com/telemetryflow/telemetryflow-agent/internal/api"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	auroracollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/aurora"
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
+	clickhousecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/clickhouse"
+	cockroachdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cockroachdb"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
+	mongodbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mongodb"
+	mssqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mssql"
+	mysqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mysql"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
+	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
+	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
+	tsdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/timescaledb"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
 	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
@@ -116,6 +125,106 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		logger.Info("cAdvisor collector enabled",
 			zap.Duration("interval", cfg.Collector.CAdvisor.Interval),
 			zap.String("endpoint", cfg.Collector.CAdvisor.Endpoint),
+		)
+	}
+
+	// Add ClickHouse collector if enabled
+	if cfg.Collector.ClickHouse.Enabled {
+		chCol := clickhousecollector.NewClickHouseCollector(cfg.Collector.ClickHouse, logger)
+		collectors = append(collectors, chCol)
+		logger.Info("ClickHouse collector enabled",
+			zap.Int("instances", len(cfg.Collector.ClickHouse.Instances)),
+			zap.Duration("collection_interval", cfg.Collector.ClickHouse.CollectionInterval),
+		)
+	}
+
+	// Add CockroachDB collector if enabled
+	if cfg.Collector.CockroachDB.Enabled {
+		crdbCol := cockroachdbcollector.NewCockroachDBCollector(cfg.Collector.CockroachDB, logger)
+		collectors = append(collectors, crdbCol)
+		logger.Info("CockroachDB collector enabled",
+			zap.Int("instances", len(cfg.Collector.CockroachDB.Instances)),
+			zap.Duration("instance_interval", cfg.Collector.CockroachDB.InstanceInterval),
+		)
+	}
+
+	// Add Aurora collector if enabled
+	if cfg.Collector.Aurora.Enabled {
+		auroraCol := auroracollector.NewAuroraCollector(cfg.Collector.Aurora, logger)
+		collectors = append(collectors, auroraCol)
+		logger.Info("Aurora collector enabled",
+			zap.Int("clusters", len(cfg.Collector.Aurora.Clusters)),
+			zap.Duration("collection_interval", cfg.Collector.Aurora.CollectionInterval),
+		)
+	}
+
+	// Add MySQL collector if enabled
+	if cfg.Collector.MySQL.Enabled {
+		mysqlCol := mysqlcollector.NewMySQLCollector(cfg.Collector.MySQL, logger)
+		collectors = append(collectors, mysqlCol)
+		logger.Info("MySQL collector enabled",
+			zap.Int("instances", len(cfg.Collector.MySQL.Instances)),
+			zap.Duration("status_interval", cfg.Collector.MySQL.StatusInterval),
+		)
+	}
+
+	// Add PostgreSQL collector if enabled
+	if cfg.Collector.PostgreSQL.Enabled {
+		pgCol := pgcollector.NewPostgreSQLCollector(cfg.Collector.PostgreSQL, logger)
+		collectors = append(collectors, pgCol)
+		logger.Info("PostgreSQL collector enabled",
+			zap.Int("instances", len(cfg.Collector.PostgreSQL.Instances)),
+			zap.Duration("instance_interval", cfg.Collector.PostgreSQL.InstanceInterval),
+		)
+	}
+
+	// Add RDS PostgreSQL collector if enabled
+	if cfg.Collector.RDSPostgreSQL.Enabled {
+		rdsPgCol := pgcollector.NewRDSPostgreSQLCollector(cfg.Collector.RDSPostgreSQL, logger)
+		collectors = append(collectors, rdsPgCol)
+		logger.Info("RDS PostgreSQL collector enabled",
+			zap.Int("instances", len(cfg.Collector.RDSPostgreSQL.Instances)),
+			zap.Duration("activity_interval", cfg.Collector.RDSPostgreSQL.ActivityInterval),
+		)
+	}
+
+	// Add SQLite3 collector if enabled
+	if cfg.Collector.SQLite3.Enabled {
+		sqlite3Col := sqlite3collector.NewSQLite3Collector(cfg.Collector.SQLite3, logger)
+		collectors = append(collectors, sqlite3Col)
+		logger.Info("SQLite3 collector enabled",
+			zap.Int("databases", len(cfg.Collector.SQLite3.Databases)),
+			zap.Duration("collection_interval", cfg.Collector.SQLite3.CollectionInterval),
+		)
+	}
+
+	// Add MongoDB Community collector if enabled
+	if cfg.Collector.MongoDBCommunity.Enabled {
+		mongoCol := mongodbcollector.NewMongoDBCollector(cfg.Collector.MongoDBCommunity, logger)
+		collectors = append(collectors, mongoCol)
+		logger.Info("MongoDB Community collector enabled",
+			zap.Int("instances", len(cfg.Collector.MongoDBCommunity.Instances)),
+			zap.Duration("interval", cfg.Collector.MongoDBCommunity.Interval),
+		)
+	}
+
+	// Add MSSQL collector if enabled
+	if cfg.Collector.MSSQL.Enabled {
+		mssqlCol := mssqlcollector.NewMSSQLCollector(cfg.Collector.MSSQL, logger)
+		collectors = append(collectors, mssqlCol)
+		logger.Info("MSSQL collector enabled",
+			zap.Int("instances", len(cfg.Collector.MSSQL.Instances)),
+			zap.Duration("metrics_interval", cfg.Collector.MSSQL.MetricsInterval),
+		)
+	}
+
+	// Add TimescaleDB collector if enabled
+	if cfg.Collector.TimescaleDB.Enabled {
+		tsdbCol := tsdbcollector.NewTimescaleDBCollector(cfg.Collector.TimescaleDB, logger)
+		collectors = append(collectors, tsdbCol)
+		logger.Info("TimescaleDB collector enabled",
+			zap.Int("instances", len(cfg.Collector.TimescaleDB.Instances)),
+			zap.Duration("instance_interval", cfg.Collector.TimescaleDB.InstanceInterval),
 		)
 	}
 
