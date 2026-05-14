@@ -34,7 +34,7 @@ FROM fluent/fluent-bit:4.2.3 AS fluent-bit
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.1.9
+ARG VERSION=1.2.0
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
@@ -75,7 +75,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
 # NOTE: Fluent Bit 4.x requires GLIBC >= 2.38 — bookworm (2.36) is too old.
 FROM debian:trixie-slim
 
-ARG VERSION=1.1.9
+ARG VERSION=1.2.0
 
 # =============================================================================
 # TelemetryFlow Metadata Labels (OCI Image Spec)
@@ -98,7 +98,10 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 
 # Install runtime dependencies and security patches
 # Fluent Bit 4.x requires: libyaml, openssl3, libcurl, libsasl2, libpq
-RUN apt-get update && apt-get upgrade -y && \
+# SECURITY: dist-upgrade ensures all base packages are patched against known CVEs
+# (glibc CVE-2026-5435/CVE-2026-6238, gnutls CVE-2026-42010/CVE-2026-33845,
+# libssh2 CVE-2026-7598, curl CVE-2026-6276, etc.)
+RUN apt-get update && apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -107,6 +110,8 @@ RUN apt-get update && apt-get upgrade -y && \
     libcurl4t64 \
     libsasl2-2 \
     libpq5 \
+    && apt-get remove -y --purge libssh2-1t64 2>/dev/null || true \
+    && apt-get autoremove -y --purge \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user and group
@@ -175,16 +180,16 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 # =============================================================================
 # Build with:
 #   docker build \
-#     --build-arg VERSION=1.1.9 \
+#     --build-arg VERSION=1.2.0 \
 #     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
 #     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
 #     --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-#     -t telemetryflow/telemetryflow-agent:1.1.9 .
+#     -t telemetryflow/telemetryflow-agent:1.2.0 .
 #
 # Multi-arch build:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     --build-arg VERSION=1.1.9 \
-#     -t telemetryflow/telemetryflow-agent:1.1.9 .
+#     --build-arg VERSION=1.2.0 \
+#     -t telemetryflow/telemetryflow-agent:1.2.0 .
 #
 # Run with:
 #   docker run -d \
@@ -195,5 +200,5 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 #     -p 13133:13133 \
 #     -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
 #     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-#     telemetryflow/telemetryflow-agent:1.1.9
+#     telemetryflow/telemetryflow-agent:1.2.0
 # =============================================================================

@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.10-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,23 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.2.0] - 2026-05-14
+
+### Security
+
+- **CVE-2026-7598 (CRITICAL)**: libssh2 integer overflow via large username/password — removed `libssh2-1t64` from Docker image (not required by TFO Agent)
+- **CVE-2026-42010 (CRITICAL)**: GnuTLS authentication bypass via NUL character in username — patched via `dist-upgrade` in Dockerfile
+- **CVE-2026-33845 (CRITICAL)**: GnuTLS DoS via DTLS zero-length fragment — patched via `dist-upgrade` in Dockerfile
+- **CVE-2026-42009 (UNKNOWN)**: GnuTLS issue — patched via `dist-upgrade` in Dockerfile
+- **CVE-2026-5435 (MEDIUM)**: glibc out-of-bounds write via TSIG record — patched via `dist-upgrade`
+- **CVE-2026-6238 (MEDIUM)**: glibc crash via crafted DNS response — patched via `dist-upgrade`
+- **CVE-2026-6276 (LOW)**: curl/libcurl cookie leak with custom Host header — patched via `dist-upgrade`
+
+### Changed
+
+- **Dockerfile**: Switched `apt-get upgrade` to `apt-get dist-upgrade` for comprehensive security patching; added explicit `libssh2-1t64` removal and `autoremove --purge` cleanup
+- **Version Bump**: Updated version from 1.1.10 to 1.2.0 across all files
 
 ## [1.1.10] - 2026-04-28
 
@@ -668,7 +685,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration                                                                              |
+| 1.2.0   | 2026-05-14 | v1.47.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes |
+| 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration |
 | 1.1.9   | 2026-03-20 | v1.47.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |
 | 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                                                                                                                                                                |
 | 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                                                                                                                                                                    |

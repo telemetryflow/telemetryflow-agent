@@ -62,7 +62,7 @@ jobs:
       build_time: ${{ steps.version.outputs.build_time }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -91,7 +91,7 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -115,7 +115,7 @@ jobs:
           cp build/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }} dist/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-linux-${{ matrix.arch }}
           path: dist/${{ env.BINARY_NAME }}-linux-${{ matrix.arch }}
@@ -130,7 +130,7 @@ jobs:
     needs: prepare
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -154,7 +154,7 @@ jobs:
           cp build/${{ env.BINARY_NAME }}-windows-amd64.exe dist/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-windows-amd64
           path: dist/${{ env.BINARY_NAME }}-windows-amd64.exe
@@ -172,7 +172,7 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -196,7 +196,7 @@ jobs:
           cp build/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }} dist/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-darwin-${{ matrix.arch }}
           path: dist/${{ env.BINARY_NAME }}-darwin-${{ matrix.arch }}
@@ -224,10 +224,10 @@ jobs:
           sudo apt-get install -y rpm
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-linux-${{ matrix.arch }}
           path: dist
@@ -353,7 +353,7 @@ jobs:
                    -bb rpmbuild/SPECS/${{ env.BINARY_NAME }}.spec
 
       - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rpm-${{ matrix.arch }}
           path: rpmbuild/RPMS/**/*.rpm
@@ -371,10 +371,10 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-linux-${{ matrix.arch }}
           path: dist
@@ -511,7 +511,7 @@ jobs:
           mv ${PKG_DIR}.deb packages/
 
       - name: Upload DEB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deb-${{ matrix.arch }}
           path: packages/*.deb
@@ -526,10 +526,10 @@ jobs:
     needs: [prepare, build-windows]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-windows-amd64
           path: dist
@@ -647,7 +647,7 @@ jobs:
           zip -r ${{ env.BINARY_NAME }}-${VERSION}-windows-amd64.zip ${PKG_DIR}
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-amd64
           path: ${{ env.BINARY_NAME }}-*.zip
@@ -672,10 +672,10 @@ jobs:
             display_name: Apple Silicon
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-darwin-${{ matrix.arch }}
           path: dist
@@ -838,7 +838,7 @@ jobs:
                          "${DMG_NAME}"
 
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dmg-${{ matrix.arch }}
           path: ${{ env.BINARY_NAME }}-*.dmg
@@ -864,10 +864,10 @@ jobs:
             arch: arm64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.os }}-${{ matrix.arch }}
           path: dist
@@ -889,7 +889,7 @@ jobs:
           tar -czvf "${TAR_DIR}.tar.gz" "${TAR_DIR}"
 
       - name: Upload tarball artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tarball-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.BINARY_NAME }}-*.tar.gz
@@ -910,38 +910,38 @@ jobs:
       - package-tarball
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download RPM packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: rpm-*
           path: artifacts/rpm
           merge-multiple: true
 
       - name: Download DEB packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: deb-*
           path: artifacts/deb
           merge-multiple: true
 
       - name: Download Windows packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*
           path: artifacts/windows
           merge-multiple: true
 
       - name: Download macOS DMG packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: dmg-*
           path: artifacts/dmg
           merge-multiple: true
 
       - name: Download tarballs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: tarball-*
           path: artifacts/tarball

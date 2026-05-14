@@ -32,7 +32,7 @@ func TestDefaultConfig(t *testing.T) {
 		cfg := banner.DefaultConfig()
 
 		assert.Equal(t, "TelemetryFlow Agent", cfg.ProductName)
-		assert.Equal(t, "1.1.2", cfg.Version)
+		assert.Equal(t, "1.2.0", cfg.Version)
 		assert.Equal(t, "Community Enterprise Observability Platform (CEOP)", cfg.Motto)
 		assert.Equal(t, "TelemetryFlow", cfg.Vendor)
 		assert.Equal(t, "DevOpsCorner Indonesia", cfg.Developer)
@@ -44,7 +44,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("should generate banner with all fields", func(t *testing.T) {
 		cfg := banner.Config{
 			ProductName: "Test Product",
-			Version:     "1.0.0",
+			Version:     "1.2.0",
 			Motto:       "Test Motto",
 			GitCommit:   "abc123",
 			BuildTime:   "2024-01-01",
@@ -61,7 +61,7 @@ func TestGenerate(t *testing.T) {
 		generatedBanner := banner.Generate(cfg)
 
 		assert.Contains(t, generatedBanner, "Test Product")
-		assert.Contains(t, generatedBanner, "1.0.0")
+		assert.Contains(t, generatedBanner, "1.2.0")
 		assert.Contains(t, generatedBanner, "Test Motto")
 		assert.Contains(t, generatedBanner, "abc123")
 		assert.Contains(t, generatedBanner, "2024-01-01")
@@ -95,7 +95,7 @@ func TestGenerateCompact(t *testing.T) {
 	t.Run("should generate compact banner", func(t *testing.T) {
 		cfg := banner.Config{
 			ProductName: "Test Product",
-			Version:     "1.0.0",
+			Version:     "1.2.0",
 			Motto:       "Test Motto",
 			Copyright:   "Copyright Test",
 		}
@@ -103,7 +103,7 @@ func TestGenerateCompact(t *testing.T) {
 		compactBanner := banner.GenerateCompact(cfg)
 
 		assert.Contains(t, compactBanner, "Test Product")
-		assert.Contains(t, compactBanner, "1.0.0")
+		assert.Contains(t, compactBanner, "1.2.0")
 		assert.Contains(t, compactBanner, "Test Motto")
 		assert.Contains(t, compactBanner, "Copyright Test")
 	})

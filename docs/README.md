@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Documentation
 
-- **Version:** 1.1.10
+- **Version:** 1.2.0
 - **OTEL SDK Version:** 1.40.0
 - **Last Updated:** January 2026
 - **Status:** Production Ready
@@ -55,8 +55,8 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.1.10 | SDK v1.40.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.1.10 | SDK v1.40.0        | Go instrumentation SDK      |
+| **TFO-Agent**     | v1.2.0 | SDK v1.40.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.2.0 | SDK v1.40.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.1.8  | Collector v0.147.0 | Central telemetry collector |
 
 This alignment ensures:

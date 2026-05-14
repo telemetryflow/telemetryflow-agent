@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Development Guide
 
-- **Version:** 1.1.10
+- **Version:** 1.2.0
 - **Last Updated:** January 2026
 - **Go Version:** 1.25+
 - **OTEL SDK Version:** 1.40.0

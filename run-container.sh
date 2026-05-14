@@ -8,7 +8,7 @@
 #
 # Options:
 #   -b, --build            Build the Docker image
-#   -t, --tag <version>    Override version tag (default: 1.1.9)
+#   -t, --tag <version>    Override version tag (default: 1.2.0)
 #   -p, --push             Push image to registry (skip build)
 #   -c, --complete         Complete: build, tag, and push
 #   -m, --multiarch        Build multi-arch (linux/amd64,linux/arm64)
@@ -34,7 +34,7 @@ set -euo pipefail
 # Config
 # ---------------------------------------------------------------------------
 IMAGE="telemetryflow/telemetryflow-agent"
-VERSION="1.1.9"
+VERSION="1.2.0"
 COMMIT=$(git rev-parse --short HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
