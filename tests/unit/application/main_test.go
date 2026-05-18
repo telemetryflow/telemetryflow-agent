@@ -306,8 +306,7 @@ func TestAPIConfig(t *testing.T) {
 		apiConfig := getDeprecatedAPIConfig(cfg)
 		require.NotNil(t, apiConfig, "API config should exist for backward compatibility")
 
-		// Verify API config has valid defaults
-		assert.NotEmpty(t, apiConfig.Endpoint)
+		// Verify API config has valid defaults (endpoint is empty by default — set via TELEMETRYFLOW_API_ENDPOINT)
 		assert.Greater(t, apiConfig.Timeout.Nanoseconds(), int64(0))
 		assert.Greater(t, apiConfig.RetryAttempts, 0)
 	})

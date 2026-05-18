@@ -2376,7 +2376,7 @@ func DefaultConfig() *Config {
 		},
 		// Deprecated: Use TelemetryFlow instead
 		API: APIConfig{
-			Endpoint:      "http://localhost:3100",
+			Endpoint:      "",
 			Timeout:       30 * time.Second,
 			RetryAttempts: 3,
 			RetryDelay:    time.Second,
@@ -3029,23 +3029,33 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// GetEffectiveEndpoint returns the TelemetryFlow endpoint as a full URL.
+// GetEffectiveEndpoint returns the API endpoint as a full URL.
+// Prefers api.endpoint (backend API) when explicitly set, falls back to telemetryflow.endpoint (collector).
 // If the endpoint is configured as bare host:port (no scheme), http:// is prepended.
 func (c *Config) GetEffectiveEndpoint() string {
-	ep := c.TelemetryFlow.Endpoint
+	ep := c.API.Endpoint
+	if ep == "" {
+		ep = c.TelemetryFlow.Endpoint
+	}
 	if ep != "" && !strings.HasPrefix(ep, "http://") && !strings.HasPrefix(ep, "https://") {
 		ep = "http://" + ep
 	}
 	return ep
 }
 
-// GetEffectiveAPIKeyID returns the TelemetryFlow API key ID
+// GetEffectiveAPIKeyID returns the API key ID, preferring api config when set
 func (c *Config) GetEffectiveAPIKeyID() string {
+	if c.API.APIKeyID != "" {
+		return c.API.APIKeyID
+	}
 	return c.TelemetryFlow.APIKeyID
 }
 
-// GetEffectiveAPIKeySecret returns the TelemetryFlow API key secret
+// GetEffectiveAPIKeySecret returns the API key secret, preferring api config when set
 func (c *Config) GetEffectiveAPIKeySecret() string {
+	if c.API.APIKeySecret != "" {
+		return c.API.APIKeySecret
+	}
 	return c.TelemetryFlow.APIKeySecret
 }
 

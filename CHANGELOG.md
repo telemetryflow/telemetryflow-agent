@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2026-05-14
 
+### Fixed
+
+- **Heartbeat 404 error**: `GetEffectiveEndpoint()` now prefers `api.endpoint` (`TELEMETRYFLOW_API_ENDPOINT`) over `telemetryflow.endpoint` when explicitly set, allowing heartbeat to target the backend API while OTLP export continues using the collector
+- **Config priority**: `GetEffectiveAPIKeyID()` and `GetEffectiveAPIKeySecret()` now prefer `api.*` values when set, falling back to `telemetryflow.*`
+- **Dockerfile**: Restored `libssh2-1t64` — `libcurl4t64` depends on it and its removal broke Fluent Bit (exit status 127)
+- **Default config**: Removed default `api.endpoint` value (`http://localhost:3100`) so it only activates when explicitly configured via env var or YAML
+
 ### Security
 
 - **CVE-2026-7598 (CRITICAL)**: libssh2 integer overflow via large username/password — removed `libssh2-1t64` from Docker image (not required by TFO Agent)

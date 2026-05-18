@@ -101,6 +101,8 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 # SECURITY: dist-upgrade ensures all base packages are patched against known CVEs
 # (glibc CVE-2026-5435/CVE-2026-6238, gnutls CVE-2026-42010/CVE-2026-33845,
 # libssh2 CVE-2026-7598, curl CVE-2026-6276, etc.)
+# NOTE: Do NOT remove libssh2-1t64 — libcurl4t64 depends on it for SCP/SFTP.
+# dist-upgrade already patches libssh2; removing it cascades to libcurl removal which breaks Fluent Bit (exit status 127).
 RUN apt-get update && apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -110,7 +112,6 @@ RUN apt-get update && apt-get dist-upgrade -y && \
     libcurl4t64 \
     libsasl2-2 \
     libpq5 \
-    && apt-get remove -y --purge libssh2-1t64 2>/dev/null || true \
     && apt-get autoremove -y --purge \
     && rm -rf /var/lib/apt/lists/*
 
