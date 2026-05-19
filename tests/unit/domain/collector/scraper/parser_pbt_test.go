@@ -119,10 +119,10 @@ func sanitizeMetricName(s string) string {
 		return ""
 	}
 	var b strings.Builder
-	for i, c := range s {
+	for _, c := range s {
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
 			b.WriteRune(c)
-		} else if i > 0 && c >= '0' && c <= '9' {
+		} else if b.Len() > 0 && c >= '0' && c <= '9' {
 			b.WriteRune(c)
 		}
 	}
