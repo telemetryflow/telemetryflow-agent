@@ -2,7 +2,7 @@
 # TelemetryFlow Agent Configuration
 # =============================================================================
 # Community Enterprise Observability Platform (CEOP)
-# Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+# Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # This configuration file controls the TelemetryFlow Agent behavior.
 # Copy to: /etc/tfo-agent/tfo-agent.yaml or ~/.tfo-agent/

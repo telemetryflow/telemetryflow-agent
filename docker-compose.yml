@@ -4,7 +4,7 @@
 #
 # TelemetryFlow Agent v1.2.0 (Based on OpenTelemetry SDK 1.40.0)
 # Community Enterprise Observability Platform (CEOP)
-# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+# Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # Features:
 #   - OTLP export for metrics, traces, and logs

@@ -2,7 +2,7 @@
 // build date — and product identity constants for the TelemetryFlow Agent.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by DevOpsCorner Indonesia.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,7 +50,7 @@ const (
 	DeveloperURL = "https://devopscorner.id"
 
 	// Copyright is the copyright notice
-	Copyright = "Copyright (c) 2024-2026 DevOpsCorner Indonesia"
+	Copyright = "Copyright (c) 2024-2026 Telemetri Data Indonesia"
 
 	// License is the license type
 	License = "Apache-2.0"

@@ -51,7 +51,7 @@ TelemetryFlow Agent v1.2.0 (OTEL SDK 1.40.0)
   License:     Apache-2.0
   Support:     https://docs.telemetryflow.id
 
-  Copyright (c) 2024-2026 DevOpsCorner Indonesia
+  Copyright (c) 2024-2026 Telemetri Data Indonesia
 ```
 
 ### Method 2: Docker Image
@@ -624,4 +624,4 @@ kubectl delete secret tfo-agent-secrets -n observability
 
 ---
 
-**Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.**
+**Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.**

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // TelemetryFlow Agent - Scheduler tracing BPF program
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Attaches to: tracepoint/sched/sched_switch, tracepoint/sched/sched_process_fork
 // Tracks: context switches, runqueue latency, on-CPU time per PID.

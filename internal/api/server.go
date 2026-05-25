@@ -3,7 +3,7 @@
 // TelemetryFlow Platform backend.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 package api
 
 import (

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // TelemetryFlow Agent - eBPF common headers
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 
 #ifndef __TFO_COMMON_H
 #define __TFO_COMMON_H

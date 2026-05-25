@@ -2,7 +2,7 @@
 // displaying the product name, version, motto, build info, and vendor details.
 //
 // TelemetryFlow Agent - Community Enterprise Observability Platform
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by DevOpsCorner Indonesia.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,7 +55,7 @@ func DefaultConfig() Config {
 		Developer:   "DevOpsCorner Indonesia",
 		License:     "Apache-2.0",
 		SupportURL:  "https://docs.telemetryflow.id",
-		Copyright:   "Copyright (c) 2024-2026 DevOpsCorner Indonesia",
+		Copyright:   "Copyright (c) 2024-2026 Telemetri Data Indonesia",
 	}
 }
 

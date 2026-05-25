@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
-# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+# Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # This workflow builds and publishes Docker images for TelemetryFlow Agent:
 # - Multi-platform support: linux/amd64, linux/arm64

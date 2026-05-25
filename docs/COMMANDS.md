@@ -131,7 +131,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
     License      Apache-2.0
     Support      https://docs.telemetryflow.id
   ──────────────────────────────────────────────────────────────────────────────
-    Copyright (c) 2024-2026 DevOpsCorner Indonesia
+    Copyright (c) 2024-2026 Telemetri Data Indonesia
   ══════════════════════════════════════════════════════════════════════════════
 
 {"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.1.2"}
@@ -200,7 +200,7 @@ TelemetryFlow Agent v1.1.2
   License:     Apache-2.0
   Support:     https://docs.telemetryflow.id
 
-  Copyright (c) 2024-2026 DevOpsCorner Indonesia
+  Copyright (c) 2024-2026 Telemetri Data Indonesia
 ```
 
 **Output (JSON):**
@@ -443,4 +443,4 @@ source ~/.bash_completion.d/tfo-agent
 
 ---
 
-**Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.**
+**Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.**

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // TelemetryFlow Agent - File I/O tracing BPF program
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Attaches to: kprobe/vfs_read, kretprobe/vfs_read,
 //              kprobe/vfs_write, kretprobe/vfs_write,

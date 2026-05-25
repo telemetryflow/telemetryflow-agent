@@ -438,4 +438,4 @@ By contributing to TelemetryFlow Agent, you agree that your contributions will b
 
 **Thank you for contributing to TelemetryFlow Agent!**
 
-Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.

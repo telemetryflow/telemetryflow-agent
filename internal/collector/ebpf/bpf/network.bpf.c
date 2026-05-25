@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // TelemetryFlow Agent - Network monitoring BPF program
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Attaches to: kprobe/tcp_connect, kprobe/tcp_close, kprobe/tcp_sendmsg,
 //              kprobe/tcp_recvmsg, kprobe/tcp_retransmit_skb,

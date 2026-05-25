@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // TelemetryFlow Agent - Syscall tracing BPF program
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Attaches to: tracepoint/raw_syscalls/sys_enter, tracepoint/raw_syscalls/sys_exit
 // Tracks: syscall invocation count, latency, and error count per PID+syscall_nr.

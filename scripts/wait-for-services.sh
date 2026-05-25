@@ -2,7 +2,7 @@
 # Wait for services to be ready for E2E tests
 #
 # TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
-# Copyright (c) 2024-2026 DevOpsCorner Indonesia. All rights reserved.
+# Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # Usage:
 #   ./scripts/wait-for-services.sh          # Wait for all services

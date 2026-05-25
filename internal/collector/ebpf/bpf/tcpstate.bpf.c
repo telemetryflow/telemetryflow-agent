@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // TelemetryFlow Agent - TCP state transition tracing BPF program
-// Copyright (c) 2024-2026 TelemetryFlow. All rights reserved.
+// Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Attaches to: tracepoint/sock/inet_sock_set_state
 // Tracks: TCP state transitions (ESTABLISHED→CLOSE_WAIT, SYN_SENT→ESTABLISHED, etc.)
