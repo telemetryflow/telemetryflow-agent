@@ -38,7 +38,7 @@ env:
   GO_VERSION: '1.26'
   BINARY_NAME: tfo-agent
   PRODUCT_NAME: TelemetryFlow Agent
-  VENDOR: DevOpsCorner Indonesia
+  VENDOR: Telemetri Data Indonesia
   MAINTAINER: support@telemetryflow.id
   DESCRIPTION: Enterprise-grade telemetry collection agent for the TelemetryFlow platform
   LICENSE: Apache-2.0

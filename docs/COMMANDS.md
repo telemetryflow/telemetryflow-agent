@@ -127,7 +127,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
     Built        2025-12-17T10:00:00Z
   ──────────────────────────────────────────────────────────────────────────────
     Vendor       TelemetryFlow (https://telemetryflow.id)
-    Developer    DevOpsCorner Indonesia
+    Developer    Telemetri Data Indonesia
     License      Apache-2.0
     Support      https://docs.telemetryflow.id
   ──────────────────────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ TelemetryFlow Agent v1.1.2
   ─────────────────────────────────────────────
   Vendor:      TelemetryFlow
   Website:     https://telemetryflow.id
-  Developer:   DevOpsCorner Indonesia
+  Developer:   Telemetri Data Indonesia
   License:     Apache-2.0
   Support:     https://docs.telemetryflow.id
 
@@ -218,7 +218,7 @@ TelemetryFlow Agent v1.1.2
   "arch": "arm64",
   "vendor": "TelemetryFlow",
   "vendor_url": "https://telemetryflow.id",
-  "developer": "DevOpsCorner Indonesia",
+  "developer": "Telemetri Data Indonesia",
   "license": "Apache-2.0",
   "support_url": "https://docs.telemetryflow.id"
 }

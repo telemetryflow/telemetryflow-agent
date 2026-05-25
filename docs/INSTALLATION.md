@@ -47,7 +47,7 @@ TelemetryFlow Agent v1.2.0 (OTEL SDK 1.40.0)
   ─────────────────────────────────────────────
   Vendor:      TelemetryFlow
   Website:     https://telemetryflow.id
-  Developer:   DevOpsCorner Indonesia
+  Developer:   Telemetri Data Indonesia
   License:     Apache-2.0
   Support:     https://docs.telemetryflow.id
 

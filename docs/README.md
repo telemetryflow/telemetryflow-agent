@@ -404,7 +404,7 @@ WantedBy=multi-user.target
 
 - **Website**: [https://telemetryflow.id](https://telemetryflow.id)
 - **Documentation**: [https://docs.telemetryflow.id](https://docs.telemetryflow.id)
-- **Developer**: [DevOpsCorner Indonesia](https://devopscorner.id)
+- **Developer**: [Telemetri Data Indonesia](https://telemetryflow.id)
 
 ---
 

@@ -84,7 +84,7 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
     org.opencontainers.image.version="${VERSION}" \
     org.opencontainers.image.vendor="TelemetryFlow" \
-    org.opencontainers.image.authors="DevOpsCorner Indonesia <support@devopscorner.id>" \
+    org.opencontainers.image.authors="Telemetri Data Indonesia <support@telemetryflow.id>" \
     org.opencontainers.image.url="https://telemetryflow.id" \
     org.opencontainers.image.documentation="https://docs.telemetryflow.id" \
     org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-platform" \
@@ -94,7 +94,7 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     io.telemetryflow.product="TelemetryFlow Agent" \
     io.telemetryflow.component="tfo-agent" \
     io.telemetryflow.platform="CEOP" \
-    io.telemetryflow.maintainer="DevOpsCorner Indonesia"
+    io.telemetryflow.maintainer="Telemetri Data Indonesia"
 
 # Install runtime dependencies and security patches
 # Fluent Bit 4.x requires: libyaml, openssl3, libcurl, libsasl2, libpq

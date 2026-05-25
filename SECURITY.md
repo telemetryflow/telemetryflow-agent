@@ -367,4 +367,4 @@ _No security researchers have been acknowledged yet._
 - **Version**: 1.1.3
 - **Project**: TelemetryFlow Agent
 
-**Built with ❤️ by DevOpsCorner Indonesia**
+**Built with ❤️ by Telemetri Data Indonesia**
