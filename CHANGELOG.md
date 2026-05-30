@@ -26,20 +26,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2026-05-19
 
+### Fixed
+
+- **Heartbeat 404 error**: `GetEffectiveEndpoint()` now prefers `api.endpoint` (`TELEMETRYFLOW_API_ENDPOINT`) over `telemetryflow.endpoint` when explicitly set, allowing heartbeat to target the backend API while OTLP export continues using the collector
+- **Config priority**: `GetEffectiveAPIKeyID()` and `GetEffectiveAPIKeySecret()` now prefer `api.*` values when set, falling back to `telemetryflow.*`
+- **Dockerfile**: Restored `libssh2-1t64` — `libcurl4t64` depends on it and its removal broke Fluent Bit (exit status 127)
+- **Default config**: Removed default `api.endpoint` value (`http://localhost:3100`) so it only activates when explicitly configured via env var or YAML
+- **Go module fix**: Added `replace` directive for `github.com/go-openapi/testify/v2` → v2.0.2 to work around upstream broken test dependency (`assert/yaml` package missing) that blocked `go mod tidy`
+
 ### Security
 
-- **GO-2026-5026 (MEDIUM)**: Punycode IDNA label bypass in `golang.org/x/net` — upgraded to v0.55.0
-- **CVE-2026-42151 (HIGH)**: Prometheus Azure OAuth client secret disclosure via config API — upgraded `github.com/prometheus/prometheus` to v0.311.3
+- **CVE-2026-42151 (HIGH)**: Prometheus Azure OAuth client secret disclosure via config API — upgraded `github.com/prometheus/prometheus` v0.310.0 → v0.311.3
 - **CVE-2026-42154 (HIGH)**: Prometheus DoS via uncontrolled memory allocation in remote read — upgraded `github.com/prometheus/prometheus` to v0.311.3
 - **CVE-2026-40179 (MEDIUM)**: Prometheus stored XSS via metric names and label values — upgraded `github.com/prometheus/prometheus` to v0.311.3
 - **CVE-2026-44903 (MEDIUM)**: Prometheus open-source monitoring system vulnerability — upgraded `github.com/prometheus/prometheus` to v0.311.3
-- **Dockerfile OS hardening**: Removed unnecessary `perl-base`, `ncurses-base`, `ncurses-bin`, `tar` from runtime image via `apt-get purge`, eliminating:
-  - CVE-2026-42496 (CRITICAL): Perl Archive::Tar symlink path traversal
-  - CVE-2026-8376 (CRITICAL): Perl heap buffer overflow
-  - CVE-2026-42497 (HIGH): Perl Archive::Tar hardlink attack
-  - CVE-2026-9538 (HIGH): Perl Archive::Tar memory exhaustion
-  - CVE-2025-69720 (HIGH): ncurses buffer overflow (arbitrary code execution)
-  - CVE-2026-5704 (MEDIUM): tar hidden file injection
+- **GO-2026-5026 (MEDIUM)**: Punycode IDNA label bypass — upgraded `golang.org/x/net` v0.53.0 → v0.55.0
+- **CVE-2026-7598 (HIGH)**: libssh2 integer overflow via large username/password — patched via `dist-upgrade` in Dockerfile
+- **CVE-2026-42010 (CRITICAL)**: GnuTLS authentication bypass via NUL character in username — patched via `dist-upgrade`
+- **CVE-2026-33845 (CRITICAL)**: GnuTLS DoS via DTLS zero-length fragment — patched via `dist-upgrade`
+- **CVE-2026-5435 (MEDIUM)**: glibc out-of-bounds write via TSIG record — patched via `dist-upgrade`
+- **CVE-2026-6238 (MEDIUM)**: glibc crash via crafted DNS response — patched via `dist-upgrade`
+- **CVE-2026-6276 (HIGH)**: curl/libcurl cookie leak with custom Host header — patched via `dist-upgrade`
+- **Dockerfile OS hardening**: `dist-upgrade` applies all available Debian trixie-security patches at build time for perl, ncurses, tar, glibc, curl, libssh2, and other base packages. Note: `perl-base`, `ncurses-*`, `tar` are required by `apt`/`dpkg` and cannot be removed — patches must come from Debian security repos
 - **Kubernetes RBAC hardening** (`deploy/kubernetes/rbac.yaml`):
   - Split `secrets` into separate rule with `list` verb only (was `get, list, watch`) — agent only counts per-namespace, never reads values
   - Split `nodes/proxy` into separate rule with `get` verb only — scoped to minimal kubelet proxy access
@@ -48,28 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `runAsGroup: 65534` to all non-root containers and init containers
   - Added `runAsNonRoot: true` at pod level in deployment-k8s.yaml
   - Added resource limits (`cpu: 10m-50m`, `memory: 16-32Mi`) to `wait-for-backend` init containers in both manifests
-- **Go module fix**: Added `replace` directive for `github.com/go-openapi/testify/v2` → v2.0.2 to work around upstream broken test dependency (`assert/yaml` package missing) that blocked `go mod tidy`
-
-### Fixed
-
-- **Heartbeat 404 error**: `GetEffectiveEndpoint()` now prefers `api.endpoint` (`TELEMETRYFLOW_API_ENDPOINT`) over `telemetryflow.endpoint` when explicitly set, allowing heartbeat to target the backend API while OTLP export continues using the collector
-- **Config priority**: `GetEffectiveAPIKeyID()` and `GetEffectiveAPIKeySecret()` now prefer `api.*` values when set, falling back to `telemetryflow.*`
-- **Dockerfile**: Restored `libssh2-1t64` — `libcurl4t64` depends on it and its removal broke Fluent Bit (exit status 127)
-- **Default config**: Removed default `api.endpoint` value (`http://localhost:3100`) so it only activates when explicitly configured via env var or YAML
-
-### Security
-
-- **CVE-2026-7598 (CRITICAL)**: libssh2 integer overflow via large username/password — removed `libssh2-1t64` from Docker image (not required by TFO Agent)
-- **CVE-2026-42010 (CRITICAL)**: GnuTLS authentication bypass via NUL character in username — patched via `dist-upgrade` in Dockerfile
-- **CVE-2026-33845 (CRITICAL)**: GnuTLS DoS via DTLS zero-length fragment — patched via `dist-upgrade` in Dockerfile
-- **CVE-2026-42009 (UNKNOWN)**: GnuTLS issue — patched via `dist-upgrade` in Dockerfile
-- **CVE-2026-5435 (MEDIUM)**: glibc out-of-bounds write via TSIG record — patched via `dist-upgrade`
-- **CVE-2026-6238 (MEDIUM)**: glibc crash via crafted DNS response — patched via `dist-upgrade`
-- **CVE-2026-6276 (LOW)**: curl/libcurl cookie leak with custom Host header — patched via `dist-upgrade`
+- **Verified zero vulnerabilities in called code** using `govulncheck` and zero Go module vulnerabilities using `trivy fs` (Trivy v0.70.0). Remaining K8s manifest findings are by-design (hostPath, SYS_PTRACE, secrets list, nodes/proxy — all required for node-level monitoring agent functionality)
 
 ### Changed
 
-- **Dockerfile**: Switched `apt-get upgrade` to `apt-get dist-upgrade` for comprehensive security patching; added explicit `libssh2-1t64` removal and `autoremove --purge` cleanup
+- **Dockerfile**: Switched `apt-get upgrade` to `apt-get dist-upgrade` for comprehensive security patching; added `autoremove --purge` cleanup
 - **Version Bump**: Updated version from 1.1.10 to 1.2.0 across all files
 
 ## [1.1.10] - 2026-04-28
