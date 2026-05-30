@@ -1,0 +1,28 @@
+# Trivy vulnerability suppression file
+# https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
+
+# perl-base: Cannot be purged (required by apt/dpkg). Vulnerable Perl modules
+# (Archive::Tar, IO::Compress, IO::Uncompress, Compress::Raw) have been removed
+# from the image at build time — no runtime impact.
+CVE-2026-42496
+CVE-2026-42497
+CVE-2026-8376
+CVE-2026-9538
+CVE-2026-52287
+CVE-2026-52286
+
+# bzip2: Off-by-one in bzip2recover — not used by TFO Agent.
+CVE-2025-7786
+
+# libcurl4t64 / curl: Connection reuse and credential leak CVEs.
+# TFO Agent uses libcurl only for Fluent Bit output and health checks —
+# no proxy authentication, no SMB, no Negotiate auth in production.
+# Patches pending from Debian trixie-security.
+CVE-2026-1965
+CVE-2026-3783
+CVE-2026-3784
+CVE-2026-4873
+CVE-2026-5545
+CVE-2026-6253
+CVE-2026-6429
+CVE-2026-7168

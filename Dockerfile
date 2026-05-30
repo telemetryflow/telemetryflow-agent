@@ -100,14 +100,16 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 # Fluent Bit 4.x requires: libyaml, openssl3, libcurl, libsasl2, libpq
 # SECURITY: dist-upgrade ensures all base packages are patched against known CVEs
 # (glibc CVE-2026-5435/CVE-2026-6238, gnutls CVE-2026-42010/CVE-2026-33845,
-# libssh2 CVE-2026-7598, curl CVE-2026-6276, perl CVE-2026-42496/CVE-2026-8376,
-# ncurses CVE-2025-69720, tar CVE-2026-5704, etc.)
+# libssh2 CVE-2026-7598, curl CVE-2026-6276, etc.)
 # NOTE: Do NOT remove libssh2-1t64 — libcurl4t64 depends on it for SCP/SFTP.
 # dist-upgrade already patches libssh2; removing it cascades to libcurl removal which breaks Fluent Bit (exit status 127).
-# NOTE: perl-base, ncurses-base, ncurses-bin, tar cannot be purged — they are
-# required by apt/dpkg/base-files. Security patches are applied via dist-upgrade instead.
-RUN apt-get update && apt-get dist-upgrade -y && \
-    apt-get install -y --no-install-recommends \
+# NOTE: perl-base is required by apt/dpkg and cannot be purged. To eliminate
+# CVE-2026-42496/CVE-2026-8376/CVE-2026-42497/CVE-2026-9538 (Archive::Tar),
+# CVE-2026-52287 (IO::Compress), CVE-2026-52286 (IO::Uncompress::Unzip),
+# we strip the vulnerable Perl modules after install — they are not needed at runtime.
+# ncurses-base, ncurses-bin, tar also cannot be purged — patches from dist-upgrade.
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     libyaml-0-2 \
@@ -115,6 +117,11 @@ RUN apt-get update && apt-get dist-upgrade -y && \
     libcurl4t64 \
     libsasl2-2 \
     libpq5 \
+    && rm -rf /usr/share/perl5/Archive/Tar* \
+              /usr/share/perl5/IO/Compress* \
+              /usr/share/perl5/IO/Uncompress* \
+              /usr/share/perl5/Compress/Zlib.pm \
+              /usr/share/perl5/Compress/Raw* \
     && apt-get autoremove -y --purge \
     && rm -rf /var/lib/apt/lists/*
 
