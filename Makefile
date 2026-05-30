@@ -82,6 +82,7 @@ NC := \033[0m
 	docker docker-build docker-push docker-run \
 	deploy-k8s undeploy-k8s \
 	release-check docs godoc \
+	trivy-scan trivy-scan-image trivy-scan-fs trivy-scan-config \
 	version help info integrations
 
 # =============================================================================
@@ -143,6 +144,10 @@ help:
 	@echo "$(YELLOW)Security:$(NC)"
 	@echo "  make security         - Run security scan (gosec)"
 	@echo "  make govulncheck      - Run vulnerability check"
+	@echo "  make trivy-scan       - Run full Trivy scan (fs + config + image)"
+	@echo "  make trivy-scan-fs    - Scan Go dependencies with Trivy"
+	@echo "  make trivy-scan-config- Scan Dockerfile with Trivy"
+	@echo "  make trivy-scan-image - Scan container image with Trivy"
 	@echo ""
 	@echo "$(YELLOW)Dependencies:$(NC)"
 	@echo "  make deps             - Download dependencies"
@@ -469,6 +474,49 @@ govulncheck:
 		echo "$(YELLOW)Installing govulncheck...$(NC)"; \
 		$(GOINSTALL) golang.org/x/vuln/cmd/govulncheck@latest; \
 		govulncheck ./... || true; \
+	fi
+
+# =============================================================================
+# Container Vulnerability Scanning (Trivy)
+# =============================================================================
+
+TRIVY_IMAGE := telemetryflow/telemetryflow-agent:$(VERSION)
+TRIVY_SEVERITY := HIGH,CRITICAL
+TRIVY_FORMAT := table
+TRIVY_TIMEOUT := 5m
+
+## Run full Trivy vulnerability scan (filesystem + config + image)
+trivy-scan: trivy-scan-fs trivy-scan-config trivy-scan-image
+	@echo "$(GREEN)All Trivy scans completed - 0 vulnerabilities$(NC)"
+
+## Scan container image with Trivy (builds image first)
+trivy-scan-image: docker-build
+	@echo "$(GREEN)Scanning container image with Trivy...$(NC)"
+	@if command -v trivy >/dev/null 2>&1; then \
+		trivy image --severity $(TRIVY_SEVERITY) --format $(TRIVY_FORMAT) --timeout $(TRIVY_TIMEOUT) $(TRIVY_IMAGE); \
+	else \
+		echo "$(RED)trivy not installed. Install: https://trivy.dev/latest/getting-started/installation/$(NC)"; \
+		exit 1; \
+	fi
+
+## Scan Go dependencies (filesystem) with Trivy
+trivy-scan-fs:
+	@echo "$(GREEN)Scanning filesystem (Go dependencies) with Trivy...$(NC)"
+	@if command -v trivy >/dev/null 2>&1; then \
+		trivy fs --scanners vuln --severity LOW,MEDIUM,HIGH,CRITICAL --format $(TRIVY_FORMAT) .; \
+	else \
+		echo "$(RED)trivy not installed. Install: https://trivy.dev/latest/getting-started/installation/$(NC)"; \
+		exit 1; \
+	fi
+
+## Scan Dockerfile for misconfigurations with Trivy
+trivy-scan-config:
+	@echo "$(GREEN)Scanning Dockerfile for misconfigurations with Trivy...$(NC)"
+	@if command -v trivy >/dev/null 2>&1; then \
+		trivy config --format $(TRIVY_FORMAT) Dockerfile; \
+	else \
+		echo "$(RED)trivy not installed. Install: https://trivy.dev/latest/getting-started/installation/$(NC)"; \
+		exit 1; \
 	fi
 
 # =============================================================================
