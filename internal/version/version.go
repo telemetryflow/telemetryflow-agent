@@ -47,7 +47,7 @@ const (
 	Developer = "Telemetri Data Indonesia"
 
 	// DeveloperURL is the developer website
-	DeveloperURL = "https://devopscorner.id"
+	DeveloperURL = "https://telemetryflow.id"
 
 	// Copyright is the copyright notice
 	Copyright = "Copyright (c) 2024-2026 Telemetri Data Indonesia"

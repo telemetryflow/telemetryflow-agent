@@ -6,6 +6,10 @@
 # Auto-registration: on startup the agent calls POST /api/v2/monitoring/kubernetes/clusters/agent-register
 # (find-or-create semantics) — safe to restart/redeploy without manual pre-registration.
 #
+# Trivy suppression annotations:
+# trivy:ignore:KSV-0121 — hostPath mount for / is required for cluster provider
+# auto-detection (checks /var/lib/rancher/k3s, /var/lib/rancher/rke2, etc.)
+#
 # Pre-requisites:
 #   kubectl create secret generic tfo-agent-credentials \
 #     --from-literal=api-key-id=tfk_xxx \
@@ -47,6 +51,10 @@ spec:
       serviceAccountName: tfo-agent
       automountServiceAccountToken: true
       terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
 
       # Wait for tfo-backend to be ready before starting the agent.
       # The K8s collector performs auto-registration on startup (POST /clusters/agent-register).
@@ -63,11 +71,21 @@ spec:
                 echo "Waiting for tfo-backend..."; sleep 5
               done
               echo "tfo-backend is ready."
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534
+            runAsGroup: 65534
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop:
                 - ALL
@@ -203,8 +221,11 @@ spec:
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534
+            runAsGroup: 65534
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop:
                 - ALL

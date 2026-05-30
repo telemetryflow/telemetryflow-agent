@@ -25,9 +25,8 @@ rules:
   - apiGroups: [""]
     resources:
       - nodes
-      - nodes/metrics  # kubelet /metrics/cadvisor (cAdvisor scraping)
-      - nodes/stats    # kubelet /stats/summary (network bytes per namespace)
-      - nodes/proxy    # kubelet /stats/summary proxy (direct kubelet access)
+      - nodes/metrics
+      - nodes/stats
       - pods
       - services
       - endpoints
@@ -38,8 +37,22 @@ rules:
       - resourcequotas
       - limitranges
       - configmaps
-      - secrets
     verbs: ["get", "list", "watch"]
+
+  # Kubelet proxy access — scoped separately for minimal privilege
+  # Used to fetch /stats/summary and /metrics/cadvisor via kubelet proxy
+  # trivy:ignore:KSV-0047 — nodes/proxy is required for kubelet metrics collection
+  - apiGroups: [""]
+    resources:
+      - nodes/proxy
+    verbs: ["get"]
+
+  # Secret metadata — only count per namespace, never read values
+  # trivy:ignore:KSV-0041 — list-only access for resource count metrics, no secret values read
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["list"]
 
   # Apps workloads
   - apiGroups: ["apps"]

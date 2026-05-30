@@ -2,6 +2,10 @@
 # TFO-Agent DaemonSet
 # Runs one agent pod per node for per-node OS metrics (node_exporter).
 # Kubernetes cluster state is collected separately by deployment-k8s.yaml.
+#
+# Trivy suppression annotations:
+# trivy:ignore:KSV-0121 — hostPath mounts for /, /proc, /sys are required by
+# node_exporter to collect host-level OS metrics (CPU, disk, network, etc.)
 
 apiVersion: apps/v1
 kind: DaemonSet
@@ -33,6 +37,9 @@ spec:
       serviceAccountName: tfo-agent
       automountServiceAccountToken: true
       terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
 
       # Tolerate all taints to run on every node (including control-plane)
       tolerations:
@@ -56,11 +63,21 @@ spec:
                 echo "Waiting for tfo-backend..."; sleep 5
               done
               echo "tfo-backend is ready."
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534
+            runAsGroup: 65534
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop:
                 - ALL
@@ -218,6 +235,8 @@ spec:
             runAsGroup: 0
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop:
                 - ALL

@@ -26,6 +26,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2026-05-19
 
+### Security
+
+- **GO-2026-5026 (MEDIUM)**: Punycode IDNA label bypass in `golang.org/x/net` — upgraded to v0.55.0
+- **CVE-2026-42151 (HIGH)**: Prometheus Azure OAuth client secret disclosure via config API — upgraded `github.com/prometheus/prometheus` to v0.311.3
+- **CVE-2026-42154 (HIGH)**: Prometheus DoS via uncontrolled memory allocation in remote read — upgraded `github.com/prometheus/prometheus` to v0.311.3
+- **CVE-2026-40179 (MEDIUM)**: Prometheus stored XSS via metric names and label values — upgraded `github.com/prometheus/prometheus` to v0.311.3
+- **CVE-2026-44903 (MEDIUM)**: Prometheus open-source monitoring system vulnerability — upgraded `github.com/prometheus/prometheus` to v0.311.3
+- **Dockerfile OS hardening**: Removed unnecessary `perl-base`, `ncurses-base`, `ncurses-bin`, `tar` from runtime image via `apt-get purge`, eliminating:
+  - CVE-2026-42496 (CRITICAL): Perl Archive::Tar symlink path traversal
+  - CVE-2026-8376 (CRITICAL): Perl heap buffer overflow
+  - CVE-2026-42497 (HIGH): Perl Archive::Tar hardlink attack
+  - CVE-2026-9538 (HIGH): Perl Archive::Tar memory exhaustion
+  - CVE-2025-69720 (HIGH): ncurses buffer overflow (arbitrary code execution)
+  - CVE-2026-5704 (MEDIUM): tar hidden file injection
+- **Kubernetes RBAC hardening** (`deploy/kubernetes/rbac.yaml`):
+  - Split `secrets` into separate rule with `list` verb only (was `get, list, watch`) — agent only counts per-namespace, never reads values
+  - Split `nodes/proxy` into separate rule with `get` verb only — scoped to minimal kubelet proxy access
+- **Kubernetes security context hardening** (`deploy/kubernetes/daemonset.yaml`, `deployment-k8s.yaml`):
+  - Added `seccompProfile: RuntimeDefault` to all pod and container security contexts
+  - Added `runAsGroup: 65534` to all non-root containers and init containers
+  - Added `runAsNonRoot: true` at pod level in deployment-k8s.yaml
+  - Added resource limits (`cpu: 10m-50m`, `memory: 16-32Mi`) to `wait-for-backend` init containers in both manifests
+- **Go module fix**: Added `replace` directive for `github.com/go-openapi/testify/v2` → v2.0.2 to work around upstream broken test dependency (`assert/yaml` package missing) that blocked `go mod tidy`
+
 ### Fixed
 
 - **Heartbeat 404 error**: `GetEffectiveEndpoint()` now prefers `api.endpoint` (`TELEMETRYFLOW_API_ENDPOINT`) over `telemetryflow.endpoint` when explicitly set, allowing heartbeat to target the backend API while OTLP export continues using the collector
