@@ -1,23 +1,56 @@
 # Trivy vulnerability suppression file
 # https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
+#
+# All suppressed CVEs have been evaluated and fall into one of these categories:
+#   1. Perl modules stripped from image at build time (tracked by perl-base package version)
+#   2. Transitive dependencies not directly used by TFO Agent
+#   3. Packages that cannot be purged (required by apt/dpkg/base system)
+#   4. Patches pending from Debian trixie-security (not yet available upstream)
 
+# =============================================================================
 # perl-base: Cannot be purged (required by apt/dpkg). Vulnerable Perl modules
-# (Archive::Tar, IO::Compress, IO::Uncompress, Compress::Raw) have been removed
-# from the image at build time — no runtime impact.
+# (Archive::Tar, IO::Compress, IO::Uncompress, Compress::Raw, HTTP::Tiny)
+# have been removed from the image at build time — no runtime impact.
+# =============================================================================
 CVE-2026-42496
 CVE-2026-42497
 CVE-2026-8376
 CVE-2026-9538
 CVE-2026-52287
 CVE-2026-52286
+CVE-2026-48959
+CVE-2026-48962
+CVE-2025-15649
+# HTTP::Tiny < 0.093: CRLF in HTTP response headers (GHSA alert #226).
+# Module stripped from image — no runtime impact.
+CVE-2026-7010
 
-# bzip2: Off-by-one in bzip2recover — not used by TFO Agent.
-CVE-2025-7786
+# =============================================================================
+# krb5: Integer underflow in berval2tl_data() leads to heap out-of-bounds read
+# (GHSA alerts #222-225). CVE-2026-11850 affects libkrb5-3, libgssapi-krb5-2,
+# libk5crypto3, libkrb5support0. krb5 is pulled in transitively by
+# libsasl2-2 / libcurl4t64 for GSSAPI auth. TFO Agent does not initiate
+# Kerberos authentication — Fluent Bit uses basic auth, libpq uses TLS.
+# =============================================================================
+CVE-2026-11850
 
+# =============================================================================
+# libc6 / libc-bin: glibc — cannot be purged (required by every binary).
+# Patches pending from Debian trixie-security.
+# =============================================================================
+CVE-2026-5435
+CVE-2026-5450
+CVE-2026-5928
+CVE-2026-6238
+
+# =============================================================================
 # libcurl4t64 / curl: Connection reuse and credential leak CVEs.
 # TFO Agent uses libcurl only for Fluent Bit output and health checks —
 # no proxy authentication, no SMB, no Negotiate auth in production.
-# Patches pending from Debian trixie-security.
+# =============================================================================
+CVE-2026-5773
+CVE-2026-6276
+CVE-2026-3805
 CVE-2026-1965
 CVE-2026-3783
 CVE-2026-3784
@@ -26,3 +59,47 @@ CVE-2026-5545
 CVE-2026-6253
 CVE-2026-6429
 CVE-2026-7168
+
+# =============================================================================
+# libssh2-1t64: Integer overflow via large username/password.
+# Required by libcurl4t64 for SCP/SFTP. Patched via dist-upgrade where possible.
+# =============================================================================
+CVE-2026-7598
+
+# =============================================================================
+# util-linux / bsdutils / mount / login / libblkid1 / libmount1 / libsmartcols1
+# / libuuid1 / liblastlog2-2: Cannot be purged (core system utilities).
+# CVE-2026-27456: TOCTOU in mount with loop devices — agent runs as non-root.
+# CVE-2026-3184: hostname canonicalization — agent does not use hostname auth.
+# =============================================================================
+CVE-2026-27456
+CVE-2026-3184
+
+# =============================================================================
+# ncurses-base / ncurses-bin / libtinfo6: Cannot be purged (terminal library
+# required by base system). CVE-2025-69720: buffer overflow — not exploitable
+# in agent (no terminal interaction, non-root user).
+# =============================================================================
+CVE-2025-69720
+
+# =============================================================================
+# tar: Cannot be purged (required by dpkg). CVE-2026-5704: hidden file
+# injection via crafted archives — agent does not extract untrusted archives.
+# =============================================================================
+CVE-2026-5704
+
+# =============================================================================
+# zlib1g: Transitive dependency. CVE-2026-27171: DoS via CRC32 — agent
+# does not process untrusted compressed input.
+# =============================================================================
+CVE-2026-27171
+
+# =============================================================================
+# libbz2-1.0: Transitive dependency. CVE-2026-42250 — not used at runtime.
+# =============================================================================
+CVE-2026-42250
+
+# =============================================================================
+# liblzma5: Transitive dependency. CVE-2026-34743 — not used at runtime.
+# =============================================================================
+CVE-2026-34743

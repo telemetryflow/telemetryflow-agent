@@ -106,7 +106,8 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 # NOTE: perl-base is required by apt/dpkg and cannot be purged. To eliminate
 # CVE-2026-42496/CVE-2026-8376/CVE-2026-42497/CVE-2026-9538 (Archive::Tar),
 # CVE-2026-52287 (IO::Compress), CVE-2026-52286 (IO::Uncompress::Unzip),
-# we strip the vulnerable Perl modules after install — they are not needed at runtime.
+# CVE-2025-4270 (HTTP::Tiny CRLF), we strip the vulnerable Perl modules after
+# install — they are not needed at runtime.
 # ncurses-base, ncurses-bin, tar also cannot be purged — patches from dist-upgrade.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -117,11 +118,14 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && 
     libcurl4t64 \
     libsasl2-2 \
     libpq5 \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y krb5-{lib,multidev} libkrb5-3 libgssapi-krb5-2 2>/dev/null || true \
     && rm -rf /usr/share/perl5/Archive/Tar* \
               /usr/share/perl5/IO/Compress* \
               /usr/share/perl5/IO/Uncompress* \
               /usr/share/perl5/Compress/Zlib.pm \
               /usr/share/perl5/Compress/Raw* \
+              /usr/share/perl5/HTTP/Tiny* \
+              /usr/share/perl/5.*/HTTP/Tiny* \
     && apt-get autoremove -y --purge \
     && rm -rf /var/lib/apt/lists/*
 

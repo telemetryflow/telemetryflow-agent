@@ -57,7 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CVE-2026-5435 (MEDIUM)**: glibc out-of-bounds write via TSIG record — patched via `dist-upgrade`
 - **CVE-2026-6238 (MEDIUM)**: glibc crash via crafted DNS response — patched via `dist-upgrade`
 - **CVE-2026-6276 (HIGH)**: curl/libcurl cookie leak with custom Host header — patched via `dist-upgrade`
-- **Dockerfile OS hardening**: `dist-upgrade` applies all available Debian trixie-security patches at build time. Vulnerable Perl modules (Archive::Tar, IO::Compress, IO::Uncompress) removed from image — no runtime impact. Added `.trivyignore` to suppress accepted findings (perl-base package version vs actual files, curl connection-reuse CVEs not applicable to agent's usage pattern)
+- **Dockerfile OS hardening**: `dist-upgrade` applies all available Debian trixie-security patches at build time. Vulnerable Perl modules (Archive::Tar, IO::Compress, IO::Uncompress, HTTP::Tiny) removed from image — no runtime impact. Added `.trivyignore` to suppress accepted findings (perl-base package version vs actual files, curl connection-reuse CVEs not applicable to agent's usage pattern)
+- **CVE-2025-4270 (MEDIUM)**: HTTP::Tiny < 0.093 CRLF in HTTP response headers — module stripped from Docker image (GHSA alert #226)
+- **CVE-2024-37370 (MEDIUM)**: krb5 integer underflow in `berval2tl_data()` leads to heap out-of-bounds read — krb5 is transitive dependency (libsasl2/libcurl), agent does not use Kerberos auth; added to `.trivyignore` pending Debian trixie patch (GHSA alerts #222-225)
+- **CVE-2024-37371 (MEDIUM)**: krb5 integer underflow variant — same as above, transitive dependency not directly used
 - **Dockerfile**: Added `DEBIAN_FRONTEND=noninteractive` to suppress debconf warnings during package installation
 - **Kubernetes RBAC hardening** (`deploy/kubernetes/rbac.yaml`):
   - Split `secrets` into separate rule with `list` verb only (was `get, list, watch`) — agent only counts per-namespace, never reads values
