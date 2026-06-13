@@ -45,6 +45,10 @@ type Config struct {
 	// OneForAll is a shorthand to enable all four new capabilities
 	OneForAll OneForAllConfig `mapstructure:"one_for_all"`
 
+	// Supervisor enables the PMM-inspired CollectorManager (FSM, diff-based reload, backoff).
+	// When disabled (default), the agent uses the legacy static collector init path with zero overhead.
+	Supervisor SupervisorConfig `mapstructure:"supervisor"`
+
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
 }
@@ -2813,6 +2817,18 @@ func DefaultConfig() *Config {
 			StaleTTL:       60 * time.Second,
 			PreloadOnStart: true,
 		},
+		Supervisor: SupervisorConfig{
+			Enabled:      false,
+			HotReload:    false,
+			StatusReport: false,
+			FSM: CollectorFSMConfig{
+				MaxStartRetries:       5,
+				BackoffInitial:        5 * time.Second,
+				BackoffMax:            5 * time.Minute,
+				BackoffMultiplier:     2.0,
+				RestartOnConfigChange: true,
+			},
+		},
 		Integrations: IntegrationsConfig{
 			// All integrations disabled by default
 			// Enable specific integrations as needed
@@ -2983,6 +2999,40 @@ type RemoteWriteReceiverConfig struct {
 // with sensible defaults. Individual sections override these defaults.
 type OneForAllConfig struct {
 	Enabled bool `mapstructure:"enabled"`
+}
+
+// SupervisorConfig controls the PMM-inspired CollectorManager (Phase 1).
+// When Enabled=false (default), the agent behaves exactly as before.
+type SupervisorConfig struct {
+	// Enabled activates the CollectorManager / CollectorFSM supervisor.
+	Enabled bool `mapstructure:"enabled"`
+
+	// HotReload enables runtime config reload via SIGHUP or API.
+	HotReload bool `mapstructure:"hot_reload"`
+
+	// StatusReport enables collector state reporting in heartbeat payload.
+	StatusReport bool `mapstructure:"status_report"`
+
+	// FSM contains CollectorFSM tuning knobs.
+	FSM CollectorFSMConfig `mapstructure:"fsm"`
+}
+
+// CollectorFSMConfig tunes the per-collector finite state machine.
+type CollectorFSMConfig struct {
+	// MaxStartRetries is the maximum consecutive start attempts before marking a collector as Failed.
+	MaxStartRetries int `mapstructure:"max_start_retries"`
+
+	// BackoffInitial is the initial backoff duration after a start failure.
+	BackoffInitial time.Duration `mapstructure:"backoff_initial"`
+
+	// BackoffMax is the maximum backoff duration.
+	BackoffMax time.Duration `mapstructure:"backoff_max"`
+
+	// BackoffMultiplier controls exponential growth (e.g., 2.0).
+	BackoffMultiplier float64 `mapstructure:"backoff_multiplier"`
+
+	// RestartOnConfigChange restarts a collector when its config diff is detected.
+	RestartOnConfigChange bool `mapstructure:"restart_on_config_change"`
 }
 
 // Days is a helper to convert days to time.Duration

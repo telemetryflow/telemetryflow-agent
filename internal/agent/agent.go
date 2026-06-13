@@ -53,6 +53,7 @@ import (
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
 	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
+	k8s "k8s.io/client-go/kubernetes"
 )
 
 // Agent is the main telemetry agent
@@ -67,17 +68,24 @@ type Agent struct {
 	k8sSync          *exporter.KubernetesSync
 	k8sCollector     *kubernetes.KubernetesCollector // kept for registration retry
 	collectors       []collector.Collector
+	collectorManager *collector.Manager
 	prometheusServer *exporter.PrometheusServer
 	agentAPIServer   *agentapi.Server
 
 	// State
-	mu      sync.RWMutex
-	running bool
-	started time.Time
+	mu         sync.RWMutex
+	running    bool
+	started    time.Time
+	configFile string
 }
 
 // New creates a new agent instance
 func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
+	return NewWithConfigFile(cfg, logger, "")
+}
+
+// NewWithConfigFile creates a new agent instance with a known config file path for hot reload.
+func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string) (*Agent, error) {
 	// Resolve a stable agent ID — deterministic via host fingerprint when not explicitly set.
 	agentID := ResolveAgentID(cfg.Agent.ID, cfg.Agent.Hostname, logger)
 
@@ -113,6 +121,7 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		Labels:            cfg.Agent.Labels,
 		Client:            client,
 		Logger:            logger,
+		StatusReport:      cfg.Supervisor.Enabled && cfg.Supervisor.StatusReport,
 	})
 
 	// Create collectors (alphabetical order)
@@ -480,22 +489,33 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 
 	// Create Agent API server if enabled (for real-time K8s queries like pod log streaming)
 	var apiServer *agentapi.Server
-	if cfg.AgentAPI.Enabled && k8sCollector != nil {
+	if cfg.AgentAPI.Enabled {
+		var k8sCs k8s.Interface
+		if k8sCollector != nil {
+			k8sCs = k8sCollector.Clientset()
+		}
 		apiServer = agentapi.NewServer(
 			agentapi.Config{
 				Enabled: cfg.AgentAPI.Enabled,
 				Port:    cfg.AgentAPI.Port,
 				APIKey:  cfg.AgentAPI.APIKey,
 			},
-			k8sCollector.Clientset(),
+			k8sCs,
 			logger,
+			nil,
 		)
-		logger.Info("Agent API server enabled",
-			zap.Int("port", cfg.AgentAPI.Port),
-		)
+		if k8sCollector != nil {
+			logger.Info("Agent API server enabled",
+				zap.Int("port", cfg.AgentAPI.Port),
+			)
+		} else {
+			logger.Info("Agent API server enabled (no K8s, supervisor endpoints only)",
+				zap.Int("port", cfg.AgentAPI.Port),
+			)
+		}
 	}
 
-	return &Agent{
+	ag := &Agent{
 		id:               agentID,
 		config:           cfg,
 		logger:           logger,
@@ -504,9 +524,33 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 		k8sSync:          k8sSync,
 		k8sCollector:     k8sCollector,
 		collectors:       collectors,
+		collectorManager: newCollectorManager(cfg, collectors, logger),
 		prometheusServer: promServer,
 		agentAPIServer:   apiServer,
-	}, nil
+		configFile:       configFile,
+	}
+
+	if ag.collectorManager != nil && cfg.Supervisor.StatusReport {
+		ag.heartbeat.SetCollectorStatesFn(ag.CollectorStates)
+	}
+
+	if ag.agentAPIServer != nil {
+		ag.agentAPIServer.SetAgent(&agentProviderAdapter{agent: ag})
+	}
+
+	return ag, nil
+}
+
+func newCollectorManager(cfg *config.Config, collectors []collector.Collector, logger *zap.Logger) *collector.Manager {
+	if !cfg.Supervisor.Enabled {
+		return nil
+	}
+	mgr := collector.NewManager(&cfg.Supervisor, logger)
+	for _, c := range collectors {
+		mgr.Register(c.Name(), c, collector.DigestConfig(nil))
+	}
+	logger.Info("supervisor mode enabled", zap.Int("collectors", len(collectors)))
+	return mgr
 }
 
 // ID returns the agent ID
@@ -631,13 +675,19 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Start collectors
-	for _, c := range a.collectors {
-		c := c // capture
-		go func() {
-			if err := c.Start(ctx); err != nil && err != context.Canceled {
-				errChan <- fmt.Errorf("collector %s error: %w", c.Name(), err)
-			}
-		}()
+	if a.collectorManager != nil {
+		if err := a.collectorManager.Start(ctx); err != nil {
+			errChan <- fmt.Errorf("supervisor error: %w", err)
+		}
+	} else {
+		for _, c := range a.collectors {
+			c := c // capture
+			go func() {
+				if err := c.Start(ctx); err != nil && err != context.Canceled {
+					errChan <- fmt.Errorf("collector %s error: %w", c.Name(), err)
+				}
+			}()
+		}
 	}
 
 	a.logger.Info("Agent started successfully")
@@ -712,17 +762,29 @@ func (a *Agent) shutdown() error {
 	}
 
 	// Stop collectors
-	for _, c := range a.collectors {
-		c := c
+	if a.collectorManager != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := c.Stop(); err != nil {
+			if err := a.collectorManager.Stop(); err != nil {
 				errMu.Lock()
-				errs = append(errs, fmt.Errorf("collector %s stop: %w", c.Name(), err))
+				errs = append(errs, fmt.Errorf("supervisor stop: %w", err))
 				errMu.Unlock()
 			}
 		}()
+	} else {
+		for _, c := range a.collectors {
+			c := c
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := c.Stop(); err != nil {
+					errMu.Lock()
+					errs = append(errs, fmt.Errorf("collector %s stop: %w", c.Name(), err))
+					errMu.Unlock()
+				}
+			}()
+		}
 	}
 
 	// Wait with timeout
@@ -795,4 +857,164 @@ type AgentStats struct {
 	Started        time.Time     `json:"started"`
 	Uptime         time.Duration `json:"uptime"`
 	CollectorCount int           `json:"collectorCount"`
+}
+
+// ReloadConfig reloads the configuration from disk and applies changes.
+// Only works when supervisor mode is enabled.
+func (a *Agent) ReloadConfig() error {
+	if a.collectorManager == nil {
+		return fmt.Errorf("supervisor mode is not enabled, cannot reload config")
+	}
+	if a.configFile == "" {
+		return fmt.Errorf("no config file path known, cannot reload")
+	}
+
+	loader := config.NewLoader()
+	newCfg, err := loader.LoadFromFile(a.configFile)
+	if err != nil {
+		return fmt.Errorf("failed to reload config: %w", err)
+	}
+
+	newCollectors := a.rebuildCollectors(newCfg)
+
+	entries := make([]collector.CollectorEntry, 0, len(newCollectors))
+	for _, c := range newCollectors {
+		entries = append(entries, collector.CollectorEntry{
+			Name:       c.Name(),
+			Collector:  c,
+			ConfigHash: collector.DigestConfig(nil),
+		})
+	}
+
+	if err := a.collectorManager.ApplyDiff(entries); err != nil {
+		return fmt.Errorf("failed to apply config diff: %w", err)
+	}
+
+	a.mu.Lock()
+	a.config = newCfg
+	a.collectors = newCollectors
+	a.mu.Unlock()
+
+	a.logger.Info("configuration reloaded successfully",
+		zap.Int("collectors", len(newCollectors)),
+	)
+	return nil
+}
+
+// rebuildCollectors creates a fresh collector list from the given config.
+func (a *Agent) rebuildCollectors(cfg *config.Config) []collector.Collector {
+	var collectors []collector.Collector
+
+	if cfg.Collector.System.Enabled {
+		collectors = append(collectors, system.NewHostCollector(system.HostCollectorConfig{
+			Interval:    cfg.Collector.System.Interval,
+			CollectCPU:  cfg.Collector.System.CPU,
+			CollectMem:  cfg.Collector.System.Memory,
+			CollectDisk: cfg.Collector.System.Disk,
+			CollectNet:  cfg.Collector.System.Network,
+			DiskPaths:   cfg.Collector.System.DiskPaths,
+			Logger:      a.logger,
+		}))
+	}
+
+	if cfg.Collector.NodeExporter.Enabled {
+		collectors = append(collectors, nodeexporter.NewNodeExporterCollector(cfg.Collector.NodeExporter, a.logger))
+	}
+	if cfg.Collector.CAdvisor.Enabled {
+		collectors = append(collectors, cadvisorcollector.NewCAdvisorCollector(cfg.Collector.CAdvisor, a.logger))
+	}
+	if cfg.Collector.ClickHouse.Enabled {
+		collectors = append(collectors, clickhousecollector.NewClickHouseCollector(cfg.Collector.ClickHouse, a.logger))
+	}
+	if cfg.Collector.CockroachDB.Enabled {
+		collectors = append(collectors, cockroachdbcollector.NewCockroachDBCollector(cfg.Collector.CockroachDB, a.logger))
+	}
+	if cfg.Collector.Aurora.Enabled {
+		collectors = append(collectors, auroracollector.NewAuroraCollector(cfg.Collector.Aurora, a.logger))
+	}
+	if cfg.Collector.MySQL.Enabled {
+		collectors = append(collectors, mysqlcollector.NewMySQLCollector(cfg.Collector.MySQL, a.logger))
+	}
+	if cfg.Collector.PostgreSQL.Enabled {
+		collectors = append(collectors, pgcollector.NewPostgreSQLCollector(cfg.Collector.PostgreSQL, a.logger))
+	}
+	if cfg.Collector.RDSPostgreSQL.Enabled {
+		collectors = append(collectors, pgcollector.NewRDSPostgreSQLCollector(cfg.Collector.RDSPostgreSQL, a.logger))
+	}
+	if cfg.Collector.SQLite3.Enabled {
+		collectors = append(collectors, sqlite3collector.NewSQLite3Collector(cfg.Collector.SQLite3, a.logger))
+	}
+	if cfg.Collector.MongoDBCommunity.Enabled {
+		collectors = append(collectors, mongodbcollector.NewMongoDBCollector(cfg.Collector.MongoDBCommunity, a.logger))
+	}
+	if cfg.Collector.MSSQL.Enabled {
+		collectors = append(collectors, mssqlcollector.NewMSSQLCollector(cfg.Collector.MSSQL, a.logger))
+	}
+	if cfg.Collector.TimescaleDB.Enabled {
+		collectors = append(collectors, tsdbcollector.NewTimescaleDBCollector(cfg.Collector.TimescaleDB, a.logger))
+	}
+
+	return collectors
+}
+
+// CollectorStates returns the state of all managed collectors (supervisor mode only).
+func (a *Agent) CollectorStates() []collector.CollectorStatus {
+	if a.collectorManager == nil {
+		return nil
+	}
+	return a.collectorManager.CollectorStates()
+}
+
+// ConfigFile returns the path to the config file.
+func (a *Agent) ConfigFile() string {
+	return a.configFile
+}
+
+// Config returns a copy of the current agent configuration.
+func (a *Agent) Config() *config.Config {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.config
+}
+
+type agentProviderAdapter struct {
+	agent *Agent
+}
+
+func (p *agentProviderAdapter) CollectorStates() []agentapi.CollectorState {
+	raw := p.agent.CollectorStates()
+	if raw == nil {
+		return nil
+	}
+	states := make([]agentapi.CollectorState, len(raw))
+	for i, s := range raw {
+		states[i] = agentapi.CollectorState{
+			Name:         s.Name,
+			State:        string(s.State),
+			StartedAt:    s.StartedAt.Unix(),
+			LastError:    s.LastError,
+			FailureCount: s.FailureCount,
+		}
+	}
+	return states
+}
+
+func (p *agentProviderAdapter) ReloadConfig() error {
+	return p.agent.ReloadConfig()
+}
+
+func (p *agentProviderAdapter) IsRunning() bool {
+	return p.agent.IsRunning()
+}
+
+func (p *agentProviderAdapter) Stats() agentapi.AgentStats {
+	s := p.agent.Stats()
+	return agentapi.AgentStats{
+		ID:             s.ID,
+		Hostname:       s.Hostname,
+		Running:        s.Running,
+		Started:        s.Started.Unix(),
+		UptimeMs:       s.Uptime.Milliseconds(),
+		CollectorCount: s.CollectorCount,
+	}
 }

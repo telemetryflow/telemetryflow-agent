@@ -33,7 +33,66 @@ import (
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+
+	resp := map[string]string{"status": "ok"}
+	if s.agent != nil {
+		resp["agent_running"] = fmt.Sprintf("%v", s.agent.IsRunning())
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// handleCollectors returns the current state of all managed collectors.
+func (s *Server) handleCollectors(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.agent == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": "supervisor mode not enabled",
+		})
+		return
+	}
+
+	states := s.agent.CollectorStates()
+	if states == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": "supervisor mode not enabled",
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"collectors": states,
+		"count":      len(states),
+	})
+}
+
+// handleReload triggers a configuration reload.
+func (s *Server) handleReload(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.agent == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": "supervisor mode not enabled",
+		})
+		return
+	}
+
+	if err := s.agent.ReloadConfig(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status": "reloaded",
+	})
 }
 
 // handlePodLogs streams pod container logs via SSE (Server-Sent Events).

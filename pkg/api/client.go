@@ -530,6 +530,20 @@ type SystemInfoPayload struct {
 	// ==========================================================================
 	Tags   map[string]string `json:"tags,omitempty"`
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// ==========================================================================
+	// Collector States (supervisor mode)
+	// ==========================================================================
+	CollectorStates []CollectorStatePayload `json:"collectorStates,omitempty"`
+}
+
+// CollectorStatePayload represents the state of a single collector in the heartbeat.
+type CollectorStatePayload struct {
+	Name         string `json:"name"`
+	State        string `json:"state"`
+	StartedAt    int64  `json:"startedAt,omitempty"`
+	LastError    string `json:"lastError,omitempty"`
+	FailureCount int    `json:"failureCount,omitempty"`
 }
 
 // CPUCoreInfoPayload contains per-core CPU information for API payload

@@ -29,14 +29,43 @@ type Server struct {
 	clientset kubernetes.Interface
 	logger    *zap.Logger
 	server    *http.Server
+	agent     AgentProvider
+}
+
+// AgentProvider exposes agent methods needed by API handlers.
+type AgentProvider interface {
+	CollectorStates() []CollectorState
+	ReloadConfig() error
+	IsRunning() bool
+	Stats() AgentStats
+}
+
+// CollectorState mirrors collector.CollectorStatus for the API layer.
+type CollectorState struct {
+	Name         string `json:"name"`
+	State        string `json:"state"`
+	StartedAt    int64  `json:"started_at,omitempty"`
+	LastError    string `json:"last_error,omitempty"`
+	FailureCount int    `json:"failure_count"`
+}
+
+// AgentStats mirrors agent.AgentStats for the API layer.
+type AgentStats struct {
+	ID             string `json:"id"`
+	Hostname       string `json:"hostname"`
+	Running        bool   `json:"running"`
+	Started        int64  `json:"started,omitempty"`
+	UptimeMs       int64  `json:"uptime_ms"`
+	CollectorCount int    `json:"collector_count"`
 }
 
 // NewServer creates a new agent API server.
-func NewServer(cfg Config, clientset kubernetes.Interface, logger *zap.Logger) *Server {
+func NewServer(cfg Config, clientset kubernetes.Interface, logger *zap.Logger, agent AgentProvider) *Server {
 	return &Server{
 		config:    cfg,
 		clientset: clientset,
 		logger:    logger.Named("agent-api"),
+		agent:     agent,
 	}
 }
 
@@ -46,6 +75,10 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Health check
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
+
+	// Supervisor endpoints
+	mux.HandleFunc("GET /api/v1/collectors", s.handleCollectors)
+	mux.HandleFunc("POST /api/v1/reload", s.handleReload)
 
 	// Pod log streaming (SSE)
 	mux.HandleFunc("GET /api/v1/pods/{namespace}/{pod}/logs", s.handlePodLogs)
@@ -91,4 +124,9 @@ func (s *Server) Stop() error {
 // Port returns the configured port.
 func (s *Server) Port() int {
 	return s.config.Port
+}
+
+// SetAgent injects the agent provider for supervisor endpoints.
+func (s *Server) SetAgent(ap AgentProvider) {
+	s.agent = ap
 }

@@ -281,6 +281,16 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("agent_api.port", 8889)
 	v.SetDefault("agent_api.api_key", "")
 
+	// Supervisor (PMM-inspired CollectorManager)
+	v.SetDefault("supervisor.enabled", false)
+	v.SetDefault("supervisor.hot_reload", false)
+	v.SetDefault("supervisor.status_report", false)
+	v.SetDefault("supervisor.fsm.max_start_retries", 5)
+	v.SetDefault("supervisor.fsm.backoff_initial", "5s")
+	v.SetDefault("supervisor.fsm.backoff_max", "5m")
+	v.SetDefault("supervisor.fsm.backoff_multiplier", 2.0)
+	v.SetDefault("supervisor.fsm.restart_on_config_change", true)
+
 	// Exporter
 	v.SetDefault("exporter.otlp.enabled", defaults.Exporter.OTLP.Enabled)
 	v.SetDefault("exporter.otlp.batch_size", defaults.Exporter.OTLP.BatchSize)
@@ -360,4 +370,10 @@ func (l *Loader) bindEnvVars(v *viper.Viper) {
 // GetConfigFilePath returns the path of the loaded config file
 func GetConfigFilePath() string {
 	return viper.ConfigFileUsed()
+}
+
+// Reload reloads the configuration from the same source as the initial load.
+// Returns a new Config without mutating the original.
+func (l *Loader) Reload(configFile string) (*Config, error) {
+	return l.Load(configFile)
 }

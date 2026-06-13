@@ -7,10 +7,10 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.1.10-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.40.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
 </div>
@@ -36,7 +36,7 @@ Thank you for your interest in contributing to TelemetryFlow Agent! This documen
 
 ## Code of Conduct
 
-This project adheres to the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/). By participating, you are expected to uphold this code. Please report unacceptable behavior to [support@devopscorner.id](mailto:support@devopscorner.id).
+This project adheres to the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/). By participating, you are expected to uphold this code. Please report unacceptable behavior to [support@telemetryflow.id](mailto:support@telemetryflow.id).
 
 ## Getting Started
 
@@ -420,7 +420,7 @@ func NewCollector(config *Config) *Collector {
 
 - **GitHub Issues**: Report bugs or request features
 - **Discussions**: Ask questions and share ideas
-- **Email**: [support@devopscorner.id](mailto:support@devopscorner.id)
+- **Email**: [support@telemetryflow.id](mailto:support@telemetryflow.id)
 
 ### Recognition
 

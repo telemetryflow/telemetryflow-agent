@@ -212,7 +212,7 @@ func runAgent() error {
 	defer cancel()
 
 	// Create and start agent
-	ag, err := agent.New(cfg, logger)
+	ag, err := agent.NewWithConfigFile(cfg, logger, cfgFile)
 	if err != nil {
 		return fmt.Errorf("failed to create agent: %w", err)
 	}
@@ -228,23 +228,33 @@ func runAgent() error {
 	}()
 
 	// Wait for signals or error
-	select {
-	case sig := <-sigChan:
-		logger.Info("Received signal, shutting down", zap.String("signal", sig.String()))
-		cancel()
-		// Wait for agent to finish
-		if err := <-errChan; err != nil && err != context.Canceled {
-			logger.Error("Agent error during shutdown", zap.Error(err))
-		}
-	case err := <-errChan:
-		if err != nil && err != context.Canceled {
-			logger.Error("Agent error", zap.Error(err))
-			return err
+	for {
+		select {
+		case sig := <-sigChan:
+			agCfg := ag.Config()
+			if sig == syscall.SIGHUP && agCfg.Supervisor.Enabled && agCfg.Supervisor.HotReload {
+				logger.Info("SIGHUP received, reloading configuration")
+				if err := ag.ReloadConfig(); err != nil {
+					logger.Error("config reload failed", zap.Error(err))
+				}
+				continue
+			}
+			logger.Info("Received signal, shutting down", zap.String("signal", sig.String()))
+			cancel()
+			if err := <-errChan; err != nil && err != context.Canceled {
+				logger.Error("Agent error during shutdown", zap.Error(err))
+			}
+			logger.Info("TelemetryFlow Agent stopped")
+			return nil
+		case err := <-errChan:
+			if err != nil && err != context.Canceled {
+				logger.Error("Agent error", zap.Error(err))
+				return err
+			}
+			logger.Info("TelemetryFlow Agent stopped")
+			return nil
 		}
 	}
-
-	logger.Info("TelemetryFlow Agent stopped")
-	return nil
 }
 
 // initLogger initializes the logger based on configuration

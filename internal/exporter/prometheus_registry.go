@@ -41,6 +41,9 @@ type SelfMetrics struct {
 	ExportBytes        *prometheus.CounterVec
 	HeartbeatSuccess   prometheus.Counter
 	HeartbeatErrors    prometheus.Counter
+
+	SupervisorCollectorsTotal   *prometheus.GaugeVec
+	SupervisorCollectorRestarts *prometheus.CounterVec
 }
 
 // NewSelfMetrics creates and registers agent self-observability metrics
@@ -102,6 +105,16 @@ func NewSelfMetrics(prefix string, registry *prometheus.Registry) *SelfMetrics {
 			Name: prefix + "_agent_heartbeat_errors_total",
 			Help: "Failed heartbeat count",
 		}),
+
+		SupervisorCollectorsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: prefix + "_agent_supervisor_collectors",
+			Help: "Number of collectors by state",
+		}, []string{"state"}),
+
+		SupervisorCollectorRestarts: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: prefix + "_agent_supervisor_collector_restarts_total",
+			Help: "Number of collector restarts by collector name",
+		}, []string{"collector"}),
 	}
 
 	// Register all metrics
@@ -117,6 +130,8 @@ func NewSelfMetrics(prefix string, registry *prometheus.Registry) *SelfMetrics {
 		sm.ExportBytes,
 		sm.HeartbeatSuccess,
 		sm.HeartbeatErrors,
+		sm.SupervisorCollectorsTotal,
+		sm.SupervisorCollectorRestarts,
 	)
 
 	// Set static agent info label

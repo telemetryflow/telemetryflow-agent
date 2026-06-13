@@ -79,6 +79,13 @@ type HeartbeatConfig struct {
 
 	// Logger is the logger instance
 	Logger *zap.Logger
+
+	// CollectorStatesFn returns current collector states (supervisor mode).
+	// When non-nil and StatusReport is enabled, states are included in heartbeat payload.
+	CollectorStatesFn func() []collector.CollectorStatus
+
+	// StatusReport enables collector state reporting in heartbeat payload.
+	StatusReport bool
 }
 
 // NewHeartbeat creates a new heartbeat exporter
@@ -208,13 +215,34 @@ func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
 
 	var sysInfo *api.SystemInfoPayload
 
-	// Collect system info if enabled
 	if h.config.IncludeSystemInfo {
 		info, err := system.GetSystemInfoStatic()
 		if err != nil {
 			h.logger.Debug("Failed to collect system info", zap.Error(err))
 		} else {
 			sysInfo = mapSystemInfoToPayload(info, h.config.Tags, h.config.Labels)
+		}
+	}
+
+	if h.config.StatusReport && h.config.CollectorStatesFn != nil {
+		if sysInfo == nil {
+			sysInfo = &api.SystemInfoPayload{}
+		}
+		states := h.config.CollectorStatesFn()
+		sysInfo.CollectorStates = make([]api.CollectorStatePayload, len(states))
+		for i, s := range states {
+			payload := api.CollectorStatePayload{
+				Name:         s.Name,
+				State:        string(s.State),
+				FailureCount: s.FailureCount,
+			}
+			if s.LastError != "" {
+				payload.LastError = s.LastError
+			}
+			if !s.StartedAt.IsZero() {
+				payload.StartedAt = s.StartedAt.Unix()
+			}
+			sysInfo.CollectorStates[i] = payload
 		}
 	}
 
@@ -234,6 +262,11 @@ func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
 // SendNow sends an immediate heartbeat
 func (h *Heartbeat) SendNow(ctx context.Context) error {
 	return h.sendHeartbeat(ctx)
+}
+
+// SetCollectorStatesFn sets the callback used to collect collector states for heartbeat.
+func (h *Heartbeat) SetCollectorStatesFn(fn func() []collector.CollectorStatus) {
+	h.config.CollectorStatesFn = fn
 }
 
 // mapSystemInfoToPayload converts collector.SystemInfo to api.SystemInfoPayload

@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2026-05-19
 
+### Added
+
+- **Supervisor Mode (Phase 1 — PMM-inspired infrastructure)**: Optional CollectorManager with per-collector FSM, exponential backoff with jitter, diff-based config reload, and status reporting. Disabled by default via `supervisor.enabled: false` — zero overhead when off. Enable with `supervisor.enabled: true` in YAML.
+- **Config Hot Reload**: SIGHUP-triggered runtime configuration reload when `supervisor.hot_reload: true` is set. Re-reads the YAML config from disk without restarting the agent.
+- **CollectorFSM**: Per-collector finite state machine tracking states (New → Starting → Running → Stopping → Stopped, with Failed and Backoff for error recovery). Configurable max retries, backoff durations, and multiplier.
+- **Supervisor Prometheus metrics**: `tfo_agent_supervisor_collectors` (gauge by state) and `tfo_agent_supervisor_collector_restarts_total` (counter by collector) registered in the self-observability registry.
+- **Heartbeat collector states**: When `supervisor.status_report: true`, heartbeat payloads include live collector states (name, state, started_at, last_error, failure_count) in `collectorStates` field.
+- **Agent API supervisor endpoints**: New `GET /api/v1/collectors` (collector states), `POST /api/v1/reload` (trigger config reload), and enhanced `GET /api/v1/health` (includes agent_running status). Available when `agent_api.enabled: true` — no longer requires K8s collector.
+- **97.3% test coverage** on `internal/collector` package with 42 unit tests (backoff, FSM, diff, manager, collector builders).
+
 ### Fixed
 
 - **Heartbeat 404 error**: `GetEffectiveEndpoint()` now prefers `api.endpoint` (`TELEMETRYFLOW_API_ENDPOINT`) over `telemetryflow.endpoint` when explicitly set, allowing heartbeat to target the backend API while OTLP export continues using the collector
@@ -708,8 +718,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.2.0   | 2026-05-14 | v1.47.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes |
-| 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration |
+| 1.2.0   | 2026-05-14 | v1.47.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes                                                                                                                                                                                                                          |
+| 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration                                                                              |
 | 1.1.9   | 2026-03-20 | v1.47.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |
 | 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                                                                                                                                                                |
 | 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                                                                                                                                                                    |
