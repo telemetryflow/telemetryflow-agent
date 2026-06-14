@@ -37,9 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **97.3% test coverage** on `internal/collector` package with 42 unit tests (backoff, FSM, diff, manager, collector builders).
 - **QAN (Query Analytics) Data Path (Phase 2 — PMM-inspired)**: Separate data path from OTLP metrics for high-cardinality per-query analytics. Disabled by default via `qan.enabled: false` — zero overhead when off.
   - **`internal/qan/`** package: `QANCollector` interface (sibling to `collector.Collector`), `QANForwarder` (periodic delta-cached collection loop), `QANExporter` (batched HTTP JSON push to `/api/v2/qan/collect` with retry/backoff).
-  - **QAN collectors**: PostgreSQL (`pg_stat_statements`), MySQL (`performance_schema.events_statements_summary_by_digest`), MongoDB (`system.profile` aggregation pipeline). Each uses SHA-256 fingerprinting and agent-side delta calculation.
-  - **Rich data model**: `QANMetricsBucket` carries `{cnt, sum, min, max, p99}` per metric + DB-specific sub-structs (`PostgreSQLQANMetrics`, `MySQLQANMetrics`, `MongoDBQANMetrics`).
-  - **Config**: `qan.enabled`, `qan.interval` (60s default), `qan.endpoint`, `qan.api_key_id`/`api_key_secret`, `qan.batch_size` (100), `qan.flush_interval` (10s), `qan.timeout` (30s), `qan.max_retry_attempts` (3), `qan.top_queries_limit` (200).
+  - **QAN collectors**: PostgreSQL (`pg_stat_statements`), MySQL (`performance_schema.events_statements_summary_by_digest`), MongoDB (`system.profile` aggregation pipeline), MSSQL (`sys.dm_exec_query_stats`), CockroachDB (`crdb_internal.node_statement_statistics`), TimescaleDB (`pg_stat_statements`), RDS PostgreSQL (`pg_stat_statements` with TLS). Each uses SHA-256 fingerprinting and agent-side delta calculation.
+  - **Rich data model**: `QANMetricsBucket` carries `{cnt, sum, min, max, p99}` per metric + DB-specific sub-structs (`PostgreSQLQANMetrics`, `MySQLQANMetrics`, `MongoDBQANMetrics`, `MSSQLQANMetrics`, `CockroachDBQANMetrics`).
+  - **Per-DB feature flags**: `qan.collectors.*` config section with boolean flags for each DB type (`postgresql`, `mysql`, `mongodb`, `mssql`, `cockroachdb`, `timescaledb`, `rds_postgresql`, `aurora`). All default to `true`.
+  - **Config**: `qan.enabled`, `qan.interval` (60s default), `qan.endpoint`, `qan.api_key_id`/`api_key_secret`, `qan.batch_size` (100), `qan.flush_interval` (10s), `qan.timeout` (30s), `qan.max_retry_attempts` (3), `qan.top_queries_limit` (200), `qan.collectors.*` (per-DB flags).
   - **29 unit tests** covering forwarder (start/stop, collect-and-forward, skip-not-running, error continuation, nil sink, stats), exporter (collect/flush, auto-flush on batch size, retry on failure, retry exhaustion, auth headers, periodic flush, default config), and types (JSON round-trip, omitempty, constants, default config, API key secret redaction).
 
 ### Fixed
@@ -54,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dockerfile**: Restored `libssh2-1t64` — `libcurl4t64` depends on it and its removal broke Fluent Bit (exit status 127)
 - **Default config**: Removed default `api.endpoint` value (`http://localhost:3100`) so it only activates when explicitly configured via env var or YAML
 - **Go module fix**: Added `replace` directive for `github.com/go-openapi/testify/v2` → v2.0.2 to work around upstream broken test dependency (`assert/yaml` package missing) that blocked `go mod tidy`
+- **OTLP endpoint URL construction (critical)**: `GetEffectiveEndpoint()` returns a full URL (e.g. `http://tfo-collector:4318`), but `otlpmetrichttp.WithEndpoint()` expects `host:port` only — the OTLP SDK was receiving malformed endpoint strings, causing all metric export to silently fail. Added `Config.GetOTLPEndpoint(signalType)` (`internal/config/config.go`) that uses `net/url` to parse per-signal endpoint overrides into `host:port` + `/path` components. The agent now correctly calls `WithEndpoint(host)` + `WithURLPath(path)`, supporting both simple host:port endpoints and full-URL overrides (e.g. `http://tfo-collector:4318/v1/metrics`).
+- **Lint compliance (20 issues → 0)**: Fixed all `make lint` findings — `errcheck` (3: wrapped `cursor.Close`/`rows.Close`/`f.Stop` in `defer func() { _ = ... }()`), `staticcheck` (1: removed empty branch), `unused` (16: deleted dead code across 6 collectors — Aurora `push.go`, MySQL QAN `sumBytesSent`, PostgreSQL QAN `version`, RDS PostgreSQL `collectAllActivity`/`submitMetrics`/`convertMetrics`, TimescaleDB `collectAllHypertables`, buffer fields).
 
 ### Security
 

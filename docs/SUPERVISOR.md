@@ -232,6 +232,8 @@ graph LR
 
 The forwarder activates automatically when collectors are present — no explicit configuration needed. The collection interval is inherited from `collector.system.interval`.
 
+The OTLP endpoint is parsed via `Config.GetOTLPEndpoint(signalType)` which uses `net/url` to split full-URL overrides into `host:port` + `/path` components for the OTLP SDK. This supports both simple endpoints (`tfo-collector:4318`) and per-signal full-URL overrides (`http://tfo-collector:4318/v1/metrics`).
+
 ```yaml
 collector:
   system:
@@ -240,6 +242,10 @@ collector:
 exporter:
   otlp:
     enabled: true # Enables OTLPMetricBridge
+    # Simple endpoint (default path /v1/metrics applied)
+    endpoint: "tfo-collector:4318"
+    # Per-signal full-URL overrides (optional, take priority)
+    metrics_endpoint: "http://tfo-collector:4318/v1/metrics"
 
 prometheus_server:
   enabled: true # Enables Prometheus bridge

@@ -30,11 +30,17 @@ import (
 type AgentType string
 
 const (
-	AgentTypePostgreSQLPgStatements AgentType = "qan-postgresql-pgstatements"
-	AgentTypeMySQLPerfSchema        AgentType = "qan-mysql-perfschema"
-	AgentTypeMySQLSlowLog           AgentType = "qan-mysql-slowlog"
-	AgentTypeMongoDBProfiler        AgentType = "qan-mongodb-profiler"
-	AgentTypeMongoDBMongolog        AgentType = "qan-mongodb-mongolog"
+	AgentTypePostgreSQLPgStatements  AgentType = "qan-postgresql-pgstatements"
+	AgentTypeMySQLPerfSchema         AgentType = "qan-mysql-perfschema"
+	AgentTypeMySQLSlowLog            AgentType = "qan-mysql-slowlog"
+	AgentTypeMongoDBProfiler         AgentType = "qan-mongodb-profiler"
+	AgentTypeMongoDBMongolog         AgentType = "qan-mongodb-mongolog"
+	AgentTypeMSSQLQueryStats         AgentType = "qan-mssql-querystats"
+	AgentTypeMSSQLQueryStore         AgentType = "qan-mssql-querystore"
+	AgentTypeCockroachDBStmtStats    AgentType = "qan-cockroachdb-stmtstats"
+	AgentTypeTimescaleDBPgStatements AgentType = "qan-timescaledb-pgstatements"
+	AgentTypeRDSPostgreSQLPgStmt     AgentType = "qan-rds-postgresql-pgstatements"
+	AgentTypeAuroraPI                AgentType = "qan-aurora-pi"
 )
 
 // QANMetricsBucket represents a single query fingerprint's aggregated metrics
@@ -77,9 +83,11 @@ type QANMetricsBucket struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// DB-specific metrics (only one populated per bucket)
-	PostgreSQL *PostgreSQLQANMetrics `json:"postgresql,omitempty"`
-	MySQL      *MySQLQANMetrics      `json:"mysql,omitempty"`
-	MongoDB    *MongoDBQANMetrics    `json:"mongodb,omitempty"`
+	PostgreSQL  *PostgreSQLQANMetrics  `json:"postgresql,omitempty"`
+	MySQL       *MySQLQANMetrics       `json:"mysql,omitempty"`
+	MongoDB     *MongoDBQANMetrics     `json:"mongodb,omitempty"`
+	MSSQL       *MSSQLQANMetrics       `json:"mssql,omitempty"`
+	CockroachDB *CockroachDBQANMetrics `json:"cockroachdb,omitempty"`
 }
 
 // PostgreSQLQANMetrics holds PostgreSQL-specific query metrics from
@@ -209,6 +217,69 @@ type MongoDBQANMetrics struct {
 	ApplicationName string `json:"application_name,omitempty"`
 }
 
+// MSSQLQANMetrics holds SQL Server-specific query metrics from
+// sys.dm_exec_query_stats (delta from previous snapshot).
+type MSSQLQANMetrics struct {
+	// Execution statistics
+	ExecutionCount float64 `json:"m_execution_count"`
+
+	// CPU time (microseconds → seconds)
+	TotalWorkerTime float64 `json:"m_total_worker_time"`
+	TotalCPUTime    float64 `json:"m_total_cpu_time"`
+
+	// Elapsed time (microseconds → seconds)
+	TotalElapsedTime float64 `json:"m_total_elapsed_time"`
+
+	// Logical reads
+	TotalLogicalReads  float64 `json:"m_total_logical_reads"`
+	TotalLogicalWrites float64 `json:"m_total_logical_writes"`
+
+	// Physical reads
+	TotalPhysicalReads float64 `json:"m_total_physical_reads"`
+
+	// Row counts
+	RowCounts float64 `json:"m_row_counts"`
+
+	// Memory grants
+	MaxGrantKB     float64 `json:"m_max_grant_kb,omitempty"`
+	MinGrantKB     float64 `json:"m_min_grant_kb,omitempty"`
+	MaxUsedGrantKB float64 `json:"m_max_used_grant_kb,omitempty"`
+	MinUsedGrantKB float64 `json:"m_min_used_grant_kb,omitempty"`
+
+	// Degree of parallelism
+	MaxDOP float64 `json:"m_max_dop,omitempty"`
+
+	// Query Store specific (when source = Query Store)
+	QueryStoreQueryID float64 `json:"qs_query_id,omitempty"`
+}
+
+// CockroachDBQANMetrics holds CockroachDB-specific query metrics from
+// crdb_internal.node_statement_statistics (delta from previous snapshot).
+type CockroachDBQANMetrics struct {
+	// Row counts
+	RowsReadCnt    float64 `json:"m_rows_read_cnt"`
+	RowsReadSum    float64 `json:"m_rows_read_sum"`
+	RowsWrittenCnt float64 `json:"m_rows_written_cnt"`
+	RowsWrittenSum float64 `json:"m_rows_written_sum"`
+
+	// Bytes
+	BytesReadCnt    float64 `json:"m_bytes_read_cnt"`
+	BytesReadSum    float64 `json:"m_bytes_read_sum"`
+	NetworkBytesCnt float64 `json:"m_network_bytes_cnt"`
+	NetworkBytesSum float64 `json:"m_network_bytes_sum"`
+
+	// Retry statistics
+	MaxRetriesCnt float64 `json:"m_max_retries_cnt"`
+	MaxRetriesSum float64 `json:"m_max_retries_sum"`
+
+	// First attempt count (successful first attempts)
+	FirstAttemptCnt float64 `json:"m_first_attempt_cnt"`
+	FirstAttemptSum float64 `json:"m_first_attempt_sum"`
+
+	// Application name (CRDB stat grouping dimension)
+	ApplicationName string `json:"application_name,omitempty"`
+}
+
 // CollectRequest is the top-level push payload sent to the QAN endpoint.
 type CollectRequest struct {
 	AgentID string             `json:"agent_id"`
@@ -253,6 +324,26 @@ type QANConfig struct {
 	// TopQueriesLimit is the max number of query fingerprints to track per
 	// database instance per cycle (default: 200).
 	TopQueriesLimit int `json:"top_queries_limit" yaml:"top_queries_limit"`
+
+	// Collectors enables/disables individual QAN collector types.
+	// All default to true when QAN.Enabled is true — set to false to disable
+	// specific DB types. Collectors only activate when the corresponding
+	// regular DB collector is enabled and has instances configured.
+	Collectors QANCollectorsConfig `json:"collectors" yaml:"collectors"`
+}
+
+// QANCollectorsConfig provides per-DB-type feature flags for QAN collection.
+// When a flag is false, that DB type's QAN collector is never created,
+// even if the regular collector has instances configured.
+type QANCollectorsConfig struct {
+	PostgreSQL    bool `json:"postgresql" yaml:"postgresql"`
+	MySQL         bool `json:"mysql" yaml:"mysql"`
+	MongoDB       bool `json:"mongodb" yaml:"mongodb"`
+	MSSQL         bool `json:"mssql" yaml:"mssql"`
+	CockroachDB   bool `json:"cockroachdb" yaml:"cockroachdb"`
+	TimescaleDB   bool `json:"timescaledb" yaml:"timescaledb"`
+	RDSPostgreSQL bool `json:"rds_postgresql" yaml:"rds_postgresql"`
+	Aurora        bool `json:"aurora" yaml:"aurora"`
 }
 
 // DefaultQANConfig returns QAN config with production defaults.
@@ -265,5 +356,15 @@ func DefaultQANConfig() QANConfig {
 		Timeout:          30 * time.Second,
 		MaxRetryAttempts: 3,
 		TopQueriesLimit:  200,
+		Collectors: QANCollectorsConfig{
+			PostgreSQL:    true,
+			MySQL:         true,
+			MongoDB:       true,
+			MSSQL:         true,
+			CockroachDB:   true,
+			TimescaleDB:   true,
+			RDSPostgreSQL: true,
+			Aurora:        true,
+		},
 	}
 }

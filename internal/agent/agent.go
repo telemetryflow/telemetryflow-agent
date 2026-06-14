@@ -45,6 +45,7 @@ import (
 	mysqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mysql"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
 	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
+	rdspgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rds_postgresql"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
@@ -498,12 +499,12 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	var otlpBridge *exporter.OTLPMetricBridge
 	if cfg.IsMetricsEnabled() {
 		bridgeCtx := context.Background()
-		tlsCfg := cfg.GetEffectiveTLSConfig()
+		otlpHost, otlpPath, otlpTLS := cfg.GetOTLPEndpoint("metrics")
 		bridge, err := exporter.NewOTLPMetricBridge(bridgeCtx, exporter.OTLPMetricBridgeConfig{
-			Endpoint:      cfg.GetEffectiveEndpoint(),
-			Path:          cfg.GetMetricsEndpointPath(),
-			TLSEnabled:    tlsCfg.Enabled,
-			TLSSkipVerify: tlsCfg.SkipVerify,
+			Endpoint:      otlpHost,
+			Path:          otlpPath,
+			TLSEnabled:    otlpTLS,
+			TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
 			Headers: map[string]string{
 				"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
 				"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
@@ -518,8 +519,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		} else {
 			otlpBridge = bridge
 			logger.Info("OTLP metric bridge enabled",
-				zap.String("endpoint", cfg.GetEffectiveEndpoint()),
-				zap.String("path", cfg.GetMetricsEndpointPath()),
+				zap.String("endpoint", otlpHost),
+				zap.String("path", otlpPath),
 			)
 		}
 	}
@@ -557,7 +558,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	if cfg.QAN.Enabled {
 		var qanCollectors []qan.QANCollector
 
-		if cfg.Collector.PostgreSQL.Enabled && len(cfg.Collector.PostgreSQL.Instances) > 0 {
+		if cfg.QAN.Collectors.PostgreSQL && cfg.Collector.PostgreSQL.Enabled && len(cfg.Collector.PostgreSQL.Instances) > 0 {
 			pgQAN := pgcollector.NewQANPostgreSQLCollector(pgcollector.QANConfig{
 				Instances:       cfg.Collector.PostgreSQL.Instances,
 				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
@@ -570,7 +571,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 		}
 
-		if cfg.Collector.MySQL.Enabled && len(cfg.Collector.MySQL.Instances) > 0 {
+		if cfg.QAN.Collectors.MySQL && cfg.Collector.MySQL.Enabled && len(cfg.Collector.MySQL.Instances) > 0 {
 			myQAN := mysqlcollector.NewQANMySQLCollector(mysqlcollector.QANMySQLConfig{
 				Instances:       cfg.Collector.MySQL.Instances,
 				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
@@ -583,7 +584,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 		}
 
-		if cfg.Collector.MongoDBCommunity.Enabled && len(cfg.Collector.MongoDBCommunity.Instances) > 0 {
+		if cfg.QAN.Collectors.MongoDB && cfg.Collector.MongoDBCommunity.Enabled && len(cfg.Collector.MongoDBCommunity.Instances) > 0 {
 			mongoQAN := mongodbcollector.NewQANMongoDBCollector(mongodbcollector.QANMongoDBConfig{
 				Instances:       cfg.Collector.MongoDBCommunity.Instances,
 				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
@@ -593,6 +594,58 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			qanCollectors = append(qanCollectors, mongoQAN)
 			logger.Info("QAN MongoDB collector enabled",
 				zap.Int("instances", len(cfg.Collector.MongoDBCommunity.Instances)),
+			)
+		}
+
+		if cfg.QAN.Collectors.MSSQL && cfg.Collector.MSSQL.Enabled && len(cfg.Collector.MSSQL.Instances) > 0 {
+			mssqlQAN := mssqlcollector.NewQANMSSQLCollector(mssqlcollector.QANMSSQLConfig{
+				Instances:       cfg.Collector.MSSQL.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          cfg.Collector.MSSQL.Tags,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, mssqlQAN)
+			logger.Info("QAN MSSQL collector enabled",
+				zap.Int("instances", len(cfg.Collector.MSSQL.Instances)),
+			)
+		}
+
+		if cfg.QAN.Collectors.CockroachDB && cfg.Collector.CockroachDB.Enabled && len(cfg.Collector.CockroachDB.Instances) > 0 {
+			crdbQAN := cockroachdbcollector.NewQANCockroachDBCollector(cockroachdbcollector.QANCockroachDBConfig{
+				Instances:       cfg.Collector.CockroachDB.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          cfg.Collector.CockroachDB.Tags,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, crdbQAN)
+			logger.Info("QAN CockroachDB collector enabled",
+				zap.Int("instances", len(cfg.Collector.CockroachDB.Instances)),
+			)
+		}
+
+		if cfg.QAN.Collectors.TimescaleDB && cfg.Collector.TimescaleDB.Enabled && len(cfg.Collector.TimescaleDB.Instances) > 0 {
+			tsQAN := tsdbcollector.NewQANTimescaleDBCollector(tsdbcollector.QANTimescaleDBConfig{
+				Instances:       cfg.Collector.TimescaleDB.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          cfg.Collector.TimescaleDB.Tags,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, tsQAN)
+			logger.Info("QAN TimescaleDB collector enabled",
+				zap.Int("instances", len(cfg.Collector.TimescaleDB.Instances)),
+			)
+		}
+
+		if cfg.QAN.Collectors.RDSPostgreSQL && cfg.Collector.RDSPostgreSQL.Enabled && len(cfg.Collector.RDSPostgreSQL.Instances) > 0 {
+			rdsPgQAN := rdspgcollector.NewQANRDSPostgreSQLCollector(rdspgcollector.QANRDSPostgreSQLConfig{
+				Instances:       cfg.Collector.RDSPostgreSQL.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          cfg.Collector.RDSPostgreSQL.Tags,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, rdsPgQAN)
+			logger.Info("QAN RDS PostgreSQL collector enabled",
+				zap.Int("instances", len(cfg.Collector.RDSPostgreSQL.Instances)),
 			)
 		}
 

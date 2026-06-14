@@ -11,10 +11,13 @@ graph TB
         K8S[Kubernetes<br/>Pod/Node/Deployment]
         EBPF[eBPF Collector<br/>28 kernel metrics]
         SYS[System Collector<br/>Basic host metrics]
+        QAN[QAN Collectors<br/>PG/MySQL/MongoDB]
     end
 
     subgraph "TFO-Agent Core"
         AGENT[Agent Core<br/>Lifecycle Management]
+        MFWD[MetricForwarder<br/>OTLP export loop]
+        QFWD[QANForwarder<br/>Delta-cached QAN loop]
         HB[Heartbeat<br/>Health Monitoring]
         BUF[Buffer<br/>Disk-backed Retry]
     end
@@ -27,6 +30,7 @@ graph TB
 
     subgraph "TFO Platform (Backend)"
         API[Agent API<br/>Registration & Health]
+        QANAPI[QAN Ingest<br/>/api/v2/qan/collect]
         DASH[Dashboards<br/>Metrics Visualization]
         ALERT[Alerting<br/>Rules & Notifications]
         DB[(PostgreSQL<br/>ClickHouse)]
@@ -36,16 +40,20 @@ graph TB
     K8S --> AGENT
     EBPF --> AGENT
     SYS --> AGENT
+    QAN --> QFWD
 
+    AGENT --> MFWD
     AGENT --> BUF
     AGENT --> HB
 
-    BUF -->|OTLP/gRPC| OTLP
+    MFWD -->|OTLP HTTP| OTLP
+    QFWD -->|JSON/HTTP| QANAPI
     HB -->|HTTP/REST| API
 
     OTLP --> PROC
     PROC --> EXP
     EXP --> DB
+    QANAPI --> DB
 
     DB --> DASH
     DB --> ALERT
@@ -53,19 +61,21 @@ graph TB
     style AGENT fill:#64B5F6,stroke:#1976D2,stroke-width:3px
     style OTLP fill:#FFB74D,stroke:#F57C00,stroke-width:3px
     style API fill:#81C784,stroke:#388E3C,stroke-width:3px
+    style QANAPI fill:#CE93D8,stroke:#7B1FA2,stroke-width:3px
 ```
 
 ## Integration Components
 
 ### 1. TFO-Agent Collectors
 
-| Collector         | Metrics                     | Protocol  | Target           |
-| ----------------- | --------------------------- | --------- | ---------------- |
-| **Node Exporter** | 100+ system metrics         | OTLP      | TFO-Collector    |
-| **Kubernetes**    | Pod/Node/Service/Deployment | OTLP      | TFO-Collector    |
-| **eBPF**          | 28 kernel-level metrics     | OTLP      | TFO-Collector    |
-| **System**        | Basic host metrics          | OTLP      | TFO-Collector    |
-| **Heartbeat**     | Agent health & status       | HTTP/REST | TFO Platform API |
+| Collector                  | Metrics                     | Protocol  | Target           |
+| -------------------------- | --------------------------- | --------- | ---------------- |
+| **Node Exporter**          | 100+ system metrics         | OTLP      | TFO-Collector    |
+| **Kubernetes**             | Pod/Node/Service/Deployment | OTLP      | TFO-Collector    |
+| **eBPF**                   | 28 kernel-level metrics     | OTLP      | TFO-Collector    |
+| **System**                 | Basic host metrics          | OTLP      | TFO-Collector    |
+| **QAN (PG/MySQL/MongoDB)** | Per-query analytics buckets | JSON/HTTP | TFO Platform API |
+| **Heartbeat**              | Agent health & status       | HTTP/REST | TFO Platform API |
 
 ### 2. TFO-Collector Endpoints
 
@@ -82,12 +92,13 @@ graph TB
 
 ### 3. TFO Platform Backend API
 
-| Endpoint                       | Method | Description        |
-| ------------------------------ | ------ | ------------------ |
-| `/api/v2/agents/register`      | POST   | Agent registration |
-| `/api/v2/agents/:id/heartbeat` | POST   | Agent heartbeat    |
-| `/api/v2/agents/:id/status`    | GET    | Agent status       |
-| `/api/v2/agents/:id/config`    | GET    | Remote config      |
+| Endpoint                       | Method | Description                          |
+| ------------------------------ | ------ | ------------------------------------ |
+| `/api/v2/agents/register`      | POST   | Agent registration                   |
+| `/api/v2/agents/:id/heartbeat` | POST   | Agent heartbeat                      |
+| `/api/v2/agents/:id/status`    | GET    | Agent status                         |
+| `/api/v2/agents/:id/config`    | GET    | Remote config                        |
+| `/api/v2/qan/collect`          | POST   | QAN (Query Analytics) data ingestion |
 
 ## Configuration Examples
 
@@ -184,6 +195,57 @@ exporter:
 buffer:
   enabled: true
   max_size_mb: 500
+```
+
+### OTLP Endpoint Configuration
+
+The agent supports per-signal OTLP endpoint overrides. When a full URL is provided (e.g. `http://tfo-collector:4318/v1/metrics`), the agent parses it into `host:port` + `/path` for the OTLP SDK:
+
+```yaml
+exporter:
+  otlp:
+    enabled: true
+    # Simple host:port (uses /v1/metrics default path)
+    endpoint: "tfo-collector:4318"
+
+    # Per-signal full-URL overrides (optional)
+    metrics_endpoint: "http://tfo-collector:4318/v1/metrics"
+    traces_endpoint: "http://tfo-collector:4318/v1/traces"
+    logs_endpoint: "http://tfo-collector:4318/v1/logs"
+```
+
+### QAN (Query Analytics) Configuration
+
+QAN is a separate data path from OTLP metrics. It carries high-cardinality per-query analytics directly to the platform backend's `/api/v2/qan/collect` endpoint:
+
+```yaml
+qan:
+  enabled: true
+  interval: 60s
+  # Must be reachable from the agent's network context.
+  # In Docker, use the bridge gateway IP (172.151.0.1) to reach host services.
+  # In Kubernetes, use the backend service DNS name.
+  endpoint: "http://172.151.0.1:3000" # Docker
+  # endpoint: "http://telemetryflow-platform:3000" # Kubernetes
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  batch_size: 100
+  flush_interval: 10s
+  timeout: 30s
+  max_retry_attempts: 3
+  top_queries_limit: 200
+
+# QAN collectors auto-reuse existing DB instance configs:
+collectors:
+  postgresql:
+    enabled: true
+    instances:
+      - name: "prod-pg"
+        host: "db.internal"
+        port: 5432
+        user: "monitor"
+        password: "secret"
+        dbname: "app"
 ```
 
 ### Kubernetes DaemonSet Configuration

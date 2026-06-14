@@ -20,6 +20,7 @@
 package config
 
 import (
+	"net/url"
 	"strings"
 	"time"
 
@@ -3164,6 +3165,68 @@ func (c *Config) GetMetricsEndpointPath() string {
 		return c.Exporter.OTLP.MetricsEndpoint
 	}
 	return c.getDefaultEndpointPath("metrics")
+}
+
+// GetOTLPEndpoint resolves the final OTLP host, path, and TLS setting for a signal.
+// When the per-signal endpoint override is a full URL (e.g. "http://tfo-collector:4318/v1/metrics"),
+// it parses the URL and returns host:port and path from it.
+// Otherwise, it strips the scheme/path from the base endpoint and uses the default version path.
+func (c *Config) GetOTLPEndpoint(signalType string) (host, path string, useTLS bool) {
+	override := ""
+	switch signalType {
+	case "metrics":
+		override = c.Exporter.OTLP.Metrics.Endpoint
+		if override == "" {
+			override = c.Exporter.OTLP.MetricsEndpoint
+		}
+	case "traces":
+		override = c.Exporter.OTLP.Traces.Endpoint
+		if override == "" {
+			override = c.Exporter.OTLP.TracesEndpoint
+		}
+	case "logs":
+		override = c.Exporter.OTLP.Logs.Endpoint
+		if override == "" {
+			override = c.Exporter.OTLP.LogsEndpoint
+		}
+	}
+
+	// If override is a full URL, parse it into host + path
+	if override != "" && (strings.HasPrefix(override, "http://") || strings.HasPrefix(override, "https://")) {
+		u, err := url.Parse(override)
+		if err == nil && u.Host != "" {
+			return u.Host, u.Path, u.Scheme == "https"
+		}
+	}
+
+	// Fall back to base endpoint + default path
+	base := c.GetEffectiveEndpoint()
+	useTLS = c.GetEffectiveTLSConfig().Enabled
+
+	// Strip scheme from base endpoint — OTLP SDK expects host:port only
+	if u, err := url.Parse(base); err == nil && u.Host != "" {
+		host = u.Host
+		// If the override was a bare path (not a full URL), use it
+		if override != "" {
+			path = override
+		} else {
+			path = c.getDefaultEndpointPath(signalType)
+			// If base URL had a path component, prepend it
+			if u.Path != "" && u.Path != "/" {
+				path = strings.TrimRight(u.Path, "/") + path
+			}
+		}
+		return host, path, useTLS
+	}
+
+	// Last resort: use raw values
+	host = base
+	if override != "" {
+		path = override
+	} else {
+		path = c.getDefaultEndpointPath(signalType)
+	}
+	return host, path, useTLS
 }
 
 // GetTracesEndpointPath returns the traces endpoint path based on version

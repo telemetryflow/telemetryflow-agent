@@ -545,9 +545,11 @@ exporter:
 
     # Override individual path suffixes (defaults derived from endpoint_version above).
     # Uncomment to customise — these are appended to telemetryflow.endpoint.
-    # metrics_endpoint: /v2/metrics
-    # traces_endpoint: /v2/traces
-    # logs_endpoint: /v2/logs
+    # When set to a full URL (e.g. http://tfo-collector:4318/v1/metrics),
+    # the agent parses it into host:port + /path for the OTLP SDK.
+    # metrics_endpoint: http://tfo-collector:4318/v2/metrics
+    # traces_endpoint: http://tfo-collector:4318/v2/traces
+    # logs_endpoint: http://tfo-collector:4318/v2/logs
 
     # ==========================================================================
     # Per-Signal Configuration
@@ -570,6 +572,63 @@ exporter:
     logs:
       enabled: true
       # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/logs)
+
+# =============================================================================
+# QAN (Query Analytics)
+# =============================================================================
+# Separate data path from OTLP metrics. Collects per-query analytics from
+# pg_stat_statements (PostgreSQL), performance_schema (MySQL), and
+# system.profile (MongoDB). Agent computes deltas and pushes JSON buckets
+# directly to the platform backend's /api/v2/qan/collect endpoint.
+#
+# QAN collectors auto-reuse the DB instances configured under collectors.*
+# below — no separate instance list needed. Only collectors with instances
+# configured will have QAN data.
+#
+# Disabled by default for zero overhead when not in use.
+#
+# When enabled, the agent creates:
+#   - QANPostgreSQLCollector for each postgresql.instances entry
+#   - QANMySQLCollector for each mysql.instances entry
+#   - QANMongoDBCollector for each mongodb_community.instances entry
+# Each collector maintains a delta cache (skips first cycle), computes
+# per-query stats {cnt, sum, min, max, p99}, and returns QANMetricsBucket[]
+# to the QANForwarder which pushes them via the QANExporter.
+qan:
+  enabled: false
+  # How often to collect QAN data from DB instances (default: 60s)
+  interval: 60s
+  # TFO Platform QAN API base URL (agent appends /api/v2/qan/collect)
+  # Must be reachable from the agent's network context:
+  #   Docker Compose: http://172.151.0.1:3000 (bridge gateway)
+  #   Kubernetes:     http://tfo-backend:3000 (in-cluster service DNS)
+  #   External:       https://api.telemetryflow.id
+  endpoint: "http://localhost:3000"
+  # API key credentials (reuse telemetryflow.api_key_id/secret)
+  api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
+  api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  # Maximum buckets per HTTP push (default: 100)
+  batch_size: 100
+  # Buffer flush interval (default: 10s)
+  flush_interval: 10s
+  # HTTP push timeout (default: 30s)
+  timeout: 30s
+  # Retry attempts on push failure with exponential backoff (default: 3)
+  max_retry_attempts: 3
+  # Maximum query fingerprints to track per DB instance per cycle (default: 200)
+  top_queries_limit: 200
+  # Per-DB-type feature flags — set any to false to disable that DB type's
+  # QAN collector. Only active when the corresponding regular DB collector
+  # is enabled and has instances configured. All default to true.
+  collectors:
+    postgresql: true
+    mysql: true
+    mongodb: true
+    mssql: true
+    cockroachdb: true
+    timescaledb: true
+    rds_postgresql: true
+    aurora: true
 
 # =============================================================================
 # Buffer - Offline/Retry Storage

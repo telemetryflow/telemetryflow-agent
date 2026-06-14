@@ -47,6 +47,7 @@ type QANExporter struct {
 	mu     sync.Mutex
 	buffer []QANMetricsBucket
 
+	stopMu    sync.Mutex
 	flushStop chan struct{}
 	flushWg   sync.WaitGroup
 }
@@ -81,7 +82,15 @@ func NewQANExporter(cfg QANConfig, agentID string, logger *zap.Logger) *QANExpor
 
 // Start begins the periodic flush goroutine.
 func (e *QANExporter) Start(ctx context.Context) error {
-	e.flushStop = make(chan struct{})
+	e.stopMu.Lock()
+	if e.flushStop != nil {
+		e.stopMu.Unlock()
+		return fmt.Errorf("qan exporter already started")
+	}
+	stopCh := make(chan struct{})
+	e.flushStop = stopCh
+	e.stopMu.Unlock()
+
 	e.flushWg.Add(1)
 	go func() {
 		defer e.flushWg.Done()
@@ -92,7 +101,7 @@ func (e *QANExporter) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				_ = e.Flush(context.Background())
 				return
-			case <-e.flushStop:
+			case <-stopCh:
 				_ = e.Flush(context.Background())
 				return
 			case <-ticker.C:
@@ -110,10 +119,14 @@ func (e *QANExporter) Start(ctx context.Context) error {
 
 // Stop flushes remaining buffers and stops the flush goroutine.
 func (e *QANExporter) Stop() error {
-	if e.flushStop != nil {
-		close(e.flushStop)
+	e.stopMu.Lock()
+	stopCh := e.flushStop
+	e.flushStop = nil
+	e.stopMu.Unlock()
+
+	if stopCh != nil {
+		close(stopCh)
 		e.flushWg.Wait()
-		e.flushStop = nil
 	}
 	return nil
 }
