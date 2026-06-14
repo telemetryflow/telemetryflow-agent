@@ -256,6 +256,29 @@ exporter:
 # "Collected metrics" with count > 0
 ```
 
+**OTLP export errors — "unknown aggregation":**
+
+If you see repeated warnings like:
+
+```json
+{
+  "level": "warn",
+  "msg": "OTLP export failed",
+  "error": "...unknown aggregation: *metricdata.Gauge[float64]"
+}
+```
+
+this means every metric is being dropped during OTLP serialization. The root cause is a Go type mismatch: `buildAggregation()` in `internal/exporter/otlp_metric_bridge.go` must return **value** types (`metricdata.Gauge[float64]`, `metricdata.Sum[float64]`), not pointer types (`*metricdata.Gauge[float64]`). The OTel SDK v1.43.0 OTLP transform pipeline type-switches on value types — Go type switches do not match `*T` against `T`.
+
+Verify the fix is applied:
+
+```bash
+# Check that the bridge returns value types
+grep 'return metricdata\.' internal/exporter/otlp_metric_bridge.go
+# Should show: return metricdata.Gauge[float64]{...} and metricdata.Sum[float64]{...}
+# NOT: return &metricdata.Gauge[float64]{...}
+```
+
 ---
 
 ### 5. High Memory Usage

@@ -405,26 +405,45 @@ stateDiagram-v2
     }
 ```
 
-## OTLP Export Protocols
+## OTLP Export Pipeline
 
 ```mermaid
 graph TB
-    subgraph "Protocol Selection"
-        CFG[Config: protocol]
-
-        CFG -->|grpc| GRPC[gRPC Exporter]
-        CFG -->|http| HTTP[HTTP Exporter]
-
-        GRPC --> GRPC_OPTS[Options:<br/>- TLS config<br/>- Compression: gzip<br/>- Headers]
-        HTTP --> HTTP_OPTS[Options:<br/>- TLS config<br/>- Compression: gzip<br/>- Headers]
-
-        GRPC_OPTS --> METER[Meter Provider]
-        HTTP_OPTS --> METER
-
-        METER --> PERIODIC[Periodic Reader<br/>interval: 10s]
-        PERIODIC --> EXPORT[Export Metrics]
+    subgraph "Collectors"
+        SYS[System Collector]
+        DB[DB Collectors]
+        INFRA[Infrastructure Collectors]
     end
+
+    subgraph "Forwarding Layer"
+        FWD[MetricForwarder<br/>periodic Collect loop]
+        BRIDGE[OTLPMetricBridge<br/>collector.Metric -> OTLP]
+        PROM[MetricsBridge<br/>collector.Metric -> Prometheus]
+    end
+
+    subgraph "Export"
+        OTLP_HTTP[OTLP HTTP Exporter<br/>otlpmetrichttp v1.43.0]
+        PROM_SVR[Prometheus Server<br/>:8888 /metrics]
+    end
+
+    SYS --> FWD
+    DB --> FWD
+    INFRA --> FWD
+
+    FWD -->|collector.Metric slice| BRIDGE
+    FWD -->|collector.Metric slice| PROM
+
+    BRIDGE -->|ResourceMetrics<br/>value-type Gauge/Sum| OTLP_HTTP
+    PROM --> PROM_SVR
+
+    OTLP_HTTP -->|HTTP POST| COLLECTOR[TFO-Collector<br/>:4318/v1/metrics]
 ```
+
+**Key design decisions:**
+
+- `MetricForwarder` is the sole collection driver — collectors' `Start()` only manages lifecycle (subprocesses, connections), `Collect()` is called by the forwarder loop.
+- `OTLPMetricBridge.Export()` converts `[]collector.Metric` into `metricdata.ResourceMetrics` using **value-type** aggregations (`metricdata.Gauge[float64]`, not pointers). The OTel SDK v1.43.0 transform pipeline type-switches on value types — pointer types are silently rejected as "unknown aggregation".
+- Counter metrics use `CumulativeTemporality` (collectors report totals since process start, not per-interval deltas).
 
 ## Deployment Architecture
 
@@ -517,12 +536,12 @@ graph LR
     end
 
     subgraph "OpenTelemetry"
-        OTEL[OTel SDK<br/>v1.40.0]
+        OTEL[OTel SDK<br/>v1.43.0]
         PROTO[OTLP Proto<br/>v1.9.0]
     end
 
     subgraph "Runtime"
-        GO[Go 1.25+]
+        GO[Go 1.26+]
         GRPC[gRPC v1.77.0]
     end
 

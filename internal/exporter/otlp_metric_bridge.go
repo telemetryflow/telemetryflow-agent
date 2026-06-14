@@ -198,7 +198,7 @@ func groupMetricsByName(metrics []collector.Metric) map[string][]metricPoint {
 // the metric type of the first point. All points in a group share the same type.
 func buildAggregation(points []metricPoint) metricdata.Aggregation {
 	if len(points) == 0 {
-		return &metricdata.Gauge[float64]{}
+		return metricdata.Gauge[float64]{}
 	}
 
 	switch points[0].m.Type {
@@ -212,9 +212,9 @@ func buildAggregation(points []metricPoint) metricdata.Aggregation {
 				Value:      p.m.Value,
 			}
 		}
-		return &metricdata.Sum[float64]{
+		return metricdata.Sum[float64]{
 			DataPoints:  dataPoints,
-			Temporality: metricdata.DeltaTemporality,
+			Temporality: metricdata.CumulativeTemporality,
 			IsMonotonic: true,
 		}
 	default: // gauge, histogram, summary all fall through to gauge
@@ -226,7 +226,7 @@ func buildAggregation(points []metricPoint) metricdata.Aggregation {
 				Value:      p.m.Value,
 			}
 		}
-		return &metricdata.Gauge[float64]{DataPoints: dataPoints}
+		return metricdata.Gauge[float64]{DataPoints: dataPoints}
 	}
 }
 

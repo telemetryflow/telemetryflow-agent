@@ -89,7 +89,7 @@ func TestBuildAggregationGauge(t *testing.T) {
 	}
 
 	agg := exporter.BuildAggregationExported(points)
-	gauge, ok := agg.(*metricdata.Gauge[float64])
+	gauge, ok := agg.(metricdata.Gauge[float64])
 	if !ok {
 		t.Fatalf("expected Gauge, got %T", agg)
 	}
@@ -114,15 +114,15 @@ func TestBuildAggregationCounter(t *testing.T) {
 	}
 
 	agg := exporter.BuildAggregationExported(points)
-	sum, ok := agg.(*metricdata.Sum[float64])
+	sum, ok := agg.(metricdata.Sum[float64])
 	if !ok {
 		t.Fatalf("expected Sum, got %T", agg)
 	}
 	if !sum.IsMonotonic {
 		t.Error("expected monotonic sum")
 	}
-	if sum.Temporality != metricdata.DeltaTemporality {
-		t.Errorf("expected delta temporality, got %v", sum.Temporality)
+	if sum.Temporality != metricdata.CumulativeTemporality {
+		t.Errorf("expected cumulative temporality, got %v", sum.Temporality)
 	}
 	if len(sum.DataPoints) != 1 {
 		t.Fatalf("expected 1 data point, got %d", len(sum.DataPoints))
@@ -134,7 +134,7 @@ func TestBuildAggregationCounter(t *testing.T) {
 
 func TestBuildAggregationEmpty(t *testing.T) {
 	agg := exporter.BuildAggregationExported(nil)
-	if _, ok := agg.(*metricdata.Gauge[float64]); !ok {
+	if _, ok := agg.(metricdata.Gauge[float64]); !ok {
 		t.Errorf("expected Gauge for empty input, got %T", agg)
 	}
 }
