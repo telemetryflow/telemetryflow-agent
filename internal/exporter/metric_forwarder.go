@@ -188,8 +188,10 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 			allMetrics = append(allMetrics, metrics...)
 		}
 	}
-
 	if len(allMetrics) == 0 {
+		f.logger.Debug("no metrics collected in this cycle",
+			zap.Int("collectors_running", f.runningCollectorCount()),
+		)
 		return
 	}
 
@@ -207,9 +209,21 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 		} else {
 			f.totalExport.Add(1)
 			f.totalMetric.Add(int64(len(allMetrics)))
-			f.logger.Debug("metrics forwarded",
+			f.logger.Info("metrics forwarded",
 				zap.Int("metrics", len(allMetrics)),
+				zap.Int64("total_exports", f.totalExport.Load()),
+				zap.Int64("total_metrics", f.totalMetric.Load()),
 			)
 		}
 	}
+}
+
+func (f *MetricForwarder) runningCollectorCount() int {
+	count := 0
+	for _, c := range f.collectors {
+		if c.IsRunning() {
+			count++
+		}
+	}
+	return count
 }
