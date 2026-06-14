@@ -68,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CVE-2026-7598 (HIGH)**: libssh2 integer overflow via large username/password — patched via `dist-upgrade` in Dockerfile
 - **CVE-2026-42010 (CRITICAL)**: GnuTLS authentication bypass via NUL character in username — patched via `dist-upgrade`
 - **CVE-2026-33845 (CRITICAL)**: GnuTLS DoS via DTLS zero-length fragment — patched via `dist-upgrade`
+- **CVE-2026-11822 (HIGH)**: SQLite memory corruption before 3.53.2 in `libsqlite3-0` (transitive dependency via `liblastlog2-2`). Agent builds with `CGO_ENABLED=0` and has no SQLite Go driver — library is never called. Best-effort purge attempted in Dockerfile; CVE suppressed in `.trivyignore`.
+- **CVE-2026-11824 (HIGH)**: SQLite heap-based buffer overflow before 3.53.2 in `libsqlite3-0` (same transitive dependency). Same justification as CVE-2026-11822.
 - **CVE-2026-5435 (MEDIUM)**: glibc out-of-bounds write via TSIG record — patched via `dist-upgrade`
 - **CVE-2026-6238 (MEDIUM)**: glibc crash via crafted DNS response — patched via `dist-upgrade`
 - **CVE-2026-6276 (HIGH)**: curl/libcurl cookie leak with custom Host header — patched via `dist-upgrade`
