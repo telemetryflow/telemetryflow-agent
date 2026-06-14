@@ -126,6 +126,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && 
               /usr/share/perl5/Compress/Raw* \
               /usr/share/perl5/HTTP/Tiny* \
               /usr/share/perl/5.*/HTTP/Tiny* \
+    && DEBIAN_FRONTEND=noninteractive apt-get purge -y libsqlite3-0 2>/dev/null || true \
     && apt-get autoremove -y --purge \
     && rm -rf /var/lib/apt/lists/*
 

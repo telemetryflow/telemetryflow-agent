@@ -103,3 +103,15 @@ CVE-2026-42250
 # liblzma5: Transitive dependency. CVE-2026-34743 — not used at runtime.
 # =============================================================================
 CVE-2026-34743
+
+# =============================================================================
+# libsqlite3-0: Transitive dependency (version 3.46.1-7+deb13u1). TFO Agent
+# builds with CGO_ENABLED=0 and has no SQLite Go driver in go.mod — the agent
+# never calls into libsqlite3. Purged from the image where possible; if dpkg
+# prevents removal (another package depends on it), these CVEs are inert.
+# CVE-2026-11822: memory corruption in SQLite before 3.53.2 (GHSA alert #227).
+# CVE-2026-11824: heap-based buffer overflow in SQLite before 3.53.2 (GHSA #228).
+# No fixed version available in Debian trixie at time of writing.
+# =============================================================================
+CVE-2026-11822
+CVE-2026-11824
