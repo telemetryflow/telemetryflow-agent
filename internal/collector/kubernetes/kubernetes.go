@@ -124,25 +124,11 @@ func (k *KubernetesCollector) Start(ctx context.Context) error {
 		zap.String("provider", k.cfg.ClusterProvider),
 	)
 
-	ticker := time.NewTicker(k.cfg.Interval)
-	defer ticker.Stop()
-
-	// Collect once immediately at startup
-	if _, err := k.Collect(ctx); err != nil {
-		k.logger.Warn("Initial collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return k.Stop()
-		case <-k.stopChan:
-			return nil
-		case <-ticker.C:
-			if _, err := k.Collect(ctx); err != nil {
-				k.logger.Warn("Collection cycle failed", zap.Error(err))
-			}
-		}
+	select {
+	case <-k.stopChan:
+		return nil
+	case <-ctx.Done():
+		return k.Stop()
 	}
 }
 

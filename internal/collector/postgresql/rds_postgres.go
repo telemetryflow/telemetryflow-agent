@@ -143,48 +143,13 @@ func (c *RDSPostgreSQLCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("RDS PostgreSQL collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("activity_interval", c.cfg.ActivityInterval),
-		zap.Duration("query_interval", c.cfg.QueryInterval),
-		zap.Duration("table_stats_interval", c.cfg.TableStatsInterval),
 	)
 
-	activityTicker := time.NewTicker(c.cfg.ActivityInterval)
-	queryTicker := time.NewTicker(c.cfg.QueryInterval)
-	tableTicker := time.NewTicker(c.cfg.TableStatsInterval)
-	defer activityTicker.Stop()
-	defer queryTicker.Stop()
-	defer tableTicker.Stop()
-
-	// Initial collection
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial activity collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-activityTicker.C:
-			if metrics, err := c.collectAllActivity(ctx); err != nil {
-				c.logger.Warn("Activity collection failed", zap.Error(err))
-			} else {
-				c.submitMetrics(ctx, metrics)
-			}
-		case <-queryTicker.C:
-			if metrics, err := c.collectAllQueryAnalytics(ctx); err != nil {
-				c.logger.Warn("Query analytics collection failed", zap.Error(err))
-			} else {
-				c.submitMetrics(ctx, metrics)
-			}
-		case <-tableTicker.C:
-			if metrics, err := c.collectAllTableStats(ctx); err != nil {
-				c.logger.Warn("Table stats collection failed", zap.Error(err))
-			} else {
-				c.submitMetrics(ctx, metrics)
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -245,6 +210,19 @@ func (c *RDSPostgreSQLCollector) Collect(ctx context.Context) ([]collector.Metri
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if qm, err := c.collectAllQueryAnalytics(ctx); err != nil {
+		c.logger.Warn("Query analytics collection failed", zap.Error(err))
+	} else {
+		all = append(all, qm...)
+	}
+
+	if tm, err := c.collectAllTableStats(ctx); err != nil {
+		c.logger.Warn("Table stats collection failed", zap.Error(err))
+	} else {
+		all = append(all, tm...)
+	}
+
 	return all, nil
 }
 
@@ -489,22 +467,6 @@ func (c *RDSPostgreSQLCollector) collectActivity(ctx context.Context, inst *rdsP
 	return all, nil
 }
 
-func (c *RDSPostgreSQLCollector) collectAllActivity(ctx context.Context) ([]collector.Metric, error) {
-	var all []collector.Metric
-	for _, inst := range c.instances {
-		metrics, err := c.collectActivity(ctx, inst)
-		if err != nil {
-			c.logger.Warn("Activity collection failed",
-				zap.String("instance", inst.config.Name),
-				zap.Error(err),
-			)
-			continue
-		}
-		all = append(all, metrics...)
-	}
-	return all, nil
-}
-
 // ---------------------------------------------------------------------------
 // Query Analytics Collection (60s interval)
 // pg_stat_statements
@@ -565,49 +527,6 @@ func (c *RDSPostgreSQLCollector) collectAllTableStats(ctx context.Context) ([]co
 		all = append(all, metrics...)
 	}
 	return all, nil
-}
-
-// ---------------------------------------------------------------------------
-// Metric Submission
-// ---------------------------------------------------------------------------
-
-// submitMetrics sends collected metrics to the platform via the reporter.
-func (c *RDSPostgreSQLCollector) submitMetrics(ctx context.Context, metrics []collector.Metric) {
-	if len(metrics) == 0 {
-		return
-	}
-
-	// Group metrics by instance for per-instance submission
-	for _, inst := range c.instances {
-		var instanceMetrics []collector.Metric
-		for _, m := range metrics {
-			if m.Labels["rds_instance_id"] == inst.config.InstanceID {
-				instanceMetrics = append(instanceMetrics, m)
-			}
-		}
-		if len(instanceMetrics) == 0 {
-			continue
-		}
-
-		payload := &AgentMetricsPayload{
-			InstanceID: inst.config.InstanceID,
-			Region:     inst.config.Region,
-			Timestamp:  time.Now().UTC().Unix(),
-			Metrics:    convertMetrics(instanceMetrics),
-		}
-
-		if err := inst.reporter.Submit(ctx, payload); err != nil {
-			c.logger.Warn("Failed to submit metrics to platform",
-				zap.String("instance", inst.config.InstanceID),
-				zap.Error(err),
-			)
-		} else {
-			c.logger.Debug("Submitted metrics to platform",
-				zap.String("instance", inst.config.InstanceID),
-				zap.Int("metric_count", len(instanceMetrics)),
-			)
-		}
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1078,21 +997,6 @@ func rdsToPgInstance(inst *rdsPgInstance) *pgInstance {
 		prevTimestamp:   inst.prevTimestamp,
 		topQueriesLimit: inst.topQueriesLimit,
 	}
-}
-
-// convertMetrics converts collector.Metric slice to MetricEntry slice for the payload.
-func convertMetrics(metrics []collector.Metric) []MetricEntry {
-	entries := make([]MetricEntry, 0, len(metrics))
-	for _, m := range metrics {
-		entries = append(entries, MetricEntry{
-			Name:   m.Name,
-			Type:   string(m.Type),
-			Value:  m.Value,
-			Labels: m.Labels,
-			Unit:   m.Unit,
-		})
-	}
-	return entries
 }
 
 // AgentMetricsPayload represents the payload submitted to the TFO Platform

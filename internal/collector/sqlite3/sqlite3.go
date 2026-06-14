@@ -67,59 +67,13 @@ func (c *SQLite3Collector) Start(ctx context.Context) error {
 
 	c.logger.Info("SQLite3 collector starting",
 		zap.Int("databases", len(c.cfg.Databases)),
-		zap.Duration("collection_interval", c.cfg.CollectionInterval),
-		zap.Duration("table_stats_interval", c.cfg.TableStatsInterval),
-		zap.Duration("process_interval", c.cfg.ProcessInterval),
 	)
 
-	collectTicker := time.NewTicker(c.cfg.CollectionInterval)
-	tableTicker := time.NewTicker(c.cfg.TableStatsInterval)
-	processTicker := time.NewTicker(c.cfg.ProcessInterval)
-	defer collectTicker.Stop()
-	defer tableTicker.Stop()
-	defer processTicker.Stop()
-
-	var integrityTicker *time.Ticker
-	var integrityCh <-chan time.Time
-	if c.cfg.IntegrityInterval > 0 {
-		integrityTicker = time.NewTicker(c.cfg.IntegrityInterval)
-		integrityCh = integrityTicker.C
-		defer integrityTicker.Stop()
-	}
-
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-collectTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Collection failed", zap.Error(err))
-			}
-		case <-tableTicker.C:
-			if metrics, err := c.collectAllTableStats(ctx); err != nil {
-				c.logger.Warn("Table stats collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Table stats collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-processTicker.C:
-			if metrics, err := c.collectAllProcesses(ctx); err != nil {
-				c.logger.Warn("Process collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Process stats collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-integrityCh:
-			if metrics, err := c.collectAllIntegrity(ctx); err != nil {
-				c.logger.Warn("Integrity check failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Integrity checks completed", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -178,6 +132,27 @@ func (c *SQLite3Collector) Collect(ctx context.Context) ([]collector.Metric, err
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if ts, err := c.collectAllTableStats(ctx); err != nil {
+		c.logger.Warn("Table stats collection failed", zap.Error(err))
+	} else {
+		all = append(all, ts...)
+	}
+
+	if ps, err := c.collectAllProcesses(ctx); err != nil {
+		c.logger.Warn("Process collection failed", zap.Error(err))
+	} else {
+		all = append(all, ps...)
+	}
+
+	if c.cfg.IntegrityInterval > 0 {
+		if im, err := c.collectAllIntegrity(ctx); err != nil {
+			c.logger.Warn("Integrity check failed", zap.Error(err))
+		} else {
+			all = append(all, im...)
+		}
+	}
+
 	return all, nil
 }
 

@@ -51,6 +51,7 @@ import (
 	tsdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/timescaledb"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
+	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
 	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 	k8s "k8s.io/client-go/kubernetes"
@@ -71,6 +72,10 @@ type Agent struct {
 	collectorManager *collector.Manager
 	prometheusServer *exporter.PrometheusServer
 	agentAPIServer   *agentapi.Server
+	otlpBridge       *exporter.OTLPMetricBridge
+	metricForwarder  *exporter.MetricForwarder
+	qanForwarder     *qan.QANForwarder
+	qanExporter      *qan.QANExporter
 
 	// State
 	mu         sync.RWMutex
@@ -487,6 +492,128 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		)
 	}
 
+	// Create OTLP metric bridge if metrics export is enabled.
+	// This is the export pipeline that forwards collected metrics to the
+	// TelemetryFlow Platform backend via OTLP HTTP.
+	var otlpBridge *exporter.OTLPMetricBridge
+	if cfg.IsMetricsEnabled() {
+		bridgeCtx := context.Background()
+		tlsCfg := cfg.GetEffectiveTLSConfig()
+		bridge, err := exporter.NewOTLPMetricBridge(bridgeCtx, exporter.OTLPMetricBridgeConfig{
+			Endpoint:      cfg.GetEffectiveEndpoint(),
+			Path:          cfg.GetMetricsEndpointPath(),
+			TLSEnabled:    tlsCfg.Enabled,
+			TLSSkipVerify: tlsCfg.SkipVerify,
+			Headers: map[string]string{
+				"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
+				"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
+				"X-TelemetryFlow-Agent-ID":   agentID,
+			},
+			Logger: logger,
+		})
+		if err != nil {
+			logger.Warn("Failed to create OTLP metric bridge, metrics will not be exported",
+				zap.Error(err),
+			)
+		} else {
+			otlpBridge = bridge
+			logger.Info("OTLP metric bridge enabled",
+				zap.String("endpoint", cfg.GetEffectiveEndpoint()),
+				zap.String("path", cfg.GetMetricsEndpointPath()),
+			)
+		}
+	}
+
+	// Create metric forwarder — bridges collectors to export sinks.
+	// Without this, collectors collect metrics but never export them.
+	var forwarder *exporter.MetricForwarder
+	if len(collectors) > 0 {
+		fwdInterval := cfg.Collector.System.Interval
+		if fwdInterval == 0 {
+			fwdInterval = 30 * time.Second
+		}
+		fwdCfg := exporter.MetricForwarderConfig{
+			Collectors: collectors,
+			Interval:   fwdInterval,
+			Logger:     logger,
+		}
+		if otlpBridge != nil {
+			fwdCfg.OTLPSink = otlpBridge
+		}
+		if promServer != nil {
+			fwdCfg.PromSink = promServer
+		}
+		forwarder = exporter.NewMetricForwarder(fwdCfg)
+		logger.Info("Metric forwarder enabled",
+			zap.Int("collectors", len(collectors)),
+			zap.Duration("interval", fwdInterval),
+		)
+	}
+
+	// Create QAN data path (separate from OTLP metrics).
+	// Only active when cfg.QAN.Enabled is true — zero overhead when disabled.
+	var qanFwd *qan.QANForwarder
+	var qanExp *qan.QANExporter
+	if cfg.QAN.Enabled {
+		var qanCollectors []qan.QANCollector
+
+		if cfg.Collector.PostgreSQL.Enabled && len(cfg.Collector.PostgreSQL.Instances) > 0 {
+			pgQAN := pgcollector.NewQANPostgreSQLCollector(pgcollector.QANConfig{
+				Instances:       cfg.Collector.PostgreSQL.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          cfg.Collector.PostgreSQL.Tags,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, pgQAN)
+			logger.Info("QAN PostgreSQL collector enabled",
+				zap.Int("instances", len(cfg.Collector.PostgreSQL.Instances)),
+			)
+		}
+
+		if cfg.Collector.MySQL.Enabled && len(cfg.Collector.MySQL.Instances) > 0 {
+			myQAN := mysqlcollector.NewQANMySQLCollector(mysqlcollector.QANMySQLConfig{
+				Instances:       cfg.Collector.MySQL.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          nil,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, myQAN)
+			logger.Info("QAN MySQL collector enabled",
+				zap.Int("instances", len(cfg.Collector.MySQL.Instances)),
+			)
+		}
+
+		if cfg.Collector.MongoDBCommunity.Enabled && len(cfg.Collector.MongoDBCommunity.Instances) > 0 {
+			mongoQAN := mongodbcollector.NewQANMongoDBCollector(mongodbcollector.QANMongoDBConfig{
+				Instances:       cfg.Collector.MongoDBCommunity.Instances,
+				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
+				Labels:          cfg.Collector.MongoDBCommunity.Tags,
+				Logger:          logger,
+			}, logger)
+			qanCollectors = append(qanCollectors, mongoQAN)
+			logger.Info("QAN MongoDB collector enabled",
+				zap.Int("instances", len(cfg.Collector.MongoDBCommunity.Instances)),
+			)
+		}
+
+		if len(qanCollectors) > 0 {
+			qanExp = qan.NewQANExporter(cfg.QAN, agentID, logger)
+
+			qanFwd = qan.NewQANForwarder(qan.QANForwarderConfig{
+				Collectors: qanCollectors,
+				Sink:       qanExp,
+				Interval:   cfg.QAN.Interval,
+				Logger:     logger,
+			})
+			logger.Info("QAN forwarder enabled",
+				zap.Int("collectors", len(qanCollectors)),
+				zap.Duration("interval", cfg.QAN.Interval),
+			)
+		} else {
+			logger.Warn("QAN enabled but no DB collectors with instances found — QAN path inactive")
+		}
+	}
+
 	// Create Agent API server if enabled (for real-time K8s queries like pod log streaming)
 	var apiServer *agentapi.Server
 	if cfg.AgentAPI.Enabled {
@@ -527,6 +654,10 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		collectorManager: newCollectorManager(cfg, collectors, logger),
 		prometheusServer: promServer,
 		agentAPIServer:   apiServer,
+		otlpBridge:       otlpBridge,
+		metricForwarder:  forwarder,
+		qanForwarder:     qanFwd,
+		qanExporter:      qanExp,
 		configFile:       configFile,
 	}
 
@@ -674,6 +805,25 @@ func (a *Agent) Run(ctx context.Context) error {
 		}()
 	}
 
+	// Start metric forwarder (bridges collectors → OTLP + Prometheus)
+	if a.metricForwarder != nil {
+		if err := a.metricForwarder.Start(ctx); err != nil && err != context.Canceled {
+			errChan <- fmt.Errorf("metric forwarder error: %w", err)
+		}
+	}
+
+	// Start QAN exporter and forwarder (separate data path from OTLP)
+	if a.qanExporter != nil {
+		if err := a.qanExporter.Start(ctx); err != nil && err != context.Canceled {
+			errChan <- fmt.Errorf("qan exporter error: %w", err)
+		}
+	}
+	if a.qanForwarder != nil {
+		if err := a.qanForwarder.Start(ctx); err != nil && err != context.Canceled {
+			errChan <- fmt.Errorf("qan forwarder error: %w", err)
+		}
+	}
+
 	// Start collectors
 	if a.collectorManager != nil {
 		if err := a.collectorManager.Start(ctx); err != nil {
@@ -785,6 +935,46 @@ func (a *Agent) shutdown() error {
 				}
 			}()
 		}
+	}
+
+	// Stop metric forwarder
+	if a.metricForwarder != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = a.metricForwarder.Stop()
+		}()
+	}
+
+	// Stop QAN forwarder and exporter
+	if a.qanForwarder != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = a.qanForwarder.Stop()
+		}()
+	}
+	if a.qanExporter != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = a.qanExporter.Stop()
+		}()
+	}
+
+	// Shutdown OTLP metric bridge
+	if a.otlpBridge != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := a.otlpBridge.Shutdown(shutdownCtx); err != nil {
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("otlp bridge shutdown: %w", err))
+				errMu.Unlock()
+			}
+		}()
 	}
 
 	// Wait with timeout

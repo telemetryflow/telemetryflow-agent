@@ -22,6 +22,8 @@ package config
 import (
 	"strings"
 	"time"
+
+	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
 )
 
 // Config represents the complete agent configuration
@@ -48,6 +50,10 @@ type Config struct {
 	// Supervisor enables the PMM-inspired CollectorManager (FSM, diff-based reload, backoff).
 	// When disabled (default), the agent uses the legacy static collector init path with zero overhead.
 	Supervisor SupervisorConfig `mapstructure:"supervisor"`
+
+	// QAN enables the PMM-inspired Query Analytics data path (separate from OTLP metrics).
+	// When disabled (default), QAN collectors and forwarder have zero overhead.
+	QAN qan.QANConfig `mapstructure:"qan"`
 
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
@@ -2829,6 +2835,7 @@ func DefaultConfig() *Config {
 				RestartOnConfigChange: true,
 			},
 		},
+		QAN: qan.DefaultQANConfig(),
 		Integrations: IntegrationsConfig{
 			// All integrations disabled by default
 			// Enable specific integrations as needed

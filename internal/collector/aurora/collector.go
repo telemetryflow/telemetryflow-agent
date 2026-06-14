@@ -97,10 +97,6 @@ type AuroraCollector struct {
 	stopChan chan struct{}
 
 	states []*clusterState
-
-	// Metric ring buffer for push batching
-	bufferMu sync.Mutex
-	buffer   []collector.Metric
 }
 
 // NewAuroraCollector creates a new AuroraCollector.
@@ -120,7 +116,6 @@ func NewAuroraCollector(cfg config.AuroraCollectorConfig, logger *zap.Logger) *A
 		cfg:    c,
 		logger: logger.Named(collectorName),
 		states: states,
-		buffer: make([]collector.Metric, 0, c.PushBatchSize),
 	}
 }
 
@@ -155,12 +150,9 @@ func (c *AuroraCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("Aurora collector starting",
 		zap.Int("clusters", len(c.cfg.Clusters)),
-		zap.Duration("collection_interval", c.cfg.CollectionInterval),
 		zap.Duration("topology_interval", c.cfg.TopologyInterval),
-		zap.Duration("pi_interval", c.cfg.PIInterval),
 	)
 
-	// Initialize AWS clients for each cluster
 	for _, state := range c.states {
 		if err := c.initAWSClients(ctx, state); err != nil {
 			c.logger.Warn("Failed to initialize AWS clients for cluster",
@@ -171,7 +163,6 @@ func (c *AuroraCollector) Start(ctx context.Context) error {
 		}
 	}
 
-	// Initial topology discovery
 	for _, state := range c.states {
 		if state.rdsClient != nil {
 			if _, err := c.discoverTopology(ctx, state); err != nil {
@@ -183,19 +174,8 @@ func (c *AuroraCollector) Start(ctx context.Context) error {
 		}
 	}
 
-	metricsTicker := time.NewTicker(c.cfg.CollectionInterval)
 	topologyTicker := time.NewTicker(c.cfg.TopologyInterval)
-	piTicker := time.NewTicker(c.cfg.PIInterval)
-	pushTicker := time.NewTicker(c.cfg.PushFlushInterval)
-	defer metricsTicker.Stop()
 	defer topologyTicker.Stop()
-	defer piTicker.Stop()
-	defer pushTicker.Stop()
-
-	// Initial collection at startup
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial metrics collection failed", zap.Error(err))
-	}
 
 	for {
 		select {
@@ -203,12 +183,6 @@ func (c *AuroraCollector) Start(ctx context.Context) error {
 			return c.Stop()
 		case <-c.stopChan:
 			return nil
-		case <-metricsTicker.C:
-			if metrics, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Metrics collection failed", zap.Error(err))
-			} else {
-				c.bufferMetrics(metrics)
-			}
 		case <-topologyTicker.C:
 			for _, state := range c.states {
 				if state.rdsClient == nil {
@@ -224,18 +198,6 @@ func (c *AuroraCollector) Start(ctx context.Context) error {
 						zap.String("cluster", state.cfg.ClusterID),
 					)
 				}
-			}
-		case <-piTicker.C:
-			if c.cfg.EnablePI {
-				if metrics, err := c.collectAllPI(ctx); err != nil {
-					c.logger.Warn("Performance Insights collection failed", zap.Error(err))
-				} else {
-					c.bufferMetrics(metrics)
-				}
-			}
-		case <-pushTicker.C:
-			if err := c.flushBuffer(ctx); err != nil {
-				c.logger.Warn("Push flush failed", zap.Error(err))
 			}
 		}
 	}
@@ -295,6 +257,15 @@ func (c *AuroraCollector) Collect(ctx context.Context) ([]collector.Metric, erro
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if c.cfg.EnablePI {
+		if piMetrics, err := c.collectAllPI(ctx); err != nil {
+			c.logger.Warn("Performance Insights collection failed", zap.Error(err))
+		} else {
+			all = append(all, piMetrics...)
+		}
+	}
+
 	return all, nil
 }
 
@@ -420,51 +391,6 @@ func (c *AuroraCollector) collectAllPI(ctx context.Context) ([]collector.Metric,
 		}
 	}
 	return all, nil
-}
-
-// -------------------------------------------------------------------
-// Buffer management
-// -------------------------------------------------------------------
-
-// bufferMetrics adds metrics to the internal ring buffer.
-func (c *AuroraCollector) bufferMetrics(metrics []collector.Metric) {
-	if len(metrics) == 0 {
-		return
-	}
-	c.bufferMu.Lock()
-	defer c.bufferMu.Unlock()
-
-	c.buffer = append(c.buffer, metrics...)
-
-	// If buffer exceeds batch size, truncate oldest entries
-	maxBuf := c.cfg.PushBatchSize * 3
-	if len(c.buffer) > maxBuf {
-		c.buffer = c.buffer[len(c.buffer)-c.cfg.PushBatchSize:]
-		c.logger.Warn("Aurora metric buffer overflow, dropping oldest metrics",
-			zap.Int("dropped", len(c.buffer)-c.cfg.PushBatchSize),
-		)
-	}
-}
-
-// flushBuffer sends all buffered metrics to the TelemetryFlow platform.
-func (c *AuroraCollector) flushBuffer(ctx context.Context) error {
-	c.bufferMu.Lock()
-	if len(c.buffer) == 0 {
-		c.bufferMu.Unlock()
-		return nil
-	}
-
-	// Take up to PushBatchSize metrics
-	batchSize := c.cfg.PushBatchSize
-	if len(c.buffer) < batchSize {
-		batchSize = len(c.buffer)
-	}
-	batch := make([]collector.Metric, batchSize)
-	copy(batch, c.buffer[:batchSize])
-	c.buffer = c.buffer[batchSize:]
-	c.bufferMu.Unlock()
-
-	return c.pushMetrics(ctx, batch)
 }
 
 // instanceLabels builds the common label set for a given Aurora instance.

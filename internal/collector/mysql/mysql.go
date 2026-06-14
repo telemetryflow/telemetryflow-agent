@@ -85,45 +85,13 @@ func (c *MySQLCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("MySQL collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("status_interval", c.cfg.StatusInterval),
-		zap.Duration("query_interval", c.cfg.QueryInterval),
-		zap.Duration("schema_interval", c.cfg.SchemaInterval),
 	)
 
-	statusTicker := time.NewTicker(c.cfg.StatusInterval)
-	queryTicker := time.NewTicker(c.cfg.QueryInterval)
-	schemaTicker := time.NewTicker(c.cfg.SchemaInterval)
-	defer statusTicker.Stop()
-	defer queryTicker.Stop()
-	defer schemaTicker.Stop()
-
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial status collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-statusTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Status collection failed", zap.Error(err))
-			}
-		case <-queryTicker.C:
-			if metrics, err := c.collectAllQueryAnalytics(ctx); err != nil {
-				c.logger.Warn("Query analytics collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Query analytics collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-schemaTicker.C:
-			if metrics, err := c.collectAllSchema(ctx); err != nil {
-				c.logger.Warn("Schema collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Schema metrics collected", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -182,6 +150,19 @@ func (c *MySQLCollector) Collect(ctx context.Context) ([]collector.Metric, error
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if qm, err := c.collectAllQueryAnalytics(ctx); err != nil {
+		c.logger.Warn("Query analytics collection failed", zap.Error(err))
+	} else {
+		all = append(all, qm...)
+	}
+
+	if sm, err := c.collectAllSchema(ctx); err != nil {
+		c.logger.Warn("Schema collection failed", zap.Error(err))
+	} else {
+		all = append(all, sm...)
+	}
+
 	return all, nil
 }
 

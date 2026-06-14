@@ -83,45 +83,13 @@ func (c *PostgreSQLCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("PostgreSQL collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("instance_interval", c.cfg.InstanceInterval),
-		zap.Duration("query_interval", c.cfg.QueryInterval),
-		zap.Duration("table_interval", c.cfg.TableInterval),
 	)
 
-	instanceTicker := time.NewTicker(c.cfg.InstanceInterval)
-	queryTicker := time.NewTicker(c.cfg.QueryInterval)
-	tableTicker := time.NewTicker(c.cfg.TableInterval)
-	defer instanceTicker.Stop()
-	defer queryTicker.Stop()
-	defer tableTicker.Stop()
-
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial instance collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-instanceTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Instance collection failed", zap.Error(err))
-			}
-		case <-queryTicker.C:
-			if metrics, err := c.collectAllQueryAnalytics(ctx); err != nil {
-				c.logger.Warn("Query analytics collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Query analytics collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-tableTicker.C:
-			if metrics, err := c.collectAllSchema(ctx); err != nil {
-				c.logger.Warn("Table stats collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Table stats collected", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -177,6 +145,19 @@ func (c *PostgreSQLCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if qm, err := c.collectAllQueryAnalytics(ctx); err != nil {
+		c.logger.Warn("Query analytics collection failed", zap.Error(err))
+	} else {
+		all = append(all, qm...)
+	}
+
+	if sm, err := c.collectAllSchema(ctx); err != nil {
+		c.logger.Warn("Table stats collection failed", zap.Error(err))
+	} else {
+		all = append(all, sm...)
+	}
+
 	return all, nil
 }
 

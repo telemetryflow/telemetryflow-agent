@@ -63,45 +63,13 @@ func (c *MongoDBCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("MongoDB Community collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("interval", c.cfg.Interval),
-		zap.Duration("collstats_interval", c.cfg.CollStatsInterval),
 	)
 
-	mainTicker := time.NewTicker(c.cfg.Interval)
-	collStatsTicker := time.NewTicker(c.cfg.CollStatsInterval)
-	queryTicker := time.NewTicker(c.cfg.QueryInterval)
-	defer mainTicker.Stop()
-	defer collStatsTicker.Stop()
-	defer queryTicker.Stop()
-
-	// Initial collection
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-mainTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Collection cycle failed", zap.Error(err))
-			}
-		case <-collStatsTicker.C:
-			if metrics, err := c.collectAllCollStats(ctx); err != nil {
-				c.logger.Warn("CollStats collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("CollStats collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-queryTicker.C:
-			if metrics, err := c.collectAllQueryMetrics(ctx); err != nil {
-				c.logger.Warn("Query metrics collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Query metrics collected", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -157,6 +125,19 @@ func (c *MongoDBCollector) Collect(ctx context.Context) ([]collector.Metric, err
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if cs, err := c.collectAllCollStats(ctx); err != nil {
+		c.logger.Warn("CollStats collection failed", zap.Error(err))
+	} else {
+		all = append(all, cs...)
+	}
+
+	if qm, err := c.collectAllQueryMetrics(ctx); err != nil {
+		c.logger.Warn("Query metrics collection failed", zap.Error(err))
+	} else {
+		all = append(all, qm...)
+	}
+
 	return all, nil
 }
 

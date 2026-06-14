@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -64,45 +63,13 @@ func (c *CockroachDBCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("CockroachDB collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("instance_interval", c.cfg.InstanceInterval),
-		zap.Duration("query_interval", c.cfg.QueryInterval),
-		zap.Duration("range_interval", c.cfg.RangeInterval),
 	)
 
-	instanceTicker := time.NewTicker(c.cfg.InstanceInterval)
-	queryTicker := time.NewTicker(c.cfg.QueryInterval)
-	rangeTicker := time.NewTicker(c.cfg.RangeInterval)
-	defer instanceTicker.Stop()
-	defer queryTicker.Stop()
-	defer rangeTicker.Stop()
-
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial instance collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-instanceTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Instance collection failed", zap.Error(err))
-			}
-		case <-queryTicker.C:
-			if metrics, err := c.collectAllQueries(ctx); err != nil {
-				c.logger.Warn("Query analytics collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Query analytics collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-rangeTicker.C:
-			if metrics, err := c.collectAllRanges(ctx); err != nil {
-				c.logger.Warn("Range metrics collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Range metrics collected", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -158,6 +125,19 @@ func (c *CockroachDBCollector) Collect(ctx context.Context) ([]collector.Metric,
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if qm, err := c.collectAllQueries(ctx); err != nil {
+		c.logger.Warn("Query analytics collection failed", zap.Error(err))
+	} else {
+		all = append(all, qm...)
+	}
+
+	if rm, err := c.collectAllRanges(ctx); err != nil {
+		c.logger.Warn("Range metrics collection failed", zap.Error(err))
+	} else {
+		all = append(all, rm...)
+	}
+
 	return all, nil
 }
 

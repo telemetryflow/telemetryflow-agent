@@ -80,25 +80,11 @@ func (c *NodeExporterCollector) Start(ctx context.Context) error {
 		zap.Duration("interval", c.cfg.raw.Interval),
 	)
 
-	ticker := time.NewTicker(c.cfg.raw.Interval)
-	defer ticker.Stop()
-
-	// Initial collection
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial node exporter collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-c.stopChan:
-			return nil
-		case <-ticker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Node exporter collection failed", zap.Error(err))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 

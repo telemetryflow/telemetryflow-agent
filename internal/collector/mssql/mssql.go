@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -63,45 +62,13 @@ func (c *MSSQLCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("MSSQL collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("metrics_interval", c.cfg.MetricsInterval),
-		zap.Duration("query_interval", c.cfg.QueryInterval),
-		zap.Duration("index_interval", c.cfg.IndexInterval),
 	)
 
-	metricsTicker := time.NewTicker(c.cfg.MetricsInterval)
-	queryTicker := time.NewTicker(c.cfg.QueryInterval)
-	indexTicker := time.NewTicker(c.cfg.IndexInterval)
-	defer metricsTicker.Stop()
-	defer queryTicker.Stop()
-	defer indexTicker.Stop()
-
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial metrics collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-metricsTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Metrics collection failed", zap.Error(err))
-			}
-		case <-queryTicker.C:
-			if metrics, err := c.collectAllQueries(ctx); err != nil {
-				c.logger.Warn("Query analytics collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Query analytics collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-indexTicker.C:
-			if metrics, err := c.collectAllIndexes(ctx); err != nil {
-				c.logger.Warn("Index stats collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Index stats collected", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -157,6 +124,19 @@ func (c *MSSQLCollector) Collect(ctx context.Context) ([]collector.Metric, error
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if qm, err := c.collectAllQueries(ctx); err != nil {
+		c.logger.Warn("Query analytics collection failed", zap.Error(err))
+	} else {
+		all = append(all, qm...)
+	}
+
+	if im, err := c.collectAllIndexes(ctx); err != nil {
+		c.logger.Warn("Index stats collection failed", zap.Error(err))
+	} else {
+		all = append(all, im...)
+	}
+
 	return all, nil
 }
 

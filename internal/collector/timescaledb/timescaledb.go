@@ -64,54 +64,13 @@ func (c *TimescaleDBCollector) Start(ctx context.Context) error {
 
 	c.logger.Info("TimescaleDB collector starting",
 		zap.Int("instances", len(c.cfg.Instances)),
-		zap.Duration("instance_interval", c.cfg.InstanceInterval),
-		zap.Duration("hypertable_interval", c.cfg.HypertableInterval),
-		zap.Duration("chunk_interval", c.cfg.ChunkInterval),
-		zap.Duration("job_interval", c.cfg.JobInterval),
 	)
 
-	instanceTicker := time.NewTicker(c.cfg.InstanceInterval)
-	hypertableTicker := time.NewTicker(c.cfg.HypertableInterval)
-	chunkTicker := time.NewTicker(c.cfg.ChunkInterval)
-	jobTicker := time.NewTicker(c.cfg.JobInterval)
-	defer instanceTicker.Stop()
-	defer hypertableTicker.Stop()
-	defer chunkTicker.Stop()
-	defer jobTicker.Stop()
-
-	if _, err := c.Collect(ctx); err != nil {
-		c.logger.Warn("Initial collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Stop()
-		case <-c.stopChan:
-			return nil
-		case <-instanceTicker.C:
-			if _, err := c.Collect(ctx); err != nil {
-				c.logger.Warn("Instance collection failed", zap.Error(err))
-			}
-		case <-hypertableTicker.C:
-			if metrics, err := c.collectAllHypertables(ctx); err != nil {
-				c.logger.Warn("Hypertable collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Hypertable metrics collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-chunkTicker.C:
-			if metrics, err := c.collectAllChunks(ctx); err != nil {
-				c.logger.Warn("Chunk collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Chunk metrics collected", zap.Int("metrics", len(metrics)))
-			}
-		case <-jobTicker.C:
-			if metrics, err := c.collectAllJobs(ctx); err != nil {
-				c.logger.Warn("Job collection failed", zap.Error(err))
-			} else {
-				c.logger.Debug("Job metrics collected", zap.Int("metrics", len(metrics)))
-			}
-		}
+	select {
+	case <-c.stopChan:
+		return nil
+	case <-ctx.Done():
+		return c.Stop()
 	}
 }
 
@@ -167,6 +126,19 @@ func (c *TimescaleDBCollector) Collect(ctx context.Context) ([]collector.Metric,
 		}
 		all = append(all, r.metrics...)
 	}
+
+	if cm, err := c.collectAllChunks(ctx); err != nil {
+		c.logger.Warn("Chunk collection failed", zap.Error(err))
+	} else {
+		all = append(all, cm...)
+	}
+
+	if jm, err := c.collectAllJobs(ctx); err != nil {
+		c.logger.Warn("Job collection failed", zap.Error(err))
+	} else {
+		all = append(all, jm...)
+	}
+
 	return all, nil
 }
 
@@ -230,23 +202,6 @@ func (c *TimescaleDBCollector) collectInstance(ctx context.Context, inst *tsdbIn
 		zap.String("instance", inst.config.Name),
 		zap.Int("metrics", len(all)),
 	)
-	return all, nil
-}
-
-func (c *TimescaleDBCollector) collectAllHypertables(ctx context.Context) ([]collector.Metric, error) {
-	var all []collector.Metric
-	for _, inst := range c.instances {
-		pool, err := c.ensureConnection(ctx, inst)
-		if err != nil {
-			continue
-		}
-		metrics, err := collectHypertables(ctx, pool, instanceLabels(inst), c.logger)
-		if err != nil {
-			c.logger.Warn("Hypertable metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
-			continue
-		}
-		all = append(all, metrics...)
-	}
 	return all, nil
 }
 

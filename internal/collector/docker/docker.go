@@ -116,25 +116,11 @@ func (d *DockerCollector) Start(ctx context.Context) error {
 		zap.Bool("diskio", d.cfg.raw.CollectDiskIO),
 	)
 
-	ticker := time.NewTicker(d.cfg.raw.Interval)
-	defer ticker.Stop()
-
-	// Initial collection
-	if _, err := d.Collect(ctx); err != nil {
-		d.logger.Warn("Initial Docker collection failed", zap.Error(err))
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-d.stopChan:
-			return nil
-		case <-ticker.C:
-			if _, err := d.Collect(ctx); err != nil {
-				d.logger.Warn("Docker collection failed", zap.Error(err))
-			}
-		}
+	select {
+	case <-d.stopChan:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
