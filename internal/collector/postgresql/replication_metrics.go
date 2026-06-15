@@ -79,8 +79,7 @@ func collectReplicationLag(ctx context.Context, pool *pgxpool.Pool, labels map[s
 	                  replay_lsn::text,
 	                  write_lag,
 	                  flush_lag,
-	                  replay_lag,
-	                  COALESCE(slot_name, '') AS slot_name
+	                  replay_lag
 	           FROM pg_stat_replication`
 
 	rows, err := pool.Query(ctx, q)
@@ -93,14 +92,13 @@ func collectReplicationLag(ctx context.Context, pool *pgxpool.Pool, labels map[s
 	for rows.Next() {
 		var pid int32
 		var usename, appName, clientAddr, state string
-		var sentLSN, writeLSN, flushLSN, replayLSN, slotName string
+		var sentLSN, writeLSN, flushLSN, replayLSN string
 		var writeLag, flushLag, replayLag *time.Duration
 
 		if err := rows.Scan(
 			&pid, &usename, &appName, &clientAddr, &state,
 			&sentLSN, &writeLSN, &flushLSN, &replayLSN,
 			&writeLag, &flushLag, &replayLag,
-			&slotName,
 		); err != nil {
 			logger.Debug("replication row scan failed", zap.Error(err))
 			continue

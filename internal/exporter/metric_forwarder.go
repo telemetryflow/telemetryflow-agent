@@ -20,6 +20,8 @@ package exporter
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -51,12 +53,13 @@ type MetricForwarder struct {
 	logger     *zap.Logger
 	interval   time.Duration
 
-	mu          sync.RWMutex
-	running     bool
-	stopChan    chan struct{}
-	totalExport atomic.Int64
-	totalError  atomic.Int64
-	totalMetric atomic.Int64
+	mu            sync.RWMutex
+	running       bool
+	stopChan      chan struct{}
+	totalExport   atomic.Int64
+	totalError    atomic.Int64
+	totalMetric   atomic.Int64
+	firstExportOK atomic.Bool
 }
 
 // MetricForwarderConfig holds configuration for the forwarder.
@@ -195,6 +198,30 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 		return
 	}
 
+	breakdown := summarizeMetrics(allMetrics)
+
+	if !f.firstExportOK.Swap(true) {
+		for _, e := range breakdown {
+			f.logger.Info("metric registered",
+				zap.String("name", e.name),
+				zap.Int("series", e.count),
+				zap.Strings("labels", e.labelKeys),
+				zap.String("unit", e.unit),
+			)
+		}
+	} else {
+		f.logger.Debug("metric breakdown",
+			zap.Int("series", len(breakdown)),
+		)
+		for _, e := range breakdown {
+			f.logger.Debug("metric",
+				zap.String("name", e.name),
+				zap.Int("series", e.count),
+				zap.Strings("labels", e.labelKeys),
+			)
+		}
+	}
+
 	if f.promSink != nil {
 		f.promSink.UpdateMetrics(allMetrics)
 	}
@@ -204,13 +231,16 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 			f.totalError.Add(1)
 			f.logger.Warn("OTLP export failed",
 				zap.Int("metrics", len(allMetrics)),
+				zap.Int("unique_names", len(breakdown)),
 				zap.Error(err),
 			)
 		} else {
 			f.totalExport.Add(1)
 			f.totalMetric.Add(int64(len(allMetrics)))
+
 			f.logger.Info("metrics forwarded",
 				zap.Int("metrics", len(allMetrics)),
+				zap.Int("unique_names", len(breakdown)),
 				zap.Int64("total_exports", f.totalExport.Load()),
 				zap.Int64("total_metrics", f.totalMetric.Load()),
 			)
@@ -226,4 +256,60 @@ func (f *MetricForwarder) runningCollectorCount() int {
 		}
 	}
 	return count
+}
+
+type metricEntry struct {
+	name      string
+	count     int
+	labelKeys []string
+	unit      string
+}
+
+func summarizeMetrics(metrics []collector.Metric) []metricEntry {
+	type agg struct {
+		count    int
+		labelSet map[string]bool
+		unit     string
+	}
+	byName := make(map[string]*agg)
+
+	for _, m := range metrics {
+		key := m.Name
+		if m.Unit != "" {
+			key += "[" + m.Unit + "]"
+		}
+		a, ok := byName[key]
+		if !ok {
+			a = &agg{labelSet: make(map[string]bool)}
+			byName[key] = a
+		}
+		a.count++
+		a.unit = m.Unit
+		for k := range m.Labels {
+			a.labelSet[k] = true
+		}
+	}
+
+	entries := make([]metricEntry, 0, len(byName))
+	for name, a := range byName {
+		cleanName := name
+		if idx := strings.Index(name, "["); idx >= 0 {
+			cleanName = name[:idx]
+		}
+		keys := make([]string, 0, len(a.labelSet))
+		for k := range a.labelSet {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		entries = append(entries, metricEntry{
+			name:      cleanName,
+			count:     a.count,
+			labelKeys: keys,
+			unit:      a.unit,
+		})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].name < entries[j].name
+	})
+	return entries
 }

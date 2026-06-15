@@ -219,9 +219,8 @@ func (e *QANExporter) push(ctx context.Context, batch []QANMetricsBucket) error 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "tfo-agent/qan-exporter")
 
-	if e.cfg.APIKeyID != "" && e.cfg.APIKeySecret != "" {
-		req.Header.Set("X-API-Key-ID", e.cfg.APIKeyID)
-		req.Header.Set("X-API-Key-Secret", e.cfg.APIKeySecret)
+	if e.cfg.APIKeySecret != "" {
+		req.Header.Set("X-TelemetryFlow-Key-Secret", e.cfg.APIKeySecret)
 	}
 
 	resp, err := e.client.Do(req)

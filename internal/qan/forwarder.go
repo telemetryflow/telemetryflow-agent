@@ -46,6 +46,13 @@ type QANCollector interface {
 	IsRunning() bool
 }
 
+// Starter is an optional interface that QAN collectors can implement to
+// support explicit lifecycle management. The QANForwarder calls Start() on
+// all collectors that implement this interface when the forwarder starts.
+type Starter interface {
+	Start(ctx context.Context) error
+}
+
 // QANSink is the interface for pushing QAN buckets to a backend.
 type QANSink interface {
 	Collect(ctx context.Context, buckets []QANMetricsBucket) error
@@ -104,6 +111,18 @@ func (f *QANForwarder) Start(ctx context.Context) error {
 	f.running = true
 	f.stopChan = make(chan struct{})
 	f.mu.Unlock()
+
+	// Start all collectors that implement Starter.
+	for _, c := range f.collectors {
+		if s, ok := c.(Starter); ok {
+			if err := s.Start(ctx); err != nil {
+				f.logger.Warn("QAN collector start failed",
+					zap.String("collector", c.Name()),
+					zap.Error(err),
+				)
+			}
+		}
+	}
 
 	f.logger.Info("QAN forwarder starting",
 		zap.Int("collectors", len(f.collectors)),

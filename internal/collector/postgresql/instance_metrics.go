@@ -78,10 +78,10 @@ func collectConnectionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgI
 	query := `
 		SELECT
 			COALESCE(datname, '') AS dbname,
-			state,
+			COALESCE(state, '') AS state,
 			count(*) AS cnt
 		FROM pg_stat_activity
-		GROUP BY datname, state
+		GROUP BY COALESCE(datname, ''), COALESCE(state, '')
 	`
 
 	rows, err := pool.Query(ctx2, query)

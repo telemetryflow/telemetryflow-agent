@@ -442,15 +442,15 @@ func collectTableSizeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map
 
 func collectBloatEstimates(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
 	query := `
-		SELECT schemaname, relname,
-		       pg_relation_size(schemaname||'.'||relname) AS total_size,
-		       pg_stat_user_tables.n_dead_tup,
-		       pg_class.relpages,
-		       pg_class.reltuples
-		FROM pg_stat_user_tables
-		JOIN pg_class ON pg_class.oid = pg_stat_user_tables.relid
-		WHERE n_dead_tup > 0
-		ORDER BY n_dead_tup DESC
+		SELECT s.schemaname, s.relname,
+		       pg_relation_size(s.relid) AS total_size,
+		       s.n_dead_tup,
+		       c.relpages,
+		       c.reltuples
+		FROM pg_stat_user_tables s
+		JOIN pg_class c ON c.oid = s.relid
+		WHERE s.n_dead_tup > 0
+		ORDER BY s.n_dead_tup DESC
 		LIMIT $1`
 
 	rows, err := pool.Query(ctx, query, limit)
