@@ -66,6 +66,7 @@ func collectQueryLog(
 		FROM system.query_log
 		WHERE
 			type IN ('QueryFinish', 'ExceptionWhileProcessing')
+			AND event_time >= now() - INTERVAL 2 HOUR
 			AND toUnixTimestamp(event_time) > %d
 		ORDER BY event_time ASC
 		LIMIT %d`,

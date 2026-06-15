@@ -169,3 +169,169 @@ func TestMetricsBridgeCustomPrefix(t *testing.T) {
 	assert.True(t, names["myapp_system_cpu_usage"],
 		"custom prefix should be applied, got: %v", names)
 }
+
+func TestMetricsBridgeLabelCardinalityMismatch_NoPanic(t *testing.T) {
+	logger := zap.NewNop()
+	registry := prometheus.NewRegistry()
+	bridge := exporter.NewMetricsBridge("tfo", registry, logger)
+
+	metrics := []collector.Metric{
+		collector.NewMetric("k8s.pod.status", 1.0, collector.MetricTypeGauge).
+			WithLabel("cluster", "prod").
+			WithLabel("namespace", "calico-system").
+			WithLabel("pod", "pod-1").
+			WithLabel("container", "container-1").
+			WithLabel("node", "worker-1"),
+		collector.NewMetric("k8s.pod.status", 1.0, collector.MetricTypeGauge).
+			WithLabel("cluster", "prod").
+			WithLabel("namespace", "calico-system").
+			WithLabel("pod", "pod-2").
+			WithLabel("container", "container-2"),
+	}
+
+	assert.NotPanics(t, func() {
+		bridge.UpdateMetrics(metrics)
+	})
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	var found bool
+	for _, f := range families {
+		if *f.Name == "tfo_k8s_pod_status" {
+			found = true
+			for _, m := range f.Metric {
+				labels := make(map[string]string)
+				for _, lp := range m.Label {
+					labels[*lp.Name] = *lp.Value
+				}
+				if labels["pod"] == "pod-2" {
+					if v, ok := labels["node"]; ok {
+						assert.Equal(t, "", v, "missing node label should be padded with empty string")
+					}
+				}
+			}
+		}
+	}
+	assert.True(t, found, "expected tfo_k8s_pod_status metric family")
+}
+
+func TestMetricsBridgeLabelExpansionOrderReversed(t *testing.T) {
+	logger := zap.NewNop()
+	registry := prometheus.NewRegistry()
+	bridge := exporter.NewMetricsBridge("tfo", registry, logger)
+
+	metricsBatch1 := []collector.Metric{
+		collector.NewMetric("k8s.pod.cpu", 50.0, collector.MetricTypeGauge).
+			WithLabel("cluster", "prod").
+			WithLabel("pod", "pod-a"),
+	}
+	bridge.UpdateMetrics(metricsBatch1)
+
+	metricsBatch2 := []collector.Metric{
+		collector.NewMetric("k8s.pod.cpu", 80.0, collector.MetricTypeGauge).
+			WithLabel("cluster", "prod").
+			WithLabel("pod", "pod-b").
+			WithLabel("node", "worker-2").
+			WithLabel("container", "c1"),
+	}
+	assert.NotPanics(t, func() {
+		bridge.UpdateMetrics(metricsBatch2)
+	})
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	var found bool
+	for _, f := range families {
+		if *f.Name == "tfo_k8s_pod_cpu" {
+			found = true
+			assert.GreaterOrEqual(t, len(f.Metric), 2)
+		}
+	}
+	assert.True(t, found, "expected tfo_k8s_pod_cpu metric family")
+}
+
+func TestMetricsBridgeExtraLabelsDropped(t *testing.T) {
+	logger := zap.NewNop()
+	registry := prometheus.NewRegistry()
+	bridge := exporter.NewMetricsBridge("tfo", registry, logger)
+
+	metricsBatch1 := []collector.Metric{
+		collector.NewMetric("system.disk.usage", 42.0, collector.MetricTypeGauge).
+			WithLabel("host", "server-1"),
+	}
+	bridge.UpdateMetrics(metricsBatch1)
+
+	metricsBatch2 := []collector.Metric{
+		collector.NewMetric("system.disk.usage", 88.0, collector.MetricTypeGauge).
+			WithLabel("host", "server-2").
+			WithLabel("device", "/dev/sda1").
+			WithLabel("mountpoint", "/data"),
+	}
+	assert.NotPanics(t, func() {
+		bridge.UpdateMetrics(metricsBatch2)
+	})
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	var found bool
+	for _, f := range families {
+		if *f.Name == "tfo_system_disk_usage" {
+			found = true
+			assert.GreaterOrEqual(t, len(f.Metric), 2)
+		}
+	}
+	assert.True(t, found, "expected tfo_system_disk_usage metric family")
+}
+
+func TestMetricsBridgeCounterLabelMismatch(t *testing.T) {
+	logger := zap.NewNop()
+	registry := prometheus.NewRegistry()
+	bridge := exporter.NewMetricsBridge("tfo", registry, logger)
+
+	metrics := []collector.Metric{
+		collector.NewMetric("k8s.pod.requests", 100.0, collector.MetricTypeCounter).
+			WithLabel("namespace", "default").
+			WithLabel("pod", "pod-1"),
+		collector.NewMetric("k8s.pod.requests", 200.0, collector.MetricTypeCounter).
+			WithLabel("namespace", "default").
+			WithLabel("pod", "pod-2").
+			WithLabel("container", "sidecar"),
+	}
+
+	assert.NotPanics(t, func() {
+		bridge.UpdateMetrics(metrics)
+	})
+}
+
+func TestMetricsBridgeRepeatedLabelMismatch(t *testing.T) {
+	logger := zap.NewNop()
+	registry := prometheus.NewRegistry()
+	bridge := exporter.NewMetricsBridge("tfo", registry, logger)
+
+	for i := 0; i < 5; i++ {
+		m := collector.NewMetric("system.net.bytes", float64(i), collector.MetricTypeGauge).
+			WithLabel("host", "server-1")
+		for j := 0; j <= i; j++ {
+			m = m.WithLabel(string(rune('a'+j)), "val")
+		}
+		assert.NotPanics(t, func() {
+			bridge.UpdateMetrics([]collector.Metric{m})
+		})
+	}
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	assert.NotEmpty(t, families)
+
+	var found bool
+	for _, f := range families {
+		if *f.Name == "tfo_system_net_bytes" {
+			found = true
+			assert.NotEmpty(t, f.Metric)
+		}
+	}
+	assert.True(t, found, "expected tfo_system_net_bytes metric family after repeated mismatched updates")
+}

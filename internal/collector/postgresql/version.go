@@ -31,7 +31,7 @@ func detectVersion(ctx context.Context, inst *pgInstance) error {
 	defer cancel()
 
 	var versionNum int
-	err := inst.pool.QueryRow(ctx2, "SHOW server_version_num").Scan(&versionNum)
+	err := inst.pool.QueryRow(ctx2, "SELECT current_setting('server_version_num')::int").Scan(&versionNum)
 	if err != nil {
 		return fmt.Errorf("postgresql %s: detect version: %w", inst.config.Name, err)
 	}

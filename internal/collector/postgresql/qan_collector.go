@@ -65,7 +65,7 @@ type qanPgInstance struct {
 
 // pgStatStatementsSnapshot captures raw counter values for delta calculation.
 type pgStatStatementsSnapshot struct {
-	queryID         uint64
+	queryID         int64
 	query           string
 	calls           uint64
 	totalExecTime   float64
@@ -244,7 +244,7 @@ func (c *QANPostgreSQLCollector) collectInstance(ctx context.Context, inst *qanP
 			continue
 		}
 
-		qidStr := strconv.FormatUint(s.queryID, 10)
+		qidStr := strconv.FormatInt(s.queryID, 10)
 		currentSnapshot[qidStr] = &s
 
 		prev, hasPrev := inst.prevSnapshot[qidStr]

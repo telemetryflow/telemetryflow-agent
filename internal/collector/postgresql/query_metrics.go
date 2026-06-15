@@ -79,6 +79,14 @@ func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInst
 	// 1. pg_stat_statements — top N queries
 	// ---------------------------------------------------------------------------
 
+	// Ensure version is detected (fallback if collectInstance didn't set it).
+	if inst.version == 0 {
+		if err := detectVersion(ctx2, inst); err != nil {
+			logger.Debug("Version detection failed in query analytics",
+				zap.String("instance", inst.config.Name), zap.Error(err))
+		}
+	}
+
 	// Check if pg_stat_statements is available.
 	var extExists bool
 	if err := pool.QueryRow(ctx2,
@@ -120,7 +128,7 @@ func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInst
 	defer rows.Close()
 
 	type stmtRow struct {
-		queryid           uint64
+		queryid           int64
 		query             string
 		calls             uint64
 		totalExecTime     float64
@@ -165,7 +173,7 @@ func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInst
 	elapsedSec := elapsed.Seconds()
 
 	for _, r := range current {
-		qidStr := strconv.FormatUint(r.queryid, 10)
+		qidStr := strconv.FormatInt(r.queryid, 10)
 		fp := fingerprintQuery(r.query)
 
 		qLabels := make(map[string]string, len(labels)+2)
@@ -210,7 +218,7 @@ func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInst
 	// Update previous counters for next cycle.
 	newCounters := make(map[string]uint64, len(current)*3)
 	for _, r := range current {
-		qidStr := strconv.FormatUint(r.queryid, 10)
+		qidStr := strconv.FormatInt(r.queryid, 10)
 		newCounters[fmt.Sprintf("query:%s:calls", qidStr)] = r.calls
 		newCounters[fmt.Sprintf("query:%s:total_exec_time", qidStr)] = uint64(r.totalExecTime)
 		newCounters[fmt.Sprintf("query:%s:rows", qidStr)] = r.rows_

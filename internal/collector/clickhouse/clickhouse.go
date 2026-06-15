@@ -66,11 +66,17 @@ type ClickHouseCollector struct {
 func NewClickHouseCollector(cfg config.ClickHouseCollectorConfig, logger *zap.Logger) *ClickHouseCollector {
 	c := NewConfig(cfg)
 
+	// Initialize watermark to 1 hour ago so the first collection cycle
+	// doesn't scan the entire system.query_log table (which can have
+	// millions of rows and cause HTTP timeouts).
+	initialWatermark := time.Now().Add(-1 * time.Hour)
+
 	states := make([]*instanceState, len(c.Instances))
 	for i, inst := range c.Instances {
 		states[i] = &instanceState{
-			inst:       inst,
-			prevEvents: make(map[string]float64),
+			inst:              inst,
+			prevEvents:        make(map[string]float64),
+			queryLogWatermark: initialWatermark,
 		}
 	}
 
