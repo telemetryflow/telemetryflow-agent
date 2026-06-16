@@ -78,10 +78,9 @@ func NewLoader(opts ...Option) *Loader {
 		sources:   []Source{SourceFile, SourceEnv},
 		envPrefix: "TELEMETRYFLOW_",
 		configPaths: []string{
-			".",
 			"./configs",
+			".",
 			"/etc/tfo-agent",
-			"$HOME/.tfo-agent",
 		},
 	}
 
@@ -100,21 +99,14 @@ func (l *Loader) Load(configFile string, target interface{}) error {
 			return fmt.Errorf("failed to load config file %s: %w", configFile, err)
 		}
 	} else {
-		// Search for config file in paths
-		found := false
-		for _, name := range []string{"tfo-agent.yaml", "tfo-agent.yml", "config.yaml", "config.yml"} {
-			for _, path := range l.configPaths {
-				path = os.ExpandEnv(path)
-				fullPath := filepath.Join(path, name)
-				if _, err := os.Stat(fullPath); err == nil {
-					if err := l.loadFromFile(fullPath, target); err != nil {
-						return fmt.Errorf("failed to load config file %s: %w", fullPath, err)
-					}
-					found = true
-					break
+		// Search for the single canonical config file: tfo-agent.yaml
+		for _, path := range l.configPaths {
+			path = os.ExpandEnv(path)
+			fullPath := filepath.Join(path, "tfo-agent.yaml")
+			if _, err := os.Stat(fullPath); err == nil {
+				if err := l.loadFromFile(fullPath, target); err != nil {
+					return fmt.Errorf("failed to load config file %s: %w", fullPath, err)
 				}
-			}
-			if found {
 				break
 			}
 		}

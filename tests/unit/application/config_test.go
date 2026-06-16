@@ -180,6 +180,40 @@ func TestConfigHelpers(t *testing.T) {
 		cfg.TelemetryFlow.APIKeySecret = "tfs_test_secret"
 		assert.Equal(t, "tfs_test_secret", cfg.GetEffectiveAPIKeySecret())
 	})
+
+	t.Run("GetBackendEndpoint should prefer backend_endpoint", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.BackendEndpoint = "http://localhost:3000/api/v2"
+		cfg.TelemetryFlow.Endpoint = "localhost:4317"
+		assert.Equal(t, "http://localhost:3000/api/v2", cfg.GetBackendEndpoint())
+	})
+
+	t.Run("GetBackendEndpoint should fall back to endpoint", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.BackendEndpoint = ""
+		cfg.TelemetryFlow.Endpoint = "localhost:4317"
+		assert.Equal(t, "http://localhost:4317", cfg.GetBackendEndpoint())
+	})
+
+	t.Run("GetBackendEndpoint should fall back to API endpoint", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.BackendEndpoint = ""
+		cfg.TelemetryFlow.Endpoint = ""
+		cfg.API.Endpoint = "http://legacy:8080" //nolint:staticcheck // testing backward compat fallback
+		assert.Equal(t, "http://legacy:8080", cfg.GetBackendEndpoint())
+	})
+
+	t.Run("GetBackendEndpoint should prepend http:// to bare host:port", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.BackendEndpoint = "localhost:3000"
+		assert.Equal(t, "http://localhost:3000", cfg.GetBackendEndpoint())
+	})
+
+	t.Run("GetBackendEndpoint should preserve https:// scheme", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.TelemetryFlow.BackendEndpoint = "https://secure.example.com"
+		assert.Equal(t, "https://secure.example.com", cfg.GetBackendEndpoint())
+	})
 }
 
 func TestAgentConfig(t *testing.T) {

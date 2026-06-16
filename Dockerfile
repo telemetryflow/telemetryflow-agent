@@ -34,7 +34,7 @@ FROM fluent/fluent-bit:4.2.3 AS fluent-bit
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.2.0
+ARG VERSION=1.2.1
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
@@ -75,7 +75,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
 # NOTE: Fluent Bit 4.x requires GLIBC >= 2.38 — bookworm (2.36) is too old.
 FROM debian:trixie-slim
 
-ARG VERSION=1.2.0
+ARG VERSION=1.2.1
 
 # =============================================================================
 # TelemetryFlow Metadata Labels (OCI Image Spec)
@@ -196,16 +196,16 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 # =============================================================================
 # Build with:
 #   docker build \
-#     --build-arg VERSION=1.2.0 \
+#     --build-arg VERSION=1.2.1 \
 #     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
 #     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
 #     --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-#     -t telemetryflow/telemetryflow-agent:1.2.0 .
+#     -t telemetryflow/telemetryflow-agent:1.2.1 .
 #
 # Multi-arch build:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     --build-arg VERSION=1.2.0 \
-#     -t telemetryflow/telemetryflow-agent:1.2.0 .
+#     --build-arg VERSION=1.2.1 \
+#     -t telemetryflow/telemetryflow-agent:1.2.1 .
 #
 # Run with:
 #   docker run -d \
@@ -216,5 +216,5 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 #     -p 13133:13133 \
 #     -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
 #     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-#     telemetryflow/telemetryflow-agent:1.2.0
+#     telemetryflow/telemetryflow-agent:1.2.1
 # =============================================================================

@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.1-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,28 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.2.1] - 2026-06-16
+
+### Added
+
+- **`telemetryflow.backend_endpoint` config field**: Separate URL for the TFO Platform backend API (heartbeat, QAN export, agent registration). When unset, falls back to `telemetryflow.endpoint` for backward compatibility. This resolves the fundamental issue where the OTLP collector endpoint (`telemetryflow.endpoint`, typically port 4317) was being used for REST API calls (heartbeat to `/monitoring/agents/{id}/heartbeat`), causing context-canceled errors.
+  - New env var: `TELEMETRYFLOW_BACKEND_ENDPOINT` (default: `http://localhost:3000/api/v2`)
+  - New getter: `Config.GetBackendEndpoint()` — prefers `backend_endpoint`, falls back to `endpoint`, then `api.endpoint`
+  - Agent API client (heartbeat, QAN, registration) now uses `GetBackendEndpoint()` instead of `GetEffectiveEndpoint()`
+  - OTLP exporter continues using `GetEffectiveEndpoint()` / `GetOTLPEndpoint()` (unchanged)
+
+### Fixed
+
+- **QAN exporter auth headers (critical)**: Auth headers used wrong names (`X-TelemetryFlow-Key-Secret`) and the API key ID header was missing entirely. Corrected to `X-API-Key-ID` and `X-API-Key-Secret` matching the platform's API middleware.
+- **Heartbeat hitting OTLP collector port (critical)**: The heartbeat API client was initialized with `cfg.GetEffectiveEndpoint()` (the OTLP collector endpoint, e.g. `localhost:4317`) instead of the platform backend API (e.g. `localhost:3000`). Fixed by introducing `backend_endpoint` and `GetBackendEndpoint()`.
+- **Config loader simplified**: Loader now searches only for `tfo-agent.yaml` (removed `config.yaml`, `config.yml`, `tfo-agent.yml` fallbacks). Canonical config file is `configs/tfo-agent.yaml`.
+
+### Changed
+
+- **Config file consolidation**: The agent loads exactly one config file — `configs/tfo-agent.yaml`. No other config file names are searched. The `--config` / `-c` flag still allows explicit override.
+- **`configs/tfo-agent.yaml`**: `telemetryflow.endpoint` default changed from `http://localhost:3000/api/v2` to `http://localhost:4317` (OTLP collector). Added `telemetryflow.backend_endpoint` with default `http://localhost:3000/api/v2` (platform backend API). Added `TELEMETRYFLOW_PROTOCOL` env var override.
+- **Version bump**: 1.2.0 → 1.2.1
 
 ## [1.2.0] - 2026-06-15
 

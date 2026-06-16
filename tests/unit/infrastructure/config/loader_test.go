@@ -394,7 +394,7 @@ func TestLoaderConfigFileDiscovery(t *testing.T) {
 		assert.Equal(t, "tfo-agent-config", cfg.Name)
 	})
 
-	t.Run("should discover tfo-agent.yml", func(t *testing.T) {
+	t.Run("should NOT discover tfo-agent.yml (only .yaml)", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		configPath := filepath.Join(tmpDir, "tfo-agent.yml")
 
@@ -412,10 +412,10 @@ func TestLoaderConfigFileDiscovery(t *testing.T) {
 		var cfg TestConfig
 		err = loader.Load("", &cfg)
 		require.NoError(t, err)
-		assert.Equal(t, "tfo-agent-yml-config", cfg.Name)
+		assert.Equal(t, "", cfg.Name) // should not load .yml
 	})
 
-	t.Run("should discover config.yaml", func(t *testing.T) {
+	t.Run("should NOT discover config.yaml (only tfo-agent.yaml)", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -433,10 +433,10 @@ func TestLoaderConfigFileDiscovery(t *testing.T) {
 		var cfg TestConfig
 		err = loader.Load("", &cfg)
 		require.NoError(t, err)
-		assert.Equal(t, "config-yaml-discovered", cfg.Name)
+		assert.Equal(t, "", cfg.Name) // should not load config.yaml
 	})
 
-	t.Run("should discover config.yml", func(t *testing.T) {
+	t.Run("should NOT discover config.yml (only tfo-agent.yaml)", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		configPath := filepath.Join(tmpDir, "config.yml")
 
@@ -454,7 +454,7 @@ func TestLoaderConfigFileDiscovery(t *testing.T) {
 		var cfg TestConfig
 		err = loader.Load("", &cfg)
 		require.NoError(t, err)
-		assert.Equal(t, "config-yml-discovered", cfg.Name)
+		assert.Equal(t, "", cfg.Name) // should not load config.yml
 	})
 
 	t.Run("should prioritize tfo-agent.yaml over config.yaml", func(t *testing.T) {

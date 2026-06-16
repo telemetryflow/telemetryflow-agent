@@ -43,11 +43,14 @@ telemetryflow:
   # TFO backend endpoint — format depends on protocol:
   #   grpc: bare host:port     (e.g., tfo-collector:4317)
   #   http: full HTTP base URL (e.g., http://tfo-backend:3000/api/v2)
-  # Used for agent heartbeat/registration and as OTLP base URL when no
-  # per-signal endpoint override is configured in exporter.otlp.*.endpoint.
-  endpoint: "${TELEMETRYFLOW_ENDPOINT:-http://localhost:3000/api/v2}"
+  # Used for OTLP export (metrics/traces/logs) and as a fallback for backend API
+  # calls when backend_endpoint is not set.
+  endpoint: "${TELEMETRYFLOW_ENDPOINT:-http://localhost:4317}"
+  # TFO Platform backend API URL — used for heartbeat, QAN export, and other
+  # REST API calls. When empty, falls back to endpoint above.
+  backend_endpoint: "${TELEMETRYFLOW_BACKEND_ENDPOINT:-http://localhost:3000/api/v2}"
   # Protocol: grpc (OTLP native) or http (REST + OTLP/HTTP)
-  protocol: http
+  protocol: "${TELEMETRYFLOW_PROTOCOL:-grpc}"
   # TLS settings for backend connection
   tls:
     enabled: true

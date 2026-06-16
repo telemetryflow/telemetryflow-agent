@@ -98,7 +98,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	// Create API client using helper methods (prefer TelemetryFlow config over legacy API)
 	tlsConfig := cfg.GetEffectiveTLSConfig()
 	client := api.NewClient(api.ClientConfig{
-		BaseURL:       cfg.GetEffectiveEndpoint(),
+		BaseURL:       cfg.GetBackendEndpoint(),
 		APIKeyID:      cfg.GetEffectiveAPIKeyID(),
 		APIKeySecret:  cfg.GetEffectiveAPIKeySecret(),
 		WorkspaceID:   cfg.GetEffectiveWorkspaceID(),

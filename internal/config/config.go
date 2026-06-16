@@ -107,8 +107,13 @@ type TelemetryFlowConfig struct {
 	// APIKeySecret is the API key secret (format: tfs_xxx)
 	APIKeySecret string `mapstructure:"api_key_secret"`
 
-	// Endpoint is the TelemetryFlow backend endpoint (host:port)
+	// Endpoint is the OTLP collector endpoint (host:port) for metric/trace/log export.
 	Endpoint string `mapstructure:"endpoint"`
+
+	// BackendEndpoint is the TFO Platform backend API URL (e.g. http://localhost:3000)
+	// used by the heartbeat, QAN exporter, and other REST API calls.
+	// When empty, falls back to Endpoint (for backward compatibility).
+	BackendEndpoint string `mapstructure:"backend_endpoint"`
 
 	// Protocol is the transport protocol (grpc or http)
 	Protocol string `mapstructure:"protocol"`
@@ -3094,6 +3099,23 @@ func (c *Config) GetEffectiveEndpoint() string {
 	ep := c.API.Endpoint
 	if ep == "" {
 		ep = c.TelemetryFlow.Endpoint
+	}
+	if ep != "" && !strings.HasPrefix(ep, "http://") && !strings.HasPrefix(ep, "https://") {
+		ep = "http://" + ep
+	}
+	return ep
+}
+
+// GetBackendEndpoint returns the platform backend API URL.
+// Prefers telemetryflow.backend_endpoint, falls back to telemetryflow.endpoint,
+// then api.endpoint. Ensures the returned value has an http:// or https:// scheme.
+func (c *Config) GetBackendEndpoint() string {
+	ep := c.TelemetryFlow.BackendEndpoint
+	if ep == "" {
+		ep = c.TelemetryFlow.Endpoint
+	}
+	if ep == "" {
+		ep = c.API.Endpoint
 	}
 	if ep != "" && !strings.HasPrefix(ep, "http://") && !strings.HasPrefix(ep, "https://") {
 		ep = "http://" + ep

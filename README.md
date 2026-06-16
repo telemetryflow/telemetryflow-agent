@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.1-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
@@ -59,8 +59,8 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.2.0 | SDK v1.43.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.2.0 | SDK v1.43.0        | Go instrumentation SDK      |
+| **TFO-Agent**     | v1.2.1 | SDK v1.43.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.2.1 | SDK v1.43.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.1.8  | Collector v0.147.0 | Central telemetry collector |
 
 ## Features
@@ -200,12 +200,15 @@ POST http://localhost:4318/v1/logs
 Create configuration file at `/etc/tfo-agent/tfo-agent.yaml`:
 
 ```yaml
-# TelemetryFlow Platform Configuration (v1.3.5+)
+# TelemetryFlow Platform Configuration
 telemetryflow:
   api_key_id: "${TELEMETRYFLOW_API_KEY_ID}"
   api_key_secret: "${TELEMETRYFLOW_API_KEY_SECRET}"
+  # OTLP collector endpoint (metrics/traces/logs export)
   endpoint: "${TELEMETRYFLOW_ENDPOINT:-localhost:4317}"
-  protocol: grpc # grpc or http
+  # Platform backend API (heartbeat, QAN, agent registration)
+  backend_endpoint: "${TELEMETRYFLOW_BACKEND_ENDPOINT:-http://localhost:3000/api/v2}"
+  protocol: "${TELEMETRYFLOW_PROTOCOL:-grpc}" # grpc or http
   tls:
     enabled: true
     skip_verify: false
@@ -250,8 +253,9 @@ buffer:
 ### Environment Variables
 
 ```bash
-# TelemetryFlow Platform (v1.3.5+)
-export TELEMETRYFLOW_ENDPOINT="localhost:4317"
+# TelemetryFlow Platform
+export TELEMETRYFLOW_ENDPOINT="localhost:4317"                         # OTLP collector
+export TELEMETRYFLOW_BACKEND_ENDPOINT="http://localhost:3000/api/v2"   # Platform backend API
 export TELEMETRYFLOW_API_KEY_ID="tfk_your_key_id"
 export TELEMETRYFLOW_API_KEY_SECRET="tfs_your_key_secret"
 export TELEMETRYFLOW_ENVIRONMENT="production"
