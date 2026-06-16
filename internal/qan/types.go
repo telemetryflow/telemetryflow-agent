@@ -296,40 +296,40 @@ type CollectResponse struct {
 // QANConfig holds configuration for the QAN data path.
 type QANConfig struct {
 	// Enabled controls whether the QAN path is active.
-	Enabled bool `json:"enabled" yaml:"enabled"`
+	Enabled bool `json:"enabled" yaml:"enabled" mapstructure:"enabled"`
 
 	// Interval is how often to collect QAN data (default: 60s).
-	Interval time.Duration `json:"interval" yaml:"interval"`
+	Interval time.Duration `json:"interval" yaml:"interval" mapstructure:"interval"`
 
 	// Endpoint is the TFO Platform QAN API URL.
 	// Example: "https://api.telemetryflow.id"
-	Endpoint string `json:"endpoint" yaml:"endpoint"`
+	Endpoint string `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint"`
 
 	// APIKeyID and APIKeySecret for authentication.
-	APIKeyID     string `json:"api_key_id" yaml:"api_key_id"`
-	APIKeySecret string `json:"-" yaml:"api_key_secret"`
+	APIKeyID     string `json:"api_key_id" yaml:"api_key_id" mapstructure:"api_key_id"`
+	APIKeySecret string `json:"-" yaml:"api_key_secret" mapstructure:"api_key_secret"`
 
 	// BatchSize is the maximum number of buckets per push (default: 100).
-	BatchSize int `json:"batch_size" yaml:"batch_size"`
+	BatchSize int `json:"batch_size" yaml:"batch_size" mapstructure:"batch_size"`
 
 	// FlushInterval is how long to buffer before flushing (default: 10s).
-	FlushInterval time.Duration `json:"flush_interval" yaml:"flush_interval"`
+	FlushInterval time.Duration `json:"flush_interval" yaml:"flush_interval" mapstructure:"flush_interval"`
 
 	// Timeout for HTTP push requests (default: 30s).
-	Timeout time.Duration `json:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout" yaml:"timeout" mapstructure:"timeout"`
 
 	// MaxRetryAttempts for push requests (default: 3).
-	MaxRetryAttempts int `json:"max_retry_attempts" yaml:"max_retry_attempts"`
+	MaxRetryAttempts int `json:"max_retry_attempts" yaml:"max_retry_attempts" mapstructure:"max_retry_attempts"`
 
 	// TopQueriesLimit is the max number of query fingerprints to track per
 	// database instance per cycle (default: 200).
-	TopQueriesLimit int `json:"top_queries_limit" yaml:"top_queries_limit"`
+	TopQueriesLimit int `json:"top_queries_limit" yaml:"top_queries_limit" mapstructure:"top_queries_limit"`
 
 	// Collectors enables/disables individual QAN collector types.
 	// All default to true when QAN.Enabled is true — set to false to disable
 	// specific DB types. Collectors only activate when the corresponding
 	// regular DB collector is enabled and has instances configured.
-	Collectors QANCollectorsConfig `json:"collectors" yaml:"collectors"`
+	Collectors QANCollectorsConfig `json:"collectors" yaml:"collectors" mapstructure:"collectors"`
 }
 
 // QANCollectorsConfig provides per-DB-type feature flags for QAN collection.
