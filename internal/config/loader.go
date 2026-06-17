@@ -318,10 +318,11 @@ func (l *Loader) bindEnvVars(v *viper.Viper) {
 	// Critical env vars that need explicit binding
 	envBindings := map[string]string{
 		// TelemetryFlow
-		"telemetryflow.endpoint":       "TELEMETRYFLOW_ENDPOINT",
-		"telemetryflow.protocol":       "TELEMETRYFLOW_PROTOCOL",
-		"telemetryflow.api_key_id":     "TELEMETRYFLOW_API_KEY_ID",
-		"telemetryflow.api_key_secret": "TELEMETRYFLOW_API_KEY_SECRET",
+		"telemetryflow.endpoint":         "TELEMETRYFLOW_ENDPOINT",
+		"telemetryflow.backend_endpoint": "TELEMETRYFLOW_BACKEND_ENDPOINT",
+		"telemetryflow.protocol":         "TELEMETRYFLOW_PROTOCOL",
+		"telemetryflow.api_key_id":       "TELEMETRYFLOW_API_KEY_ID",
+		"telemetryflow.api_key_secret":   "TELEMETRYFLOW_API_KEY_SECRET",
 
 		// Agent
 		"agent.id":           "TELEMETRYFLOW_ID",
