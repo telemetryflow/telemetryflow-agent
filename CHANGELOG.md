@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Heartbeat hitting OTLP collector port (critical)**: The heartbeat API client was initialized with `cfg.GetEffectiveEndpoint()` (the OTLP collector endpoint, e.g. `localhost:4317`) instead of the platform backend API (e.g. `localhost:3000`). Fixed by introducing `backend_endpoint` and `GetBackendEndpoint()`.
 - **Config loader simplified**: Loader now searches only for `tfo-agent.yaml` (removed `config.yaml`, `config.yml`, `tfo-agent.yml` fallbacks). Canonical config file is `configs/tfo-agent.yaml`.
 
+### Security
+
+- **CVE-2026-54411 (MEDIUM)**: linux-pam vulnerability (GHSA #229-232) affecting libpam-modules, libpam-modules-bin, libpam-runtime, libpam0g. PAM cannot be purged (required by login/system authentication). Agent runs as non-root (UID 10001) with `nologin` shell — PAM is never invoked. Suppressed in `.trivyignore`.
+- **CVE-2026-12087 (MEDIUM)**: perl-Socket information disclosure via out-of-bounds read (GHSA #233). Perl Socket module stripped from Docker image at build time — no runtime impact. Suppressed in `.trivyignore`.
+- **CVE-2026-48961 (MEDIUM)**: perl-IO-Compress denial of service in zipdetails. IO::Compress module already stripped from Docker image. Suppressed in `.trivyignore`.
+- **util-linux CVEs (GHSA #234-269)**: libblkid Integer Overflow (dos.c), mount(8) TOCTOU (hook_owner.c, Target Path Redirection), LIBMOUNT_FORCE_MOUNT2 nosuid/noexec bypass. All require local SUID `mount(8)` access — agent runs as non-root. Suppressed in `.trivyignore` with justification.
+- **Dockerfile**: Expanded Perl module stripping to include Socket module (`/usr/lib/*/perl/auto/Socket`, `/usr/share/perl/5.*/Socket*`) and Perl 5.x IO::Compress/IO::Uncompress variants.
+
 ### Changed
 
 - **Config file consolidation**: The agent loads exactly one config file — `configs/tfo-agent.yaml`. No other config file names are searched. The `--config` / `-c` flag still allows explicit override.

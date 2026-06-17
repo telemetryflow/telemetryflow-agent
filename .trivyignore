@@ -9,7 +9,7 @@
 
 # =============================================================================
 # perl-base: Cannot be purged (required by apt/dpkg). Vulnerable Perl modules
-# (Archive::Tar, IO::Compress, IO::Uncompress, Compress::Raw, HTTP::Tiny)
+# (Archive::Tar, IO::Compress, IO::Uncompress, Compress::Raw, HTTP::Tiny, Socket)
 # have been removed from the image at build time — no runtime impact.
 # =============================================================================
 CVE-2026-42496
@@ -20,10 +20,22 @@ CVE-2026-52287
 CVE-2026-52286
 CVE-2026-48959
 CVE-2026-48962
+CVE-2026-48961
 CVE-2025-15649
 # HTTP::Tiny < 0.093: CRLF in HTTP response headers (GHSA alert #226).
 # Module stripped from image — no runtime impact.
 CVE-2026-7010
+# perl-Socket: Information Disclosure due to Out-of-Bounds Read (GHSA #233).
+# Module stripped from image — no runtime impact.
+CVE-2026-12087
+
+# =============================================================================
+# linux-pam (libpam-modules, libpam-modules-bin, libpam-runtime, libpam0g):
+# Cannot be purged — required by login/passwd/system authentication. TFO Agent
+# runs as non-root user (UID 10001) with nologin shell — PAM is never invoked.
+# Patch pending from Debian trixie-security.
+# =============================================================================
+CVE-2026-54411
 
 # =============================================================================
 # krb5: Integer underflow in berval2tl_data() leads to heap out-of-bounds read
@@ -69,11 +81,20 @@ CVE-2026-7598
 # =============================================================================
 # util-linux / bsdutils / mount / login / libblkid1 / libmount1 / libsmartcols1
 # / libuuid1 / liblastlog2-2: Cannot be purged (core system utilities).
+# Agent runs as non-root (UID 10001) — mount(8), chfn, chsh are not accessible.
 # CVE-2026-27456: TOCTOU in mount with loop devices — agent runs as non-root.
 # CVE-2026-3184: hostname canonicalization — agent does not use hostname auth.
+# CVE-2025-14104: Heap buffer overread in setpwnam() — not reachable from agent.
+# CVE-2022-0563: Partial disclosure in chfn/chsh — not installed in agent image.
+# GHSA alerts #234-269: libblkid Integer Overflow (dos.c), mount(8) TOCTOU
+# (hook_owner.c, Target Path Redirection), LIBMOUNT_FORCE_MOUNT2 nosuid/noexec
+# bypass — all require local SUID mount(8) access which is not available to
+# the non-root agent process.
 # =============================================================================
 CVE-2026-27456
 CVE-2026-3184
+CVE-2025-14104
+CVE-2022-0563
 
 # =============================================================================
 # ncurses-base / ncurses-bin / libtinfo6: Cannot be purged (terminal library
