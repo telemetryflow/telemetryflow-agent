@@ -1,7 +1,7 @@
 // Package mssql implements the SQL Server QAN collector using
 // sys.dm_exec_query_stats with delta calculation from previous snapshot.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -246,6 +246,8 @@ func (c *QANMSSQLCollector) collectInstance(ctx context.Context, inst *qanMssqlI
 			QueryTimeCnt:    float64(deltaExecs),
 			QueryTimeSum:    deltaElapsedTime,
 			QueryTimeMax:    deltaElapsedTime,
+			// p99 approximated by max (upper bound); dm_exec_query_stats exposes no histogram.
+			QueryTimeP99: deltaElapsedTime,
 			MSSQL: &qan.MSSQLQANMetrics{
 				ExecutionCount:     float64(deltaExecs),
 				TotalWorkerTime:    deltaWorkerTime,

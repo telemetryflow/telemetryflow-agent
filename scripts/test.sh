@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test runner script for TelemetryFlow Agent
 #
-# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 
 set -e

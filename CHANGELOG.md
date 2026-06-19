@@ -33,12 +33,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New getter: `Config.GetBackendEndpoint()` — prefers `backend_endpoint`, falls back to `endpoint`, then `api.endpoint`
   - Agent API client (heartbeat, QAN, registration) now uses `GetBackendEndpoint()` instead of `GetEffectiveEndpoint()`
   - OTLP exporter continues using `GetEffectiveEndpoint()` / `GetOTLPEndpoint()` (unchanged)
+- **Cache collectors**: Redis, Valkey, and Memcached collectors monitoring cache instances over their native protocols. No external client libraries required.
+  - `internal/collector/redis/` — RESP INFO + commandstats under `db.redis.*`
+  - `internal/collector/valkey/` — RESP INFO (reuses redis client) under `db.valkey.*`
+  - `internal/collector/memcache/` — TCP stats + optional slabs under `db.memcache.*`
+- **Queueing collectors**: RabbitMQ, Apache Kafka, and Confluent Kafka.
+  - `internal/collector/rabbitmq/` — Management HTTP API (`/api/overview`, `/api/nodes`, `/api/queues`) under `queue.rabbitmq.*`
+  - `internal/collector/kafka/` — JMX Prometheus exporter scrape under `queue.kafka.*`
+  - `internal/collector/confluent_kafka/` — Confluent Metrics API query under `queue.confluent_kafka.*`
+- **Messaging collectors**: NATS and Google Cloud Pub/Sub.
+  - `internal/collector/nats/` — HTTP monitoring (`/varz`, `/connz`, `/routez`, `/subsz`, `/jsz`) under `messaging.nats.*`
+  - `internal/collector/pubsub/` — Cloud Monitoring API with service-account JWT auth (stdlib RS256, no Google client SDK) under `messaging.pubsub.*`
+- **Config types & defaults**: Added `NATSCollectorConfig`/`NATSInstanceConfig` and `PubSubCollectorConfig`/`PubSubInstanceConfig`. Added `Tags` to `MySQLCollectorConfig` for QAN label propagation.
+- **Config files**: New `configs/collectors-{redis,valkey,memcache,rabbitmq,kafka,confluent-kafka,nats,pubsub}.yaml` plus matching sections (disabled by default) in `configs/tfo-agent.yaml`.
+- **Tests**: Unit tests for all five queueing/messaging collectors (`Build*Metric`, lifecycle, no-instances, interface conformance); Pub/Sub JWT-signer coverage.
 
 ### Fixed
 
 - **QAN exporter auth headers (critical)**: Auth headers used wrong names (`X-TelemetryFlow-Key-Secret`) and the API key ID header was missing entirely. Corrected to `X-API-Key-ID` and `X-API-Key-Secret` matching the platform's API middleware.
 - **Heartbeat hitting OTLP collector port (critical)**: The heartbeat API client was initialized with `cfg.GetEffectiveEndpoint()` (the OTLP collector endpoint, e.g. `localhost:4317`) instead of the platform backend API (e.g. `localhost:3000`). Fixed by introducing `backend_endpoint` and `GetBackendEndpoint()`.
 - **Config loader simplified**: Loader now searches only for `tfo-agent.yaml` (removed `config.yaml`, `config.yml`, `tfo-agent.yml` fallbacks). Canonical config file is `configs/tfo-agent.yaml`.
+- **Aurora QAN (#1)**: Implemented the Aurora QAN collector wrapping RDS Performance Insights (previously a stub returning no data).
+- **MySQL QAN labels (#2)**: Tags from `MySQLCollectorConfig` are now propagated onto QAN buckets.
+- **QueryTimeP99 (#3)**: Populated from the MySQL performance-schema histogram; other engines upper-bound p99 with max execution time.
+- **QAN cross-DB filter (#4)**: PostgreSQL / TimescaleDB / RDSPostgreSQL QAN queries now filter to the target database (previously leaked cross-DB rows).
+- **QAN ordering (#5)**: Top queries are now ranked by per-cycle delta rather than cumulative counters, so the busiest queries of the moment surface first.
+- **QAN validation (#6)**: `ValidateQAN` now requires an endpoint when QAN is enabled, failing fast instead of emitting context-canceled errors at runtime.
+- **Dead AgentType constants (#7)**: Removed unused `AgentTypeSlowLog` / `AgentTypeMongoLog` / `AgentTypeQueryStore` constants.
 
 ### Security
 

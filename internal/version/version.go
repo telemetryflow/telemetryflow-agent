@@ -1,7 +1,7 @@
 // Package version exposes build-time metadata — semantic version, Git commit,
 // build date — and product identity constants for the TelemetryFlow Agent.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -35,7 +35,7 @@ const (
 	ProductDescription = "Community Enterprise-grade observability agent for metrics, logs, and traces collection"
 
 	// Motto is the product tagline
-	Motto = "Community Enterprise Observability Platform (CEOP)"
+	Motto = "AI-Powered Observability & Incident Response Management (IRM) Platform"
 
 	// Vendor is the organization that owns this software
 	Vendor = "TelemetryFlow"

@@ -1,0 +1,26 @@
+# TelemetryFlow Agent - Valkey Cache Collector Configuration
+#
+# Example configuration for monitoring Valkey instances. Valkey speaks the
+# Redis-compatible RESP protocol, so the collector reuses the same INFO-based
+# collection path with valkey-prefixed metric names (db.valkey.*).
+
+valkey:
+  enabled: true
+
+  info_interval: 15s
+
+  tags:
+    env: "production"
+    tier: "cache"
+
+  instances:
+    - name: "valkey-primary"
+      host: "valkey-primary.internal"
+      port: 6379
+      password: "${VALKEY_PASSWORD}"
+      db: 0
+      # tls_enabled: false
+      # tls_skip_verify: false
+      collect_command_stats: true
+      tags:
+        role: "primary"

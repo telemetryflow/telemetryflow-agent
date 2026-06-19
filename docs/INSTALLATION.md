@@ -1,14 +1,14 @@
 # TelemetryFlow Agent Installation Guide
 
-- **Version:** 1.2.0
-- **OTEL SDK Version:** 1.40.0
+- **Version:** 1.2.1
+- **OTEL SDK Version:** 1.43.0
 - **Last Updated:** January 2026
 
 ---
 
 ## Prerequisites
 
-- Go 1.25 or later (for building from source)
+- Go 1.26 or later (for building from source)
 - Make (for build automation)
 - Docker (optional, for containerized deployment)
 
@@ -33,7 +33,7 @@ make build
 **Expected Output:**
 
 ```
-TelemetryFlow Agent v1.2.0 (OTEL SDK 1.40.0)
+TelemetryFlow Agent v1.2.1 (OTEL SDK 1.43.0)
 
   Build Information
   ─────────────────────────────────────────────
@@ -82,8 +82,8 @@ docker-compose down
 
 | Variable                       | Description                      | Default                             |
 | ------------------------------ | -------------------------------- | ----------------------------------- |
-| `VERSION`                      | Build version                    | `1.1.8`                             |
-| `OTEL_SDK_VERSION`             | OpenTelemetry SDK version        | `1.40.0`                            |
+| `VERSION`                      | Build version                    | `1.2.1`                             |
+| `OTEL_SDK_VERSION`             | OpenTelemetry SDK version        | `1.43.0`                            |
 | `IMAGE_NAME`                   | Docker image name                | `telemetryflow/telemetryflow-agent` |
 | `OTLP_GRPC_PORT`               | OTLP gRPC port                   | `4317`                              |
 | `OTLP_HTTP_PORT`               | OTLP HTTP port                   | `4318`                              |
@@ -100,11 +100,11 @@ docker-compose down
 ```bash
 # Build image with version info
 docker build \
-  --build-arg VERSION=1.1.8 \
+  --build-arg VERSION=1.2.1 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.1.8 .
+  -t telemetryflow/telemetryflow-agent:1.2.1 .
 
 # Run with configuration
 docker run -d \
@@ -116,7 +116,7 @@ docker run -d \
   -p 13133:13133 \
   -v $(pwd)/configs/tfo-agent.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.1.8
+  telemetryflow/telemetryflow-agent:1.2.1
 
 # Check logs
 docker logs tfo-agent
@@ -129,7 +129,7 @@ curl http://localhost:13133/
 
 ```bash
 # Download the latest release
-VERSION=1.1.8
+VERSION=1.2.1
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
@@ -220,7 +220,7 @@ EOF
 ```bash
 sudo tee /etc/systemd/system/tfo-agent.service > /dev/null <<'EOF'
 [Unit]
-Description=TelemetryFlow Agent - Community Enterprise Observability Platform
+Description=TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 Documentation=https://docs.telemetryflow.id
 After=network-online.target
 Wants=network-online.target
@@ -374,7 +374,7 @@ metadata:
   namespace: observability
   labels:
     app: tfo-agent
-    version: "1.1.8"
+    version: "1.2.1"
 spec:
   selector:
     matchLabels:
@@ -390,7 +390,7 @@ spec:
 
       containers:
         - name: tfo-agent
-          image: telemetryflow/telemetryflow-agent:1.1.8
+          image: telemetryflow/telemetryflow-agent:1.2.1
           args:
             - "start"
             - "--config"
@@ -555,7 +555,7 @@ tfo-agent version
 
 ```bash
 # Pull new image
-docker pull telemetryflow/telemetryflow-agent:1.1.8
+docker pull telemetryflow/telemetryflow-agent:1.2.1
 
 # Stop and remove old container
 docker stop tfo-agent
@@ -565,7 +565,7 @@ docker rm tfo-agent
 docker run -d \
   --name tfo-agent \
   ... # same options as before
-  telemetryflow/telemetryflow-agent:1.1.8 \
+  telemetryflow/telemetryflow-agent:1.2.1 \
   start --config /etc/tfo-agent/config.yaml
 ```
 
@@ -574,7 +574,7 @@ docker run -d \
 ```bash
 # Update image in DaemonSet
 kubectl set image daemonset/tfo-agent \
-  tfo-agent=telemetryflow/telemetryflow-agent:1.1.8 \
+  tfo-agent=telemetryflow/telemetryflow-agent:1.2.1 \
   -n observability
 
 # Watch rollout

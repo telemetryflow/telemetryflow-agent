@@ -4,7 +4,7 @@
 //
 // QAN data flows: QANCollector → QANForwarder → QANExporter → TFO Platform QAN endpoint
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -23,6 +23,7 @@
 package qan
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -32,11 +33,8 @@ type AgentType string
 const (
 	AgentTypePostgreSQLPgStatements  AgentType = "qan-postgresql-pgstatements"
 	AgentTypeMySQLPerfSchema         AgentType = "qan-mysql-perfschema"
-	AgentTypeMySQLSlowLog            AgentType = "qan-mysql-slowlog"
 	AgentTypeMongoDBProfiler         AgentType = "qan-mongodb-profiler"
-	AgentTypeMongoDBMongolog         AgentType = "qan-mongodb-mongolog"
 	AgentTypeMSSQLQueryStats         AgentType = "qan-mssql-querystats"
-	AgentTypeMSSQLQueryStore         AgentType = "qan-mssql-querystore"
 	AgentTypeCockroachDBStmtStats    AgentType = "qan-cockroachdb-stmtstats"
 	AgentTypeTimescaleDBPgStatements AgentType = "qan-timescaledb-pgstatements"
 	AgentTypeRDSPostgreSQLPgStmt     AgentType = "qan-rds-postgresql-pgstatements"
@@ -367,4 +365,36 @@ func DefaultQANConfig() QANConfig {
 			Aurora:        true,
 		},
 	}
+}
+
+// Validate returns an error if the QAN configuration is inconsistent.
+// Returns nil when QAN is disabled. When enabled, the endpoint is required
+// (otherwise the exporter silently drops every batch) and timing knobs must
+// be positive.
+func (c QANConfig) Validate() error {
+	if !c.Enabled {
+		return nil
+	}
+	if c.Endpoint == "" {
+		return fmt.Errorf("qan.enabled is true but qan.endpoint is empty — QAN buckets would be silently dropped")
+	}
+	if c.Interval < time.Second {
+		return fmt.Errorf("qan.interval must be >= 1s, got %s", c.Interval)
+	}
+	if c.FlushInterval < time.Second {
+		return fmt.Errorf("qan.flush_interval must be >= 1s, got %s", c.FlushInterval)
+	}
+	if c.Timeout < time.Second {
+		return fmt.Errorf("qan.timeout must be >= 1s, got %s", c.Timeout)
+	}
+	if c.BatchSize < 1 {
+		return fmt.Errorf("qan.batch_size must be >= 1, got %d", c.BatchSize)
+	}
+	if c.MaxRetryAttempts < 0 {
+		return fmt.Errorf("qan.max_retry_attempts must be >= 0, got %d", c.MaxRetryAttempts)
+	}
+	if c.TopQueriesLimit < 1 {
+		return fmt.Errorf("qan.top_queries_limit must be >= 1, got %d", c.TopQueriesLimit)
+	}
+	return nil
 }

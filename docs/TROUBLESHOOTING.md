@@ -1,7 +1,7 @@
 # TelemetryFlow Agent Troubleshooting Guide
 
-- **Version:** 1.1.2
-- **Last Updated:** January 2026
+- **Version:** 1.2.1
+- **Last Updated:** June 2026
 
 ---
 

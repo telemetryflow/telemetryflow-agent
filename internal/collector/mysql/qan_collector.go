@@ -1,7 +1,7 @@
 // Package mysql implements the MySQL/MariaDB/Percona QAN collector using
 // performance_schema.events_statements_summary_by_digest with delta calculation.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -275,6 +275,10 @@ func (c *QANMySQLCollector) collectInstance(ctx context.Context, inst *qanMySQLI
 			QueryTimeSum:     deltaTimerWait / picosPerSecond,
 			QueryTimeMin:     float64(s.minTimerWait) / picosPerSecond,
 			QueryTimeMax:     float64(s.maxTimerWait) / picosPerSecond,
+			// p99 approximated by max (upper bound). True percentiles are
+			// available via performance_schema.events_statements_histogram_by_digest
+			// (MySQL 5.7+) and can replace this in a follow-up.
+			QueryTimeP99: float64(s.maxTimerWait) / picosPerSecond,
 			MySQL: &qan.MySQLQANMetrics{
 				LockTimeCnt: float64(deltaCount),
 				LockTimeSum: float64(deltaLockTime) / 1e9,

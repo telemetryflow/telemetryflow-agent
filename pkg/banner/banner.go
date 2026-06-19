@@ -1,7 +1,7 @@
 // Package banner renders the TelemetryFlow Agent ASCII-art startup banner,
 // displaying the product name, version, motto, build info, and vendor details.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -45,7 +45,7 @@ func DefaultConfig() Config {
 	return Config{
 		ProductName: "TelemetryFlow Agent",
 		Version:     "1.2.0",
-		Motto:       "Community Enterprise Observability Platform (CEOP)",
+		Motto:       "AI-Powered Observability & Incident Response Management (IRM) Platform",
 		GitCommit:   "unknown",
 		BuildTime:   "unknown",
 		GoVersion:   "unknown",

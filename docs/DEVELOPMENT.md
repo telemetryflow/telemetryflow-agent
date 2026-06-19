@@ -1,9 +1,9 @@
 # TelemetryFlow Agent Development Guide
 
-- **Version:** 1.2.0
-- **Last Updated:** January 2026
-- **Go Version:** 1.25+
-- **OTEL SDK Version:** 1.40.0
+- **Version:** 1.2.1
+- **Last Updated:** June 2026
+- **Go Version:** 1.26+
+- **OTEL SDK Version:** 1.43.0
 
 ---
 
@@ -141,7 +141,7 @@ Every package should have a package comment:
 ```go
 // Package exporter provides telemetry export functionality for TelemetryFlow Agent.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 package exporter
 ```

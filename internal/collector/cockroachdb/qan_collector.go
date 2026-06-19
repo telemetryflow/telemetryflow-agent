@@ -1,7 +1,7 @@
 // Package cockroachdb implements the CockroachDB QAN collector using
 // crdb_internal.node_statement_statistics with delta calculation.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -213,6 +213,8 @@ func (c *QANCockroachDBCollector) collectInstance(ctx context.Context, inst *qan
 			QueryTimeCnt:     deltaCount,
 			QueryTimeSum:     avgLatencySec * deltaCount,
 			QueryTimeMax:     s.maxLatency / 1e9,
+			// p99 approximated by max (upper bound); crdb_internal node_statement_statistics has no histogram.
+			QueryTimeP99: s.maxLatency / 1e9,
 			CockroachDB: &qan.CockroachDBQANMetrics{
 				RowsReadCnt:     deltaCount,
 				RowsReadSum:     deltaRowsRead,

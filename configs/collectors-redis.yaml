@@ -1,0 +1,36 @@
+# TelemetryFlow Agent - Redis Cache Collector Configuration
+#
+# Example configuration for monitoring Redis instances over RESP.
+# Collects INFO, keyspace, and optional commandstats metrics.
+
+redis:
+  enabled: true
+
+  # Global interval for INFO collection (default: 15s)
+  info_interval: 15s
+
+  # Collector-level tags applied to all Redis metrics
+  tags:
+    env: "production"
+    tier: "cache"
+
+  instances:
+    - name: "redis-primary"
+      host: "redis-primary.internal"
+      port: 6379
+      password: "${REDIS_PASSWORD}"
+      db: 0
+      # TLS options
+      # tls_enabled: false
+      # tls_skip_verify: false
+      collect_command_stats: true
+      tags:
+        role: "primary"
+
+    - name: "redis-replica"
+      host: "redis-replica.internal"
+      port: 6379
+      password: "${REDIS_PASSWORD}"
+      collect_command_stats: true
+      tags:
+        role: "replica"

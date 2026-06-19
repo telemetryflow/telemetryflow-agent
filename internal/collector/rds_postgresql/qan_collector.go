@@ -3,7 +3,7 @@
 // delta calculation — identical to the PostgreSQL QAN collector but with
 // RDS-specific connection defaults (verify-full SSL, RDS CA cert).
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,7 @@ package rds_postgresql
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -163,15 +164,23 @@ func (c *QANRDSPostgreSQLCollector) collectInstance(ctx context.Context, inst *q
 	}
 
 	limit := c.cfg.TopQueriesLimit
+	candidatePool := limit * 3
+	if candidatePool > 1000 {
+		candidatePool = 1000
+	}
+	if candidatePool < limit {
+		candidatePool = limit
+	}
 
 	query := `
 		SELECT queryid, query, calls, total_exec_time, min_exec_time, max_exec_time,
 		       rows, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written
 		FROM pg_stat_statements
+		WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
 		ORDER BY total_exec_time DESC
 		LIMIT $1`
 
-	rows, err := pool.Query(ctx2, query, limit)
+	rows, err := pool.Query(ctx2, query, candidatePool)
 	if err != nil {
 		return nil, fmt.Errorf("query pg_stat_statements: %w", err)
 	}
@@ -246,6 +255,8 @@ func (c *QANRDSPostgreSQLCollector) collectInstance(ctx context.Context, inst *q
 			QueryTimeSum:     deltaTime / 1000.0,
 			QueryTimeMin:     s.minExecTime / 1000.0,
 			QueryTimeMax:     s.maxExecTime / 1000.0,
+			// p99 approximated by max (upper bound); pg_stat_statements has no histogram.
+			QueryTimeP99: s.maxExecTime / 1000.0,
 			PostgreSQL: &qan.PostgreSQLQANMetrics{
 				RowsCnt:              float64(deltaCalls),
 				RowsSum:              float64(deltaRows),
@@ -263,6 +274,14 @@ func (c *QANRDSPostgreSQLCollector) collectInstance(ctx context.Context, inst *q
 
 	inst.prevSnapshot = currentSnapshot
 	inst.prevTime = now
+
+	if len(buckets) > limit {
+		sort.Slice(buckets, func(i, j int) bool {
+			return buckets[i].QueryTimeSum > buckets[j].QueryTimeSum
+		})
+		buckets = buckets[:limit]
+	}
+
 	return buckets, nil
 }
 

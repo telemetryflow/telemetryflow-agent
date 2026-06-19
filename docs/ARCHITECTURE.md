@@ -2,7 +2,7 @@
 
 ## Overview
 
-TelemetryFlow Agent is part of the TelemetryFlow Community Enterprise Observability Platform (CEOP). This document describes the architecture and integration with other TelemetryFlow components.
+TelemetryFlow Agent is part of the TelemetryFlow AI-Powered Observability & Incident Response Management (IRM) Platform. This document describes the architecture and integration with other TelemetryFlow components.
 
 ## System Architecture
 
@@ -271,7 +271,7 @@ sequenceDiagram
     "containerRuntime": "docker",
     "cloudProvider": "aws",
     "cloudRegion": "us-west-2",
-    "agentVersion": "1.1.2",
+    "agentVersion": "1.2.1",
     "agentUptime": 86400
   }
 }

@@ -1,0 +1,23 @@
+# TelemetryFlow Agent - Memcached Cache Collector Configuration
+#
+# Example configuration for monitoring Memcached instances over TCP.
+# Collects `stats` and (optionally) `stats slabs` output.
+
+memcache:
+  enabled: true
+
+  # Global interval for stats collection (default: 15s)
+  stats_interval: 15s
+
+  tags:
+    env: "production"
+    tier: "cache"
+
+  instances:
+    - name: "memcache-1"
+      host: "memcache.internal"
+      port: 11211
+      timeout: 5s
+      collect_slab_stats: true
+      tags:
+        role: "shared"

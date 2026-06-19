@@ -2,7 +2,7 @@
 // Viper-based loading from YAML files and TFOAGENT_ environment variables, with
 // sensible defaults for every field.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -294,6 +294,30 @@ type CollectorConfig struct {
 	// RDSPostgreSQL contains AWS RDS PostgreSQL agent-side collector settings
 	RDSPostgreSQL RDSPostgreSQLCollectorConfig `mapstructure:"rds_postgresql"`
 
+	// Redis contains Redis cache monitoring collector settings
+	Redis RedisCollectorConfig `mapstructure:"redis"`
+
+	// Valkey contains Valkey cache monitoring collector settings (Redis-compatible protocol)
+	Valkey ValkeyCollectorConfig `mapstructure:"valkey"`
+
+	// Memcache contains Memcached cache monitoring collector settings
+	Memcache MemcacheCollectorConfig `mapstructure:"memcache"`
+
+	// RabbitMQ contains RabbitMQ queueing monitoring collector settings (Management API)
+	RabbitMQ RabbitMQCollectorConfig `mapstructure:"rabbitmq"`
+
+	// Kafka contains Apache Kafka queueing monitoring collector settings (JMX exporter scrape)
+	Kafka KafkaCollectorConfig `mapstructure:"kafka"`
+
+	// ConfluentKafka contains Confluent Kafka queueing monitoring collector settings (Metrics API)
+	ConfluentKafka ConfluentKafkaCollectorConfig `mapstructure:"confluent_kafka"`
+
+	// NATS contains NATS messaging monitoring collector settings (HTTP monitoring API)
+	NATS NATSCollectorConfig `mapstructure:"nats"`
+
+	// PubSub contains Google Cloud Pub/Sub messaging monitoring collector settings (Cloud Monitoring API)
+	PubSub PubSubCollectorConfig `mapstructure:"pubsub"`
+
 	// PrometheusScraper contains Prometheus pull-based scraper settings
 	PrometheusScraper PrometheusScraperConfig `mapstructure:"prometheus_scraper"`
 
@@ -368,6 +392,7 @@ type MySQLCollectorConfig struct {
 	StatusInterval time.Duration         `mapstructure:"status_interval"`
 	QueryInterval  time.Duration         `mapstructure:"query_interval"`
 	SchemaInterval time.Duration         `mapstructure:"schema_interval"`
+	Tags           map[string]string     `mapstructure:"tags"`
 }
 
 // MySQLInstanceConfig contains connection settings for a single MySQL instance.
@@ -675,6 +700,10 @@ type AuroraCollectorConfig struct {
 	// EnablePI enables Performance Insights data collection
 	EnablePI bool `mapstructure:"enable_pi"`
 
+	// TopQueriesLimit is the maximum number of top SQL queries to report from
+	// Performance Insights per instance per collection cycle (default: 200).
+	TopQueriesLimit int `mapstructure:"top_queries_limit"`
+
 	// CloudWatchBatchSize is the maximum number of metrics per GetMetricData request (default: 500)
 	CloudWatchBatchSize int `mapstructure:"cloudwatch_batch_size"`
 
@@ -812,6 +841,198 @@ type RDSPostgreSQLInstanceConfig struct {
 
 	// Tags are custom key-value tags applied to all metrics from this instance
 	Tags map[string]string `mapstructure:"tags"`
+}
+
+// =============================================================================
+// Cache & Queueing Collectors (Redis, Valkey, Memcached, RabbitMQ, Kafka)
+// =============================================================================
+
+// RedisCollectorConfig contains settings for monitoring Redis instances.
+type RedisCollectorConfig struct {
+	Enabled   bool                  `mapstructure:"enabled"`
+	Instances []RedisInstanceConfig `mapstructure:"instances"`
+	// InfoInterval is how often to collect INFO/CLUSTER stats (default: 15s)
+	InfoInterval time.Duration `mapstructure:"info_interval"`
+	// Tags are collector-level tags applied to all Redis metrics
+	Tags map[string]string `mapstructure:"tags"`
+}
+
+// RedisInstanceConfig contains connection settings for a single Redis instance.
+type RedisInstanceConfig struct {
+	Name     string `mapstructure:"name"`
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+	// TLSEnabled enables TLS for the Redis connection (default: false)
+	TLSEnabled    bool `mapstructure:"tls_enabled"`
+	TLSSkipVerify bool `mapstructure:"tls_skip_verify"`
+	// CollectLatency enables LATENCY HISTORY/RESET collection (default: false)
+	CollectLatency bool `mapstructure:"collect_latency"`
+	// CollectCommandStats enables INFO commandstats (default: true)
+	CollectCommandStats bool              `mapstructure:"collect_command_stats"`
+	Tags                map[string]string `mapstructure:"tags"`
+}
+
+// ValkeyCollectorConfig contains settings for monitoring Valkey instances.
+// Valkey speaks the Redis-compatible protocol (RESP), so the collector reuses
+// the same INFO-based collection path with valkey-prefixed metric names.
+type ValkeyCollectorConfig struct {
+	Enabled      bool                   `mapstructure:"enabled"`
+	Instances    []ValkeyInstanceConfig `mapstructure:"instances"`
+	InfoInterval time.Duration          `mapstructure:"info_interval"`
+	Tags         map[string]string      `mapstructure:"tags"`
+}
+
+// ValkeyInstanceConfig contains connection settings for a single Valkey instance.
+type ValkeyInstanceConfig struct {
+	Name                string            `mapstructure:"name"`
+	Host                string            `mapstructure:"host"`
+	Port                int               `mapstructure:"port"`
+	Password            string            `mapstructure:"password"`
+	DB                  int               `mapstructure:"db"`
+	TLSEnabled          bool              `mapstructure:"tls_enabled"`
+	TLSSkipVerify       bool              `mapstructure:"tls_skip_verify"`
+	CollectCommandStats bool              `mapstructure:"collect_command_stats"`
+	Tags                map[string]string `mapstructure:"tags"`
+}
+
+// MemcacheCollectorConfig contains settings for monitoring Memcached instances.
+type MemcacheCollectorConfig struct {
+	Enabled   bool                     `mapstructure:"enabled"`
+	Instances []MemcacheInstanceConfig `mapstructure:"instances"`
+	// StatsInterval is how often to collect stats (default: 15s)
+	StatsInterval time.Duration     `mapstructure:"stats_interval"`
+	Tags          map[string]string `mapstructure:"tags"`
+}
+
+// MemcacheInstanceConfig contains connection settings for a single Memcached instance.
+type MemcacheInstanceConfig struct {
+	Name             string            `mapstructure:"name"`
+	Host             string            `mapstructure:"host"`
+	Port             int               `mapstructure:"port"`
+	Timeout          time.Duration     `mapstructure:"timeout"`
+	CollectSlabStats bool              `mapstructure:"collect_slab_stats"`
+	Tags             map[string]string `mapstructure:"tags"`
+}
+
+// RabbitMQCollectorConfig contains settings for monitoring RabbitMQ via the
+// Management HTTP API.
+type RabbitMQCollectorConfig struct {
+	Enabled   bool                     `mapstructure:"enabled"`
+	Instances []RabbitMQInstanceConfig `mapstructure:"instances"`
+	// OverviewInterval is how often to collect /api/overview (default: 15s)
+	OverviewInterval time.Duration `mapstructure:"overview_interval"`
+	// QueueInterval is how often to collect /api/queues (default: 30s)
+	QueueInterval time.Duration `mapstructure:"queue_interval"`
+	// NodeInterval is how often to collect /api/nodes (default: 30s)
+	NodeInterval time.Duration     `mapstructure:"node_interval"`
+	Tags         map[string]string `mapstructure:"tags"`
+}
+
+// RabbitMQInstanceConfig contains connection settings for a single RabbitMQ Management API endpoint.
+type RabbitMQInstanceConfig struct {
+	Name          string `mapstructure:"name"`
+	URL           string `mapstructure:"url"`
+	Username      string `mapstructure:"username"`
+	Password      string `mapstructure:"password"`
+	Vhost         string `mapstructure:"vhost"`
+	TLSEnabled    bool   `mapstructure:"tls_enabled"`
+	TLSSkipVerify bool   `mapstructure:"tls_skip_verify"`
+	// QueueFilter limits queue collection to names matching this regex (empty = all)
+	QueueFilter string            `mapstructure:"queue_filter"`
+	Tags        map[string]string `mapstructure:"tags"`
+}
+
+// KafkaCollectorConfig contains settings for monitoring Apache Kafka via a
+// JMX Prometheus exporter HTTP endpoint (the standard sidecar deployment).
+type KafkaCollectorConfig struct {
+	Enabled   bool                  `mapstructure:"enabled"`
+	Instances []KafkaInstanceConfig `mapstructure:"instances"`
+	// ScrapeInterval is how often to scrape the JMX exporter (default: 15s)
+	ScrapeInterval time.Duration     `mapstructure:"scrape_interval"`
+	Tags           map[string]string `mapstructure:"tags"`
+}
+
+// KafkaInstanceConfig contains connection settings for a single Kafka JMX exporter endpoint.
+type KafkaInstanceConfig struct {
+	Name string `mapstructure:"name"`
+	// ExporterURL is the JMX Prometheus exporter URL (e.g., http://kafka:9404/metrics)
+	ExporterURL   string            `mapstructure:"exporter_url"`
+	Username      string            `mapstructure:"username"`
+	Password      string            `mapstructure:"password"`
+	TLSSkipVerify bool              `mapstructure:"tls_skip_verify"`
+	Cluster       string            `mapstructure:"cluster"`
+	Tags          map[string]string `mapstructure:"tags"`
+}
+
+// ConfluentKafkaCollectorConfig contains settings for monitoring Confluent Kafka
+// via the Confluent Metrics HTTP query API.
+type ConfluentKafkaCollectorConfig struct {
+	Enabled       bool                           `mapstructure:"enabled"`
+	Instances     []ConfluentKafkaInstanceConfig `mapstructure:"instances"`
+	QueryInterval time.Duration                  `mapstructure:"query_interval"`
+	Tags          map[string]string              `mapstructure:"tags"`
+}
+
+// ConfluentKafkaInstanceConfig contains connection settings for the Confluent Metrics API.
+type ConfluentKafkaInstanceConfig struct {
+	Name string `mapstructure:"name"`
+	// MetricsURL is the Confluent Metrics API endpoint (e.g., https://api.telemetry.confluent.cloud/v1/metrics/cloud/query)
+	MetricsURL string            `mapstructure:"metrics_url"`
+	APIKey     string            `mapstructure:"api_key"`
+	APISecret  string            `mapstructure:"api_secret"`
+	Cluster    string            `mapstructure:"cluster"`
+	Tags       map[string]string `mapstructure:"tags"`
+}
+
+// NATSCollectorConfig contains settings for monitoring NATS servers via the
+// built-in HTTP monitoring API (/varz, /connz, /routez, /subsz, /jsz).
+type NATSCollectorConfig struct {
+	Enabled   bool                 `mapstructure:"enabled"`
+	Instances []NATSInstanceConfig `mapstructure:"instances"`
+	// StatsInterval is how often to scrape the monitoring endpoints (default: 15s)
+	StatsInterval time.Duration     `mapstructure:"stats_interval"`
+	Tags          map[string]string `mapstructure:"tags"`
+}
+
+// NATSInstanceConfig contains connection settings for a single NATS monitoring endpoint.
+type NATSInstanceConfig struct {
+	Name string `mapstructure:"name"`
+	// URL is the base monitoring URL (e.g., http://nats:8222)
+	URL           string `mapstructure:"url"`
+	Username      string `mapstructure:"username"`
+	Password      string `mapstructure:"password"`
+	TLSSkipVerify bool   `mapstructure:"tls_skip_verify"`
+	// CollectJetStream enables /jsz collection (default: false)
+	CollectJetStream bool              `mapstructure:"collect_jetstream"`
+	Tags             map[string]string `mapstructure:"tags"`
+}
+
+// PubSubCollectorConfig contains settings for monitoring Google Cloud Pub/Sub
+// via the Cloud Monitoring API (service-account based).
+type PubSubCollectorConfig struct {
+	Enabled   bool                   `mapstructure:"enabled"`
+	Instances []PubSubInstanceConfig `mapstructure:"instances"`
+	// StatsInterval is how often to query Cloud Monitoring (default: 60s)
+	StatsInterval time.Duration     `mapstructure:"stats_interval"`
+	Tags          map[string]string `mapstructure:"tags"`
+}
+
+// PubSubInstanceConfig contains settings for a single GCP project being monitored.
+type PubSubInstanceConfig struct {
+	Name string `mapstructure:"name"`
+	// ProjectID is the GCP project ID (e.g., my-gcp-project)
+	ProjectID string `mapstructure:"project_id"`
+	// CredentialsFile is the path to a GCP service account JSON key (optional; uses ADC if empty)
+	CredentialsFile string `mapstructure:"credentials_file"`
+	// ServiceAccountEmail overrides the JWT issuer when using raw key bytes (optional)
+	ServiceAccountEmail string `mapstructure:"service_account_email"`
+	// PrivateKeyFile is the path to a PEM-encoded private key paired with ServiceAccountEmail (optional)
+	PrivateKeyFile string `mapstructure:"private_key_file"`
+	// SubscriptionFilter limits collection to subscriptions matching this regex (empty = all)
+	SubscriptionFilter string            `mapstructure:"subscription_filter"`
+	Tags               map[string]string `mapstructure:"tags"`
 }
 
 // CAdvisorCollectorConfig contains cAdvisor Prometheus scraper collector settings.
@@ -2384,7 +2605,7 @@ func DefaultConfig() *Config {
 			ID:          "",
 			Hostname:    "",
 			Name:        "TelemetryFlow Agent",
-			Description: "TelemetryFlow Agent - Community Enterprise Observability Platform",
+			Description: "TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform",
 			Tags: map[string]string{
 				"environment": "production",
 			},
@@ -2641,6 +2862,48 @@ func DefaultConfig() *Config {
 				JobInterval:        60 * time.Second,
 				MaxConnections:     3,
 				Instances:          []TimescaleDBInstanceConfig{},
+			},
+			Redis: RedisCollectorConfig{
+				Enabled:      false,
+				InfoInterval: 15 * time.Second,
+				Instances:    []RedisInstanceConfig{},
+			},
+			Valkey: ValkeyCollectorConfig{
+				Enabled:      false,
+				InfoInterval: 15 * time.Second,
+				Instances:    []ValkeyInstanceConfig{},
+			},
+			Memcache: MemcacheCollectorConfig{
+				Enabled:       false,
+				StatsInterval: 15 * time.Second,
+				Instances:     []MemcacheInstanceConfig{},
+			},
+			RabbitMQ: RabbitMQCollectorConfig{
+				Enabled:          false,
+				OverviewInterval: 15 * time.Second,
+				QueueInterval:    30 * time.Second,
+				NodeInterval:     30 * time.Second,
+				Instances:        []RabbitMQInstanceConfig{},
+			},
+			Kafka: KafkaCollectorConfig{
+				Enabled:        false,
+				ScrapeInterval: 15 * time.Second,
+				Instances:      []KafkaInstanceConfig{},
+			},
+			ConfluentKafka: ConfluentKafkaCollectorConfig{
+				Enabled:       false,
+				QueryInterval: 30 * time.Second,
+				Instances:     []ConfluentKafkaInstanceConfig{},
+			},
+			NATS: NATSCollectorConfig{
+				Enabled:       false,
+				StatsInterval: 15 * time.Second,
+				Instances:     []NATSInstanceConfig{},
+			},
+			PubSub: PubSubCollectorConfig{
+				Enabled:       false,
+				StatsInterval: 60 * time.Second,
+				Instances:     []PubSubInstanceConfig{},
 			},
 		},
 		PrometheusServer: PrometheusServerConfig{
@@ -3088,6 +3351,10 @@ func (c *Config) Validate() error {
 		if c.Exporter.OTLP.EndpointVersion != "v1" && c.Exporter.OTLP.EndpointVersion != "v2" {
 			return ErrInvalidEndpointVersion
 		}
+	}
+	// Validate QAN configuration (no-op when disabled)
+	if err := c.QAN.Validate(); err != nil {
+		return err
 	}
 	return nil
 }

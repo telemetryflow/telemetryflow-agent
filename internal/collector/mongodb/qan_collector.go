@@ -1,7 +1,7 @@
 // Package mongodb implements the MongoDB QAN collector using the profiler
 // (system.profile) with delta calculation from previous snapshot.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -296,6 +296,8 @@ func (c *QANMongoDBCollector) collectInstance(ctx context.Context, inst *qanMong
 			QueryTimeSum:    float64(deltaMillis) / 1000.0,
 			QueryTimeMin:    float64(result.MillisMin) / 1000.0,
 			QueryTimeMax:    float64(result.MillisMax) / 1000.0,
+			// p99 approximated by max (upper bound); profiler aggregate has no histogram.
+			QueryTimeP99: float64(result.MillisMax) / 1000.0,
 			MongoDB: &qan.MongoDBQANMetrics{
 				DocsReturnedCnt: float64(deltaCount),
 				DocsReturnedSum: float64(deltaDocsReturned),

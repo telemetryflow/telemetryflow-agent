@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wait for services to be ready for E2E tests
 #
-# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # Usage:

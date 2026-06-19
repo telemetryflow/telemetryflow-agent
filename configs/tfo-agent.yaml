@@ -1,7 +1,7 @@
 # =============================================================================
 # TelemetryFlow Agent Configuration
 # =============================================================================
-# Community Enterprise Observability Platform (CEOP)
+# AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # This configuration file controls the TelemetryFlow Agent behavior.
@@ -78,7 +78,7 @@ agent:
   # Human-readable agent name
   name: "${TELEMETRYFLOW_AGENT_NAME:-tfo-agent}"
   # Human-readable description
-  description: "TelemetryFlow Agent - Community Enterprise Observability Platform"
+  description: "TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform"
   # Agent version (auto-populated at build time)
   version: ""
   # Custom tags for labeling and filtering (sent with every heartbeat)
@@ -412,6 +412,10 @@ collectors:
     status_interval: 10s
     query_interval: 60s
     schema_interval: 300s
+    # Collector-level tags applied to all MySQL metrics and QAN buckets.
+    # tags:
+    #   environment: "production"
+    #   team: "database"
     instances:
       # - name: "production-mysql-primary"
       #   host: "localhost"
@@ -466,6 +470,9 @@ collectors:
     pi_interval: 60s
     # Enable Performance Insights collection
     enable_pi: false
+    # Maximum number of top SQL queries to report from Performance Insights
+    # per instance per cycle (default: 200). Also caps QAN buckets.
+    top_queries_limit: 200
     # CloudWatch GetMetricData batch size (max 500 per request)
     cloudwatch_batch_size: 500
     # CloudWatch API rate limit (TPS, max 50 for GetMetricData)
@@ -490,6 +497,100 @@ collectors:
       #   tags:
       #     environment: "production"
       #     team: "database"
+
+  # ===========================================================================
+  # Cache Collectors - Redis / Valkey / Memcached
+  # ===========================================================================
+  # Monitor cache instances. Redis & Valkey speak RESP (INFO + commandstats);
+  # Memcached is scraped over TCP (stats + optional stats slabs).
+  redis:
+    enabled: false
+    info_interval: 15s
+    tags: {}
+    instances: []
+    # - name: "redis-primary"
+    #   host: "redis.internal"
+    #   port: 6379
+    #   password: "${REDIS_PASSWORD}"
+    #   collect_command_stats: true
+
+  valkey:
+    enabled: false
+    info_interval: 15s
+    tags: {}
+    instances: []
+    # - name: "valkey-primary"
+    #   host: "valkey.internal"
+    #   port: 6379
+    #   collect_command_stats: true
+
+  memcache:
+    enabled: false
+    stats_interval: 15s
+    tags: {}
+    instances: []
+    # - name: "memcache-1"
+    #   host: "memcache.internal"
+    #   port: 11211
+    #   collect_slab_stats: true
+
+  # ===========================================================================
+  # Queueing Collectors - RabbitMQ / Kafka / Confluent Kafka
+  # ===========================================================================
+  rabbitmq:
+    enabled: false
+    overview_interval: 15s
+    queue_interval: 30s
+    node_interval: 30s
+    tags: {}
+    instances: []
+    # - name: "rabbitmq-primary"
+    #   url: "http://rabbitmq.internal:15672"
+    #   username: "${RABBITMQ_USER}"
+    #   password: "${RABBITMQ_PASSWORD}"
+    #   queue_filter: ""  # regex; empty = all queues
+
+  kafka:
+    enabled: false
+    scrape_interval: 15s
+    tags: {}
+    instances: []
+    # - name: "kafka-broker-1"
+    #   exporter_url: "http://kafka-1.internal:9404/metrics"  # JMX Prometheus exporter
+    #   cluster: "prod-cluster"
+
+  confluent_kafka:
+    enabled: false
+    query_interval: 30s
+    tags: {}
+    instances: []
+    # - name: "confluent-cloud-prod"
+    #   metrics_url: "https://api.telemetry.confluent.cloud/v1/metrics/cloud/query"
+    #   api_key: "${CONFLUENT_API_KEY}"
+    #   api_secret: "${CONFLUENT_API_SECRET}"
+    #   cluster: "lkc-xxxxxxxx"
+
+  # ===========================================================================
+  # Messaging Collectors - NATS / Google Cloud Pub/Sub
+  # ===========================================================================
+  nats:
+    enabled: false
+    stats_interval: 15s
+    tags: {}
+    instances: []
+    # - name: "nats-primary"
+    #   url: "http://nats.internal:8222"
+    #   collect_jetstream: true
+
+  pubsub:
+    enabled: false
+    stats_interval: 60s
+    tags: {}
+    instances: []
+    # - name: "gcp-pubsub-prod"
+    #   project_id: "my-gcp-project"
+    #   credentials_file: "/etc/tfo/secrets/gcp-pubsub-sa.json"
+    #   subscription_filter: ""  # regex; empty = all subscriptions
 
   # Remote Write Receiver
   # Accepts Prometheus Remote Write (snappy-encoded protobuf) on a local port,

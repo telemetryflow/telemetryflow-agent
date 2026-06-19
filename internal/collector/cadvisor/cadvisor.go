@@ -1,7 +1,7 @@
 // Package cadvisor scrapes container and host metrics from a running cAdvisor
 // Prometheus endpoint and forwards them through the TelemetryFlow Agent pipeline.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //

@@ -2,7 +2,8 @@
 # TelemetryFlow Agent - Dockerfile
 # =============================================================================
 #
-# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# TelemetryFlow Agent v1.2.1 (Based on OpenTelemetry SDK 1.43.0)
+# AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -81,7 +82,7 @@ ARG VERSION=1.2.1
 # TelemetryFlow Metadata Labels (OCI Image Spec)
 # =============================================================================
 LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
-    org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - Community Enterprise Observability Platform (CEOP)" \
+    org.opencontainers.image.description="Enterprise telemetry collection agent for metrics, logs, and traces - AI-Powered Observability & Incident Response Management (IRM) Platform" \
     org.opencontainers.image.version="${VERSION}" \
     org.opencontainers.image.vendor="TelemetryFlow" \
     org.opencontainers.image.authors="Telemetri Data Indonesia <support@telemetryflow.id>" \

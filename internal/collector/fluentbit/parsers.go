@@ -3,7 +3,7 @@
 // parsers.go contains built-in Fluent Bit parser and multiline parser definitions
 // for Docker JSON, CRI, syslog, and common multiline stack trace patterns.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //

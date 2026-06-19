@@ -1,7 +1,7 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.1.2
-- **Last Updated:** January 2026
+- **Version:** 1.2.1
+- **Last Updated:** June 2026
 
 ---
 
@@ -118,13 +118,13 @@ Starts the TelemetryFlow Agent with the specified configuration.
                        \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    TelemetryFlow Agent v1.1.2
-    Community Enterprise Observability Platform (CEOP)
+    TelemetryFlow Agent v1.2.1
+    AI-Powered Observability & Incident Response Management (IRM) Platform
   ══════════════════════════════════════════════════════════════════════════════
     Platform     darwin/arm64
-    Go Version   go1.22.0
+    Go Version   go1.26.0
     Commit       abc1234
-    Built        2025-12-17T10:00:00Z
+    Built        2026-06-19T10:00:00Z
   ──────────────────────────────────────────────────────────────────────────────
     Vendor       TelemetryFlow (https://telemetryflow.id)
     Developer    Telemetri Data Indonesia
@@ -134,9 +134,9 @@ Starts the TelemetryFlow Agent with the specified configuration.
     Copyright (c) 2024-2026 Telemetri Data Indonesia
   ══════════════════════════════════════════════════════════════════════════════
 
-{"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.1.2"}
-{"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Configuration loaded","file":"configs/tfo-agent.yaml"}
-{"level":"info","ts":"2025-12-17T10:00:00Z","msg":"Agent started","id":"agent-001","hostname":"server-01"}
+{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.2.1"}
+{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Configuration loaded","file":"configs/tfo-agent.yaml"}
+{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Agent started","id":"agent-001","hostname":"server-01"}
 ```
 
 **Signal Handling:**
@@ -173,7 +173,7 @@ Displays version and build information.
 
 # Short version only
 ./build/tfo-agent version --short
-# Output: 1.1.2
+# Output: 1.2.1
 
 # JSON format
 ./build/tfo-agent version --json
@@ -182,13 +182,13 @@ Displays version and build information.
 **Output (Default):**
 
 ```
-TelemetryFlow Agent v1.1.2
+TelemetryFlow Agent v1.2.1
 
   Build Information
   ─────────────────────────────────────────────
   Commit:      abc1234
   Branch:      main
-  Built:       2025-12-17T10:00:00Z
+  Built:       2026-06-19T10:00:00Z
   Go Version:  go1.22.0
   Platform:    darwin/arm64
 
@@ -209,10 +209,10 @@ TelemetryFlow Agent v1.1.2
 {
   "product": "TelemetryFlow Agent",
   "description": "Enterprise telemetry collection agent",
-  "version": "1.1.2",
+  "version": "1.2.1",
   "git_commit": "abc1234",
   "git_branch": "main",
-  "build_time": "2025-12-17T10:00:00Z",
+  "build_time": "2026-06-19T10:00:00Z",
   "go_version": "go1.22.0",
   "os": "darwin",
   "arch": "arm64",

@@ -1,6 +1,6 @@
 # TelemetryFlow Agent - System Information Capabilities
 
-[![Version](https://img.shields.io/badge/Version-1.1.10-orange.svg)](../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.1-orange.svg)](../CHANGELOG.md)
 
 This document describes the comprehensive system information collected by the TelemetryFlow Agent during heartbeat and telemetry operations.
 

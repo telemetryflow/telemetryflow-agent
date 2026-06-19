@@ -1,0 +1,24 @@
+# TelemetryFlow Agent - Confluent Kafka Queueing Collector Configuration
+#
+# Example configuration for monitoring Confluent Cloud / Confluent Platform
+# Kafka clusters via the Confluent Metrics HTTP query API. Queries are grouped
+# by topic and emitted under queue.confluent_kafka.*.
+
+confluent_kafka:
+  enabled: true
+
+  # Query interval for the Metrics API (default: 30s)
+  query_interval: 30s
+
+  tags:
+    env: "production"
+    tier: "queueing"
+
+  instances:
+    - name: "confluent-cloud-prod"
+      metrics_url: "https://api.telemetry.confluent.cloud/v1/metrics/cloud/query"
+      api_key: "${CONFLUENT_API_KEY}"
+      api_secret: "${CONFLUENT_API_SECRET}"
+      cluster: "lkc-xxxxxxxx"   # Confluent Cloud cluster ID
+      tags:
+        provider: "confluent-cloud"

@@ -2,7 +2,7 @@
 # TelemetryFlow Agent - Release Workflow
 # =============================================================================
 #
-# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # This workflow builds and releases TelemetryFlow Agent for multiple platforms:
@@ -291,7 +291,7 @@ jobs:
 
           cat > %{buildroot}/usr/lib/systemd/system/tfo-agent.service << 'SYSTEMD'
           [Unit]
-          Description=${{ env.PRODUCT_NAME }} - Community Enterprise Observability Platform
+          Description=${{ env.PRODUCT_NAME }} - AI-Powered Observability & Incident Response Management (IRM) Platform
           Documentation=${{ env.HOMEPAGE }}
           After=network-online.target
           Wants=network-online.target
@@ -479,7 +479,7 @@ jobs:
           PKG_DIR=${{ env.BINARY_NAME }}_${VERSION}_${{ matrix.arch }}
           cat > ${PKG_DIR}/lib/systemd/system/tfo-agent.service << EOF
           [Unit]
-          Description=${{ env.PRODUCT_NAME }} - Community Enterprise Observability Platform
+          Description=${{ env.PRODUCT_NAME }} - AI-Powered Observability & Incident Response Management (IRM) Platform
           Documentation=${{ env.HOMEPAGE }}
           After=network-online.target
           Wants=network-online.target
@@ -585,7 +585,7 @@ jobs:
           $binPath = "`"$InstallDir\tfo-agent.exe`" start --config `"$ConfigDir\tfo-agent.yaml`""
           New-Service -Name $ServiceName `
                       -DisplayName "TelemetryFlow Agent" `
-                      -Description "TelemetryFlow Agent - Community Enterprise Observability Platform" `
+                      -Description "TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform" `
                       -BinaryPathName $binPath `
                       -StartupType Automatic
 

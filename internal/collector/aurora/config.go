@@ -1,6 +1,6 @@
 // Package aurora implements the Amazon Aurora database monitoring collector.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -39,6 +39,9 @@ func NewConfig(cfg config.AuroraCollectorConfig) Config {
 	}
 	if cfg.PIInterval == 0 {
 		cfg.PIInterval = 60 * time.Second
+	}
+	if cfg.TopQueriesLimit == 0 {
+		cfg.TopQueriesLimit = 200
 	}
 	if cfg.CloudWatchBatchSize == 0 {
 		cfg.CloudWatchBatchSize = 500

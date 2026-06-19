@@ -61,6 +61,23 @@ The Kubernetes collector uses four data sources:
 | **TimescaleDB**                 | Direct database connection (pgx)                                                                              | Hypertable stats (dimensions, chunks, compression), chunk age bucketing, continuous aggregate refresh lag, background job health (stuck detection, failures), data node availability                                                    |
 | **SQLite3**                     | File-based (database/sql)                                                                                     | Page cache hit/miss, WAL metrics, lock contention, integrity checks, table row counts and page stats                                                                                                                                    |
 
+## Cache, Queueing & Messaging Collectors
+
+| Collector                | Source                        | Description                                                                                                                                   |
+| ------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Redis**                | RESP (INFO, commandstats)     | Connections, memory, keyspace hits/misses, evictions, per-DB keys, per-command stats; optional TLS                                            |
+| **Valkey**               | RESP (INFO, commandstats)     | Same coverage as Redis under `db.valkey.*` — Valkey speaks RESP, so the redis client is reused                                                |
+| **Memcached**            | TCP (stats, stats slabs)      | Connections, cmd counts, hit/miss ratios, bytes, items, evictions, per-slab stats                                                             |
+| **RabbitMQ**             | Management HTTP API           | Cluster object/queue totals, message flow counters & rates, per-node mem/disk/FD/proc, per-queue messages/consumers/rates; queue_filter regex |
+| **Apache Kafka**         | JMX Prometheus exporter       | Broker/topic counters & gauges normalized from the JMX exporter exposition under `queue.kafka.*`; cluster + instance labels                   |
+| **Confluent Kafka**      | Confluent Metrics API         | Per-topic received/sent bytes & records, retained bytes, partition count via the Confluent Cloud/Platform metrics query API                   |
+| **NATS**                 | HTTP monitoring (/varz, /jsz) | Connections, subscriptions, sent/received msgs & bytes, routes, subscription cache hit rate, JetStream streams/consumers/messages/bytes       |
+| **Google Cloud Pub/Sub** | Cloud Monitoring API          | Undelivered/outstanding messages, oldest unacked age, sent/ack counts per subscription; service-account JWT (stdlib RS256, no Google SDK)     |
+
+> **No external client libraries**: cache/queueing/messaging collectors speak their
+> native wire protocols or management APIs directly and forward metrics through the
+> standard OTLP pipeline.
+
 ## Metric Naming Conventions
 
 | Prefix                      | Collector                            |
@@ -80,3 +97,11 @@ The Kubernetes collector uses four data sources:
 | `db.cockroachdb.*`          | CockroachDB collector                |
 | `db.timescaledb.*`          | TimescaleDB collector                |
 | `db.sqlite3.*`              | SQLite3 collector                    |
+| `db.redis.*`                | Redis cache collector                |
+| `db.valkey.*`               | Valkey cache collector               |
+| `db.memcache.*`             | Memcached cache collector            |
+| `queue.rabbitmq.*`          | RabbitMQ collector                   |
+| `queue.kafka.*`             | Apache Kafka collector               |
+| `queue.confluent_kafka.*`   | Confluent Kafka collector            |
+| `messaging.nats.*`          | NATS collector                       |
+| `messaging.pubsub.*`        | Google Cloud Pub/Sub collector       |

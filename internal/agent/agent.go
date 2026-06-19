@@ -2,7 +2,7 @@
 // It orchestrates all collectors, exporters, the API client, Kubernetes
 // sync, heartbeat, and the optional Prometheus /metrics endpoint.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -35,21 +35,29 @@ import (
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
 	clickhousecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/clickhouse"
 	cockroachdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cockroachdb"
+	confluentkafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/confluent_kafka"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
+	kafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/kafka"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
+	memcachecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/memcache"
 	mongodbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mongodb"
 	mssqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mssql"
 	mysqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mysql"
+	natscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nats"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
 	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
+	pubsubcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pubsub"
+	rabbitmqcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rabbitmq"
 	rdspgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rds_postgresql"
+	redicollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/redis"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
 	tsdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/timescaledb"
+	valkeycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/valkey"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
 	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
@@ -133,6 +141,11 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	// Create collectors (alphabetical order)
 	var collectors []collector.Collector
 
+	// auroraCol is lifted to function scope so it can be registered as a QAN
+	// collector when QAN.Aurora is enabled (the Aurora collector implements
+	// both collector.Collector and qan.QANCollector).
+	var auroraCol *auroracollector.AuroraCollector
+
 	// Add cAdvisor collector if enabled
 	if cfg.Collector.CAdvisor.Enabled {
 		cadvisorCol := cadvisorcollector.NewCAdvisorCollector(cfg.Collector.CAdvisor, logger)
@@ -165,7 +178,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 
 	// Add Aurora collector if enabled
 	if cfg.Collector.Aurora.Enabled {
-		auroraCol := auroracollector.NewAuroraCollector(cfg.Collector.Aurora, logger)
+		auroraCol = auroracollector.NewAuroraCollector(cfg.Collector.Aurora, logger)
 		collectors = append(collectors, auroraCol)
 		logger.Info("Aurora collector enabled",
 			zap.Int("clusters", len(cfg.Collector.Aurora.Clusters)),
@@ -240,6 +253,86 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("TimescaleDB collector enabled",
 			zap.Int("instances", len(cfg.Collector.TimescaleDB.Instances)),
 			zap.Duration("instance_interval", cfg.Collector.TimescaleDB.InstanceInterval),
+		)
+	}
+
+	// Add Redis collector if enabled
+	if cfg.Collector.Redis.Enabled {
+		redisCol := redicollector.NewRedisCollector(cfg.Collector.Redis, logger)
+		collectors = append(collectors, redisCol)
+		logger.Info("Redis collector enabled",
+			zap.Int("instances", len(cfg.Collector.Redis.Instances)),
+			zap.Duration("info_interval", cfg.Collector.Redis.InfoInterval),
+		)
+	}
+
+	// Add Valkey collector if enabled
+	if cfg.Collector.Valkey.Enabled {
+		valkeyCol := valkeycollector.NewValkeyCollector(cfg.Collector.Valkey, logger)
+		collectors = append(collectors, valkeyCol)
+		logger.Info("Valkey collector enabled",
+			zap.Int("instances", len(cfg.Collector.Valkey.Instances)),
+			zap.Duration("info_interval", cfg.Collector.Valkey.InfoInterval),
+		)
+	}
+
+	// Add Memcached collector if enabled
+	if cfg.Collector.Memcache.Enabled {
+		memcacheCol := memcachecollector.NewMemcacheCollector(cfg.Collector.Memcache, logger)
+		collectors = append(collectors, memcacheCol)
+		logger.Info("Memcache collector enabled",
+			zap.Int("instances", len(cfg.Collector.Memcache.Instances)),
+			zap.Duration("stats_interval", cfg.Collector.Memcache.StatsInterval),
+		)
+	}
+
+	// Add RabbitMQ collector if enabled
+	if cfg.Collector.RabbitMQ.Enabled {
+		rabbitCol := rabbitmqcollector.NewRabbitMQCollector(cfg.Collector.RabbitMQ, logger)
+		collectors = append(collectors, rabbitCol)
+		logger.Info("RabbitMQ collector enabled",
+			zap.Int("instances", len(cfg.Collector.RabbitMQ.Instances)),
+			zap.Duration("queue_interval", cfg.Collector.RabbitMQ.QueueInterval),
+		)
+	}
+
+	// Add Kafka collector if enabled (JMX Prometheus exporter scrape)
+	if cfg.Collector.Kafka.Enabled {
+		kafkaCol := kafkacollector.NewKafkaCollector(cfg.Collector.Kafka, logger)
+		collectors = append(collectors, kafkaCol)
+		logger.Info("Kafka collector enabled",
+			zap.Int("instances", len(cfg.Collector.Kafka.Instances)),
+			zap.Duration("scrape_interval", cfg.Collector.Kafka.ScrapeInterval),
+		)
+	}
+
+	// Add Confluent Kafka collector if enabled (Metrics API query)
+	if cfg.Collector.ConfluentKafka.Enabled {
+		confluentCol := confluentkafkacollector.NewConfluentKafkaCollector(cfg.Collector.ConfluentKafka, logger)
+		collectors = append(collectors, confluentCol)
+		logger.Info("Confluent Kafka collector enabled",
+			zap.Int("instances", len(cfg.Collector.ConfluentKafka.Instances)),
+			zap.Duration("query_interval", cfg.Collector.ConfluentKafka.QueryInterval),
+		)
+	}
+
+	// Add NATS collector if enabled (HTTP monitoring API)
+	if cfg.Collector.NATS.Enabled {
+		natsCol := natscollector.NewNATSCollector(cfg.Collector.NATS, logger)
+		collectors = append(collectors, natsCol)
+		logger.Info("NATS collector enabled",
+			zap.Int("instances", len(cfg.Collector.NATS.Instances)),
+			zap.Duration("stats_interval", cfg.Collector.NATS.StatsInterval),
+		)
+	}
+
+	// Add Google Cloud Pub/Sub collector if enabled (Cloud Monitoring API)
+	if cfg.Collector.PubSub.Enabled {
+		pubsubCol := pubsubcollector.NewPubSubCollector(cfg.Collector.PubSub, logger)
+		collectors = append(collectors, pubsubCol)
+		logger.Info("Pub/Sub collector enabled",
+			zap.Int("instances", len(cfg.Collector.PubSub.Instances)),
+			zap.Duration("stats_interval", cfg.Collector.PubSub.StatsInterval),
 		)
 	}
 
@@ -575,7 +668,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			myQAN := mysqlcollector.NewQANMySQLCollector(mysqlcollector.QANMySQLConfig{
 				Instances:       cfg.Collector.MySQL.Instances,
 				TopQueriesLimit: cfg.QAN.TopQueriesLimit,
-				Labels:          nil,
+				Labels:          cfg.Collector.MySQL.Tags,
 				Logger:          logger,
 			}, logger)
 			qanCollectors = append(qanCollectors, myQAN)
@@ -646,6 +739,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			qanCollectors = append(qanCollectors, rdsPgQAN)
 			logger.Info("QAN RDS PostgreSQL collector enabled",
 				zap.Int("instances", len(cfg.Collector.RDSPostgreSQL.Instances)),
+			)
+		}
+
+		// Aurora QAN reuses the Aurora collector, which derives per-query
+		// buckets from Performance Insights. It requires both the Aurora
+		// collector and PI to be enabled.
+		if cfg.QAN.Collectors.Aurora && auroraCol != nil && cfg.Collector.Aurora.EnablePI {
+			qanCollectors = append(qanCollectors, auroraCol)
+			logger.Info("QAN Aurora (Performance Insights) collector enabled",
+				zap.Int("clusters", len(cfg.Collector.Aurora.Clusters)),
 			)
 		}
 

@@ -3,7 +3,7 @@
 // FileTailer tails log files, handles rotation (truncation/inode change),
 // and supports glob path expansion for collecting from multiple files.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //

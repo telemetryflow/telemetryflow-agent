@@ -1,0 +1,25 @@
+# TelemetryFlow Agent - Google Cloud Pub/Sub Messaging Collector Configuration
+#
+# Example configuration for monitoring Google Cloud Pub/Sub subscriptions via
+# the Cloud Monitoring API. Authenticates with a GCP service account key.
+# Metrics are emitted under messaging.pubsub.*.
+
+pubsub:
+  enabled: true
+
+  # Query interval for Cloud Monitoring (default: 60s)
+  stats_interval: 60s
+
+  tags:
+    env: "production"
+    tier: "messaging"
+
+  instances:
+    - name: "gcp-pubsub-prod"
+      project_id: "my-gcp-project"
+      # Path to a GCP service account JSON key with Monitoring Viewer role.
+      credentials_file: "/etc/tfo/secrets/gcp-pubsub-sa.json"
+      # Limit collection to subscriptions matching this regex (empty = all)
+      subscription_filter: "^orders-.*"
+      tags:
+        provider: "gcp"

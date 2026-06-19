@@ -2,7 +2,7 @@
 # TelemetryFlow Agent - Docker Image Builder Workflow
 # =============================================================================
 #
-# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # This workflow builds and publishes Docker images for TelemetryFlow Agent:

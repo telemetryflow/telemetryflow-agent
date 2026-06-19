@@ -1,0 +1,24 @@
+# TelemetryFlow Agent - NATS Messaging Collector Configuration
+#
+# Example configuration for monitoring NATS servers via the built-in HTTP
+# monitoring API (/varz, /connz, /routez, /subsz, /jsz).
+
+nats:
+  enabled: true
+
+  # Stats scrape interval (default: 15s)
+  stats_interval: 15s
+
+  tags:
+    env: "production"
+    tier: "messaging"
+
+  instances:
+    - name: "nats-primary"
+      url: "http://nats.internal:8222"
+      # username: "${NATS_USER}"     # optional basic auth
+      # password: "${NATS_PASSWORD}"
+      # tls_skip_verify: false
+      collect_jetstream: true
+      tags:
+        role: "primary"

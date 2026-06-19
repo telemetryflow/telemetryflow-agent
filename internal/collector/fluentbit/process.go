@@ -3,7 +3,7 @@
 // process.go manages the Fluent Bit subprocess lifecycle: start, stop, health
 // check, and automatic restart on crash with configurable backoff.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //

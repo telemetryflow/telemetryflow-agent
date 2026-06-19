@@ -32,7 +32,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.3.5"
+    subgraph "TelemetryFlow Ecosystem v1.4.2"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.43.0]
         end
@@ -42,7 +42,7 @@ graph LR
         end
 
         subgraph "Processing"
-            COLLECTOR[TFO-Collector<br/>OTEL v0.146.1]
+            COLLECTOR[TFO-Collector<br/>OTEL v0.152.1]
         end
     end
 
@@ -59,9 +59,9 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.2.1 | SDK v1.43.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.2.1 | SDK v1.43.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.8  | Collector v0.147.0 | Central telemetry collector |
+| **TFO-Agent**     | v1.2.1  | SDK v1.43.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.2.1  | SDK v1.43.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.2.0  | Collector v0.151.0 | Central telemetry collector |
 
 ## Features
 
@@ -292,22 +292,30 @@ tfo-agent/
 ├── internal/
 │   ├── agent/             # Core agent lifecycle
 │   ├── buffer/            # Disk-backed retry buffer
-│   ├── collector/         # Metric collectors
-│   │   ├── aurora/        # Amazon Aurora CloudWatch/PI/RDS collector
-│   │   ├── cadvisor/      # cAdvisor Prometheus scraper collector
-│   │   ├── clickhouse/    # ClickHouse database collector
-│   │   ├── cockroachdb/   # CockroachDB database collector
-│   │   ├── docker/        # Docker container metrics collector
-│   │   ├── ebpf/          # eBPF kernel-level metrics collector
-│   │   ├── kubernetes/    # Kubernetes metrics collector
-│   │   ├── mongodb/       # MongoDB database collector
-│   │   ├── mssql/         # Microsoft SQL Server collector
-│   │   ├── mysql/         # MySQL/MariaDB/Percona collector
-│   │   ├── nodeexporter/  # Node Exporter metrics collector
-│   │   ├── postgresql/    # PostgreSQL/RDS PostgreSQL collector
-│   │   ├── sqlite3/       # SQLite3 database collector
-│   │   ├── system/        # System metrics collector
-│   │   └── timescaledb/   # TimescaleDB collector
+ │   ├── collector/         # Metric collectors
+ │   │   ├── aurora/        # Amazon Aurora CloudWatch/PI/RDS collector
+ │   │   ├── cadvisor/      # cAdvisor Prometheus scraper collector
+ │   │   ├── clickhouse/    # ClickHouse database collector
+ │   │   ├── cockroachdb/   # CockroachDB database collector
+ │   │   ├── confluent_kafka/ # Confluent Kafka Metrics API collector
+ │   │   ├── docker/        # Docker container metrics collector
+ │   │   ├── ebpf/          # eBPF kernel-level metrics collector
+ │   │   ├── kafka/         # Apache Kafka (JMX exporter) collector
+ │   │   ├── kubernetes/    # Kubernetes metrics collector
+ │   │   ├── memcache/      # Memcached cache collector
+ │   │   ├── mongodb/       # MongoDB database collector
+ │   │   ├── mssql/         # Microsoft SQL Server collector
+ │   │   ├── mysql/         # MySQL/MariaDB/Percona collector
+ │   │   ├── nats/          # NATS messaging collector
+ │   │   ├── nodeexporter/  # Node Exporter metrics collector
+ │   │   ├── postgresql/    # PostgreSQL/RDS PostgreSQL collector
+ │   │   ├── pubsub/        # Google Cloud Pub/Sub collector
+ │   │   ├── rabbitmq/      # RabbitMQ (Management API) collector
+ │   │   ├── redis/         # Redis cache collector
+ │   │   ├── sqlite3/       # SQLite3 database collector
+ │   │   ├── system/        # System metrics collector
+ │   │   ├── timescaledb/   # TimescaleDB collector
+ │   │   └── valkey/        # Valkey cache collector
 │   ├── config/            # Configuration management
 │   ├── exporter/          # OTLP data exporters
 │   └── version/           # Version and banner info
@@ -402,6 +410,21 @@ The agent provides native collectors for popular databases via direct connection
 | **CockroachDB**   | Direct connection                               | SQL stats, range stats, store metrics, replication                                                                                                      |
 | **TimescaleDB**   | Direct connection                               | Hypertable stats, chunk stats, compression ratios, continuous aggregates, job health                                                                    |
 | **SQLite3**       | File access                                     | Page cache, WAL metrics, lock contention, integrity checks, table stats                                                                                 |
+
+### Cache, Queueing & Messaging Monitoring
+
+The agent monitors cache, queueing, and messaging systems over their native wire protocols or management APIs (no external client libraries required):
+
+| Collector           | Source                        | Metrics                                                                                      |
+| ------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
+| **Redis**           | RESP (INFO, commandstats)     | Connections, memory, keyspace hits/misses, evictions, per-DB keys, per-command stats         |
+| **Valkey**          | RESP (INFO, commandstats)     | Same coverage as Redis under `db.valkey.*` (Valkey speaks RESP)                              |
+| **Memcached**       | TCP (stats, stats slabs)      | Connections, cmd counts, hit/miss ratios, bytes, items, evictions, per-slab stats            |
+| **RabbitMQ**        | Management HTTP API           | Cluster object/queue totals, message flow counters & rates, per-node mem/disk/FD, per-queue  |
+| **Apache Kafka**    | JMX Prometheus exporter       | Broker/topic counters & gauges (`queue.kafka.*`) normalized from the JMX exporter exposition |
+| **Confluent Kafka** | Confluent Metrics API         | Per-topic received/sent bytes & records, retained bytes, partition count                     |
+| **NATS**            | HTTP monitoring (/varz, /jsz) | Connections, subscriptions, sent/received msgs & bytes, routes, JetStream streams/consumers  |
+| **Google Pub/Sub**  | Cloud Monitoring API          | Undelivered/outstanding messages, oldest unacked age, sent/ack counts per subscription       |
 
 ### eBPF Metrics (Linux-only)
 

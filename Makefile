@@ -1,6 +1,7 @@
 # TelemetryFlow Agent - Makefile
 #
-# TelemetryFlow Agent - Community Enterprise Observability Platform (CEOP)
+# TelemetryFlow Agent v1.2.1 (Based on OpenTelemetry SDK 1.43.0)
+# AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
 # Build and development commands for TelemetryFlow Agent

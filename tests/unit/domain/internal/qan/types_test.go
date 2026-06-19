@@ -1,6 +1,6 @@
 // Package qan_test contains unit tests for QAN data types.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -311,9 +311,7 @@ func TestAgentType_Constants(t *testing.T) {
 	}{
 		{"postgresql", qan.AgentTypePostgreSQLPgStatements, "qan-postgresql-pgstatements"},
 		{"mysql_perfschema", qan.AgentTypeMySQLPerfSchema, "qan-mysql-perfschema"},
-		{"mysql_slowlog", qan.AgentTypeMySQLSlowLog, "qan-mysql-slowlog"},
 		{"mongodb_profiler", qan.AgentTypeMongoDBProfiler, "qan-mongodb-profiler"},
-		{"mongodb_mongolog", qan.AgentTypeMongoDBMongolog, "qan-mongodb-mongolog"},
 	}
 
 	for _, tt := range tests {

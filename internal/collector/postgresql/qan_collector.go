@@ -1,7 +1,7 @@
 // Package postgresql implements the PostgreSQL QAN collector using
 // pg_stat_statements with delta calculation from previous snapshot.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -24,6 +24,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -201,17 +202,31 @@ func (c *QANPostgreSQLCollector) collectInstance(ctx context.Context, inst *qanP
 		return nil, nil
 	}
 
+	// Fetch a candidate pool larger than the final limit so delta-based
+	// ranking doesn't miss queries that are slow in this period but not
+	// historically. Final truncation to TopQueriesLimit happens after
+	// delta computation, ranked by the period's total exec-time delta.
 	limit := c.cfg.TopQueriesLimit
+	candidatePool := limit * 3
+	if candidatePool > 1000 {
+		candidatePool = 1000
+	}
+	if candidatePool < limit {
+		candidatePool = limit
+	}
 
+	// Filter to the current database's dbid so queries from other databases
+	// connected through this monitoring user are not mis-attributed.
 	query := `
 		SELECT queryid, query, calls, total_exec_time, min_exec_time, max_exec_time,
 		       rows, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written,
 		       temp_blks_read, temp_blks_written, blk_read_time, blk_write_time
 		FROM pg_stat_statements
+		WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
 		ORDER BY total_exec_time DESC
 		LIMIT $1`
 
-	rows, err := pool.Query(ctx2, query, limit)
+	rows, err := pool.Query(ctx2, query, candidatePool)
 	if err != nil {
 		return nil, fmt.Errorf("query pg_stat_statements: %w", err)
 	}
@@ -298,6 +313,11 @@ func (c *QANPostgreSQLCollector) collectInstance(ctx context.Context, inst *qanP
 			QueryTimeSum:     deltaTime / 1000.0,
 			QueryTimeMin:     minTime / 1000.0,
 			QueryTimeMax:     s.maxExecTime / 1000.0,
+			// pg_stat_statements exposes no latency histogram, so a true p99
+			// cannot be derived. Use the period max as a conservative upper
+			// bound (valid since p99 <= max). True percentiles require the
+			// PG17+ pg_stat_statements histogram views.
+			QueryTimeP99: s.maxExecTime / 1000.0,
 			PostgreSQL: &qan.PostgreSQLQANMetrics{
 				RowsCnt: float64(deltaCalls),
 				RowsSum: float64(deltaRows),
@@ -328,6 +348,16 @@ func (c *QANPostgreSQLCollector) collectInstance(ctx context.Context, inst *qanP
 
 	inst.prevSnapshot = currentSnapshot
 	inst.prevTime = now
+
+	// Rank by the period's total exec-time delta (QueryTimeSum) and truncate
+	// to the configured TopQueriesLimit so the slowest queries THIS period
+	// win over historically-slow-but-now-idle ones.
+	if len(buckets) > limit {
+		sort.Slice(buckets, func(i, j int) bool {
+			return buckets[i].QueryTimeSum > buckets[j].QueryTimeSum
+		})
+		buckets = buckets[:limit]
+	}
 
 	return buckets, nil
 }

@@ -1,0 +1,31 @@
+# TelemetryFlow Agent - Apache Kafka Queueing Collector Configuration
+#
+# Example configuration for monitoring Apache Kafka brokers by scraping a
+# JMX Prometheus exporter HTTP endpoint (the standard sidecar deployment).
+# Metric names are normalized to queue.kafka.* with cluster/instance labels.
+
+kafka:
+  enabled: true
+
+  # Scrape interval for the JMX exporter (default: 15s)
+  scrape_interval: 15s
+
+  tags:
+    env: "production"
+    tier: "queueing"
+
+  instances:
+    - name: "kafka-broker-1"
+      exporter_url: "http://kafka-1.internal:9404/metrics"
+      cluster: "prod-cluster"
+      # username: "${JMX_USER}"       # optional basic auth
+      # password: "${JMX_PASSWORD}"
+      # tls_skip_verify: false
+      tags:
+        broker: "1"
+
+    - name: "kafka-broker-2"
+      exporter_url: "http://kafka-2.internal:9404/metrics"
+      cluster: "prod-cluster"
+      tags:
+        broker: "2"

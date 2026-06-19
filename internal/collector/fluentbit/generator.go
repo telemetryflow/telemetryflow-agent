@@ -3,7 +3,7 @@
 // generator.go dynamically generates fluent-bit.conf and parsers.conf from
 // the TFO-Agent YAML configuration, including INPUT, FILTER, and OUTPUT sections.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //

@@ -1,7 +1,7 @@
 // Package banner_test contains unit tests for the startup banner renderer
 // verifying product name, version, and vendor information output.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
@@ -33,7 +33,7 @@ func TestDefaultConfig(t *testing.T) {
 
 		assert.Equal(t, "TelemetryFlow Agent", cfg.ProductName)
 		assert.Equal(t, "1.2.0", cfg.Version)
-		assert.Equal(t, "Community Enterprise Observability Platform (CEOP)", cfg.Motto)
+		assert.Equal(t, "AI-Powered Observability & Incident Response Management (IRM) Platform", cfg.Motto)
 		assert.Equal(t, "TelemetryFlow", cfg.Vendor)
 		assert.Equal(t, "Telemetri Data Indonesia", cfg.Developer)
 		assert.Equal(t, "Apache-2.0", cfg.License)

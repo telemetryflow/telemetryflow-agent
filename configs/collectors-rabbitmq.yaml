@@ -1,0 +1,28 @@
+# TelemetryFlow Agent - RabbitMQ Queueing Collector Configuration
+#
+# Example configuration for monitoring RabbitMQ brokers via the
+# Management HTTP API (/api/overview, /api/nodes, /api/queues).
+
+rabbitmq:
+  enabled: true
+
+  # Global intervals (default: overview 15s, queues/nodes 30s)
+  overview_interval: 15s
+  queue_interval: 30s
+  node_interval: 30s
+
+  tags:
+    env: "production"
+    tier: "queueing"
+
+  instances:
+    - name: "rabbitmq-primary"
+      url: "http://rabbitmq.internal:15672"
+      username: "${RABBITMQ_USER}"
+      password: "${RABBITMQ_PASSWORD}"
+      vhost: ""            # empty = all vhosts
+      # tls_enabled: false
+      # tls_skip_verify: false
+      # queue_filter: "^orders\\."   # regex; empty = all queues
+      tags:
+        role: "primary"

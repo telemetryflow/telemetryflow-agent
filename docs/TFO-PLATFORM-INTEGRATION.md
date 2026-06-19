@@ -68,14 +68,25 @@ graph TB
 
 ### 1. TFO-Agent Collectors
 
-| Collector                  | Metrics                     | Protocol  | Target           |
-| -------------------------- | --------------------------- | --------- | ---------------- |
-| **Node Exporter**          | 100+ system metrics         | OTLP      | TFO-Collector    |
-| **Kubernetes**             | Pod/Node/Service/Deployment | OTLP      | TFO-Collector    |
-| **eBPF**                   | 28 kernel-level metrics     | OTLP      | TFO-Collector    |
-| **System**                 | Basic host metrics          | OTLP      | TFO-Collector    |
-| **QAN (PG/MySQL/MongoDB)** | Per-query analytics buckets | JSON/HTTP | TFO Platform API |
-| **Heartbeat**              | Agent health & status       | HTTP/REST | TFO Platform API |
+| Collector                  | Metrics                                                                                  | Protocol  | Target           |
+| -------------------------- | ---------------------------------------------------------------------------------------- | --------- | ---------------- |
+| **Node Exporter**          | 100+ system metrics                                                                      | OTLP      | TFO-Collector    |
+| **Kubernetes**             | Pod/Node/Service/Deployment                                                              | OTLP      | TFO-Collector    |
+| **eBPF**                   | 28 kernel-level metrics                                                                  | OTLP      | TFO-Collector    |
+| **System**                 | Basic host metrics                                                                       | OTLP      | TFO-Collector    |
+| **Database Collectors**    | MySQL, PostgreSQL, MSSQL, MongoDB, ClickHouse, CockroachDB, TimescaleDB, SQLite3, Aurora | OTLP      | TFO-Collector    |
+| **QAN (PG/MySQL/MongoDB)** | Per-query analytics buckets                                                              | JSON/HTTP | TFO Platform API |
+| **Cache Collectors**       | Redis, Valkey, Memcached                                                                 | OTLP      | TFO-Collector    |
+| **Queueing Collectors**    | RabbitMQ, Kafka, Confluent Kafka                                                         | OTLP      | TFO-Collector    |
+| **Messaging Collectors**   | NATS, Google Cloud Pub/Sub                                                               | OTLP      | TFO-Collector    |
+| **Heartbeat**              | Agent health & status                                                                    | HTTP/REST | TFO Platform API |
+
+> **Cache / Queueing / Messaging**: Redis, Valkey, Memcached, RabbitMQ, Apache Kafka
+> (JMX exporter scrape), Confluent Kafka (Metrics API), NATS (monitoring API), and
+> Google Cloud Pub/Sub (Cloud Monitoring API) are collected over their native
+> protocols/management APIs and forwarded through the standard OTLP pipeline — no
+> external client libraries required. Metric namespaces: `db.{redis,valkey,memcache}.*`,
+> `queue.{rabbitmq,kafka,confluent_kafka}.*`, `messaging.{nats,pubsub}.*`.
 
 ### 2. TFO-Collector Endpoints
 
@@ -304,7 +315,7 @@ spec:
       hostPID: true
       containers:
         - name: tfo-agent
-          image: telemetryflow/tfo-agent:1.1.4
+          image: telemetryflow/telemetryflow-agent:1.2.1
           securityContext:
             privileged: true # Required for eBPF
           env:

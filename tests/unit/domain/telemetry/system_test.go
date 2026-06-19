@@ -1,7 +1,7 @@
 // Package telemetry_test contains unit tests for core telemetry domain types
 // including the collector interface, metric structs, and system host collector.
 //
-// TelemetryFlow Agent - Community Enterprise Observability Platform
+// TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Open Source Software built by Telemetri Data Indonesia.
 //
