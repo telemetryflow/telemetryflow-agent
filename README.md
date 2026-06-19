@@ -292,30 +292,30 @@ tfo-agent/
 ├── internal/
 │   ├── agent/             # Core agent lifecycle
 │   ├── buffer/            # Disk-backed retry buffer
- │   ├── collector/         # Metric collectors
- │   │   ├── aurora/        # Amazon Aurora CloudWatch/PI/RDS collector
- │   │   ├── cadvisor/      # cAdvisor Prometheus scraper collector
- │   │   ├── clickhouse/    # ClickHouse database collector
- │   │   ├── cockroachdb/   # CockroachDB database collector
- │   │   ├── confluent_kafka/ # Confluent Kafka Metrics API collector
- │   │   ├── docker/        # Docker container metrics collector
- │   │   ├── ebpf/          # eBPF kernel-level metrics collector
- │   │   ├── kafka/         # Apache Kafka (JMX exporter) collector
- │   │   ├── kubernetes/    # Kubernetes metrics collector
- │   │   ├── memcache/      # Memcached cache collector
- │   │   ├── mongodb/       # MongoDB database collector
- │   │   ├── mssql/         # Microsoft SQL Server collector
- │   │   ├── mysql/         # MySQL/MariaDB/Percona collector
- │   │   ├── nats/          # NATS messaging collector
- │   │   ├── nodeexporter/  # Node Exporter metrics collector
- │   │   ├── postgresql/    # PostgreSQL/RDS PostgreSQL collector
- │   │   ├── pubsub/        # Google Cloud Pub/Sub collector
- │   │   ├── rabbitmq/      # RabbitMQ (Management API) collector
- │   │   ├── redis/         # Redis cache collector
- │   │   ├── sqlite3/       # SQLite3 database collector
- │   │   ├── system/        # System metrics collector
- │   │   ├── timescaledb/   # TimescaleDB collector
- │   │   └── valkey/        # Valkey cache collector
+│   ├── collector/         # Metric collectors
+│   │   ├── aurora/        # Amazon Aurora CloudWatch/PI/RDS collector
+│   │   ├── cadvisor/      # cAdvisor Prometheus scraper collector
+│   │   ├── clickhouse/    # ClickHouse database collector
+│   │   ├── cockroachdb/   # CockroachDB database collector
+│   │   ├── confluent_kafka/ # Confluent Kafka Metrics API collector
+│   │   ├── docker/        # Docker container metrics collector
+│   │   ├── ebpf/          # eBPF kernel-level metrics collector
+│   │   ├── kafka/         # Apache Kafka (JMX exporter) collector
+│   │   ├── kubernetes/    # Kubernetes metrics collector
+│   │   ├── memcache/      # Memcached cache collector
+│   │   ├── mongodb/       # MongoDB database collector
+│   │   ├── mssql/         # Microsoft SQL Server collector
+│   │   ├── mysql/         # MySQL/MariaDB/Percona collector
+│   │   ├── nats/          # NATS messaging collector
+│   │   ├── nodeexporter/  # Node Exporter metrics collector
+│   │   ├── postgresql/    # PostgreSQL/RDS PostgreSQL collector
+│   │   ├── pubsub/        # Google Cloud Pub/Sub collector
+│   │   ├── rabbitmq/      # RabbitMQ (Management API) collector
+│   │   ├── redis/         # Redis cache collector
+│   │   ├── sqlite3/       # SQLite3 database collector
+│   │   ├── system/        # System metrics collector
+│   │   ├── timescaledb/   # TimescaleDB collector
+│   │   └── valkey/        # Valkey cache collector
 │   ├── config/            # Configuration management
 │   ├── exporter/          # OTLP data exporters
 │   └── version/           # Version and banner info
