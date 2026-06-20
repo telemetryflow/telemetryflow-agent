@@ -88,7 +88,7 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     org.opencontainers.image.authors="Telemetri Data Indonesia <support@telemetryflow.id>" \
     org.opencontainers.image.url="https://telemetryflow.id" \
     org.opencontainers.image.documentation="https://docs.telemetryflow.id" \
-    org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-platform" \
+    org.opencontainers.image.source="https://github.com/telemetryflow/telemetryflow-agent" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.base.name="debian:trixie-slim" \
     # TelemetryFlow specific labels
