@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.2.1-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
@@ -23,6 +23,28 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.2.2] - 2026-07-21
+
+### Added
+
+- **SNMP industry-standard interface monitoring**: The SNMP integration now ships standard IF-MIB defaults out of the box. Scalars (`sysDescr`, `sysUpTime`, `sysName`, UCD CPU/memory) are polled via GET, and the `ifTable` (`1.3.6.1.2.1.2.2`) plus `ifXTable` (`1.3.6.1.2.1.31.1.1.1`) are walked so **64-bit HC octet counters** (`ifHCInOctets`/`ifHCOutOctets`), `ifName`, `ifHighSpeed`, oper status, errors and discards are collected without manual OID mapping. Each interface row carries an `index` tag feeding the platform's per-interface utilization view.
+- **Tests**: Added unit-test suites raising coverage of previously-untested packages — SNMP integration helpers, the DB collectors `aurora` (95.9%), `mssql` (95.4%), `rds_postgresql` (95.4%), `cockroachdb` (95.0%), `sqlite3` (78.5%), plus `internal/api` (96.1%), `internal/receiver/remotewrite` (96.6%), `internal/collector/log` (95.9%), `internal/config` (98.2%), and `internal/exporter` (95.5%).
+
+### Fixed
+
+- **SNMP health check (critical)**: `Health()` previously used a UDP `DialTimeout` which — because UDP is connectionless — always reported every target as reachable. It now issues a real SNMP GET for `sysUpTime.0`; a target is counted reachable only if it actually answers SNMP. Probes run concurrently with a short bounded timeout.
+- **SNMPv3 privacy**: Privacy (encryption) parameters are now applied via an `AuthPriv` bitmask test instead of an exact equality check, so encryption is correctly enabled whenever `security_level: authPriv` is requested.
+- **SNMP robustness**: Guard against a nil connection on close (avoids a panic on partial connect), warn when the community string defaults to `public`, poll targets concurrently so one slow device no longer blocks the whole scrape, honor the client's `MaxOids` limit for GET batching, and unwind in-flight I/O on context cancellation.
+
+### Security
+
+- **Fluent Bit upgraded 4.2.3 → 5.0.9** (latest stable). The Fluent Bit binary itself scans clean; the runtime image `telemetryflow/telemetryflow-agent:1.2.2` scans **clean at CRITICAL/HIGH/MEDIUM** and the Go binary reports 0 vulnerabilities.
+- **Evaluated CVE suppressions**: Documented and suppressed non-reachable core-OS CVEs surfaced by the 5.0.9 image scan — `perl-base` (CVE-2026-13221, CVE-2026-57432), `util-linux`/`libblkid` (CVE-2026-53615), `gzip` (CVE-2026-41992/41991), `libacl1`/`libattr1` (CVE-2026-54369/54370/54371), `libcurl` (multiple), `libp11-kit0`, `libnghttp2-14`. Each cannot be purged, runs under the non-root agent (UID 10001), and does not exercise the vulnerable code paths. See `.trivyignore` for per-CVE rationale.
+
+### Changed
+
+- **Version bump**: 1.2.1 → 1.2.2
 
 ## [1.2.1] - 2026-06-16
 

@@ -1,6 +1,6 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.2.1
+- **Version:** 1.2.2
 - **Last Updated:** June 2026
 
 ---
@@ -118,7 +118,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
                        \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    TelemetryFlow Agent v1.2.1
+    TelemetryFlow Agent v1.2.2
     AI-Powered Observability & Incident Response Management (IRM) Platform
   ══════════════════════════════════════════════════════════════════════════════
     Platform     darwin/arm64
@@ -134,7 +134,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
     Copyright (c) 2024-2026 Telemetri Data Indonesia
   ══════════════════════════════════════════════════════════════════════════════
 
-{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.2.1"}
+{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.2.2"}
 {"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Configuration loaded","file":"configs/tfo-agent.yaml"}
 {"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Agent started","id":"agent-001","hostname":"server-01"}
 ```
@@ -173,7 +173,7 @@ Displays version and build information.
 
 # Short version only
 ./build/tfo-agent version --short
-# Output: 1.2.1
+# Output: 1.2.2
 
 # JSON format
 ./build/tfo-agent version --json
@@ -182,7 +182,7 @@ Displays version and build information.
 **Output (Default):**
 
 ```
-TelemetryFlow Agent v1.2.1
+TelemetryFlow Agent v1.2.2
 
   Build Information
   ─────────────────────────────────────────────
@@ -209,7 +209,7 @@ TelemetryFlow Agent v1.2.1
 {
   "product": "TelemetryFlow Agent",
   "description": "Enterprise telemetry collection agent",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "git_commit": "abc1234",
   "git_branch": "main",
   "build_time": "2026-06-19T10:00:00Z",

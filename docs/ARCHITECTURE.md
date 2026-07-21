@@ -271,7 +271,7 @@ sequenceDiagram
     "containerRuntime": "docker",
     "cloudProvider": "aws",
     "cloudRegion": "us-west-2",
-    "agentVersion": "1.2.1",
+    "agentVersion": "1.2.2",
     "agentUptime": 86400
   }
 }
