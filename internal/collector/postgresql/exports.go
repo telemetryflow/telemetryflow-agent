@@ -20,7 +20,10 @@ package postgresql
 
 import (
 	"context"
+	"crypto/tls"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
@@ -120,6 +123,85 @@ func MakeIndexLabelsExported(base map[string]string, schemaName, relName, idxNam
 
 func NewConfigExported(cfg config.PostgreSQLCollectorConfig) Config {
 	return NewConfig(cfg)
+}
+
+// --- Connection / lifecycle test seams (standard collector) ---
+
+// ConnectFailurePathExported drives ensureConnection against an unreachable or
+// mis-configured instance twice to exercise the connect-error and subsequent
+// back-off branches, then closes the (nil) pool. It returns the error from each
+// ensureConnection call. Used by external tests to cover connection.go without a
+// live database.
+func (c *PostgreSQLCollector) ConnectFailurePathExported(ctx context.Context, cfg config.PostgreSQLInstanceConfig) (firstErr, secondErr error) {
+	inst := &pgInstance{config: cfg, prevCounters: make(map[string]uint64)}
+	_, firstErr = c.ensureConnection(ctx, inst)
+	_, secondErr = c.ensureConnection(ctx, inst)
+	c.closeConnection(inst)
+	return firstErr, secondErr
+}
+
+// AdvanceBackoffExported drives advanceBackoff n times on a fresh instance and
+// returns the resulting backoff duration.
+func (c *PostgreSQLCollector) AdvanceBackoffExported(n int) time.Duration {
+	inst := &pgInstance{config: config.PostgreSQLInstanceConfig{Name: "t"}}
+	for i := 0; i < n; i++ {
+		c.advanceBackoff(inst)
+	}
+	return inst.backoff
+}
+
+// --- QAN collector test seams ---
+
+func FingerprintQueryQANExported(query string) string { return fingerprintQueryQAN(query) }
+
+// QANInstanceLabelsExported builds the QAN label set for an instance.
+func QANInstanceLabelsExported(cfg QANConfig, inst config.PostgreSQLInstanceConfig) map[string]string {
+	c := NewQANPostgreSQLCollector(cfg, zap.NewNop())
+	return c.instanceLabels(&qanPgInstance{config: inst})
+}
+
+// --- RDS collector test seams ---
+
+func BuildRDSConnStringExported(cfg config.RDSPostgreSQLInstanceConfig) string {
+	return buildRDSConnString(cfg)
+}
+
+func RDSTLSConfigExported(caBundlePath string) (*tls.Config, error) {
+	return rdsTLSConfig(caBundlePath)
+}
+
+func ApplyRDSInstanceDefaultsExported(inst *config.RDSPostgreSQLInstanceConfig) {
+	applyRDSInstanceDefaults(inst)
+}
+
+func ContainsStringExported(s, substr string) bool { return containsString(s, substr) }
+
+func HasRDSWalStatsExported(version int) bool {
+	return hasRDSWalStats(&rdsPgInstance{version: version})
+}
+
+func RDSInstanceLabelsExported(inst config.RDSPostgreSQLInstanceConfig, versionStr string) map[string]string {
+	return rdsInstanceLabels(&rdsPgInstance{config: inst, versionStr: versionStr})
+}
+
+// RDSToPgInstanceConfigExported converts an RDS instance config to the standard
+// PostgreSQL instance config via rdsToPgInstance and returns the resulting config.
+func RDSToPgInstanceConfigExported(inst config.RDSPostgreSQLInstanceConfig, version int) config.PostgreSQLInstanceConfig {
+	return rdsToPgInstance(&rdsPgInstance{
+		config:       inst,
+		version:      version,
+		prevCounters: make(map[string]uint64),
+	}).config
+}
+
+// RDSConnectFailurePathExported drives ensureRDSConnection twice against an
+// unreachable instance to exercise the connect-error, TLS-fallback, and back-off
+// branches, then advances the backoff. It returns the error from each call.
+func (c *RDSPostgreSQLCollector) RDSConnectFailurePathExported(ctx context.Context, cfg config.RDSPostgreSQLInstanceConfig) (firstErr, secondErr error) {
+	inst := &rdsPgInstance{config: cfg, prevCounters: make(map[string]uint64)}
+	_, firstErr = c.ensureRDSConnection(ctx, inst)
+	_, secondErr = c.ensureRDSConnection(ctx, inst)
+	return firstErr, secondErr
 }
 
 // EmitMetricsForInstanceExported wraps OTLPEmitter.EmitMetricsForInstance
