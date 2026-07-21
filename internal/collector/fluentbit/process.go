@@ -53,7 +53,8 @@ type ProcessManager struct {
 	running      bool
 	restartCount int
 	startTime    time.Time
-	stderrLines  []string // circular buffer of recent stderr
+	stderrLines  []string      // circular buffer of recent stderr
+	exited       chan struct{} // closed by startProcess when the current cmd.Wait() returns
 }
 
 // NewProcessManager creates a new Fluent Bit process manager.
@@ -133,10 +134,12 @@ func (p *ProcessManager) startProcess(ctx context.Context) error {
 		return fmt.Errorf("start fluent-bit: %w", err)
 	}
 
+	exited := make(chan struct{})
 	p.mu.Lock()
 	p.cmd = cmd
 	p.running = true
 	p.startTime = time.Now()
+	p.exited = exited
 	p.mu.Unlock()
 
 	p.logger.Info("Fluent Bit started",
@@ -154,13 +157,16 @@ func (p *ProcessManager) startProcess(ctx context.Context) error {
 		}
 	}()
 
-	// Wait for process to exit
+	// Wait for process to exit. This is the ONLY call to cmd.Wait() for this
+	// process; Stop() must never call Wait() again (it is not safe to call
+	// concurrently). Stop() waits on the exited channel closed below instead.
 	waitErr := cmd.Wait()
 
 	p.mu.Lock()
 	p.running = false
 	p.cmd = nil
 	p.mu.Unlock()
+	close(exited)
 
 	return waitErr
 }
@@ -169,6 +175,7 @@ func (p *ProcessManager) startProcess(ctx context.Context) error {
 func (p *ProcessManager) Stop() error {
 	p.mu.Lock()
 	cmd := p.cmd
+	exited := p.exited
 	p.mu.Unlock()
 
 	if cmd == nil || cmd.Process == nil {
@@ -183,12 +190,14 @@ func (p *ProcessManager) Stop() error {
 		return cmd.Process.Kill()
 	}
 
-	// Wait with timeout
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-
+	// Wait for the process to exit, but do NOT call cmd.Wait() here — that would
+	// race with startProcess's own Wait(). Instead observe the exited channel
+	// that startProcess closes once its single Wait() returns.
+	if exited == nil {
+		return nil
+	}
 	select {
-	case <-done:
+	case <-exited:
 		return nil
 	case <-time.After(shutdownTimeout):
 		p.logger.Warn("Fluent Bit did not stop gracefully, killing")
