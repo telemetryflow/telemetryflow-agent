@@ -101,7 +101,7 @@ func TestErrorPaths_RealCRDB_QAN(t *testing.T) {
 		Instances: []config.CockroachDBInstanceConfig{inst},
 		Logger:    zap.NewNop(),
 	}, zap.NewNop())
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	// Connection succeeds; the statement-statistics query fails on real columns.
 	_, err := c.CollectQAN(context.Background())

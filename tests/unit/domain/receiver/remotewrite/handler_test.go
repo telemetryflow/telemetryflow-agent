@@ -286,7 +286,7 @@ func freePort(t *testing.T) int {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return l.Addr().(*net.TCPAddr).Port
 }
 
@@ -317,7 +317,7 @@ func TestReceiver_StartStopCollect(t *testing.T) {
 	resp, err := http.DefaultClient.Do(httpReq)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNoContent, resp.StatusCode)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	metrics, err := r.Collect(context.Background())
 	require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestReceiver_StartPortInUse(t *testing.T) {
 	// Bind on all interfaces (":port") to conflict with the receiver's ":port" server.
 	l, err := net.Listen("tcp", ":"+itoa(port))
 	require.NoError(t, err)
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 
 	r := remotewrite.NewRemoteWriteReceiver(remotewrite.RemoteWriteReceiverConfig{Port: port}, zap.NewNop())
 	require.NoError(t, r.Start(context.Background()))
@@ -355,7 +355,7 @@ func TestReceiver_CollectEmpty(t *testing.T) {
 	cfg := remotewrite.RemoteWriteReceiverConfig{Port: freePort(t)}
 	r := remotewrite.NewRemoteWriteReceiver(cfg, zap.NewNop())
 	require.NoError(t, r.Start(context.Background()))
-	defer r.Stop()
+	defer func() { _ = r.Stop() }()
 	metrics, err := r.Collect(context.Background())
 	require.NoError(t, err)
 	assert.Empty(t, metrics)
