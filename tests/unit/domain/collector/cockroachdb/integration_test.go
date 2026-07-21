@@ -95,7 +95,7 @@ func TestIntegration_Collect(t *testing.T) {
 		Instances:          []config.CockroachDBInstanceConfig{inst},
 		TopStatementsLimit: 50,
 	}, zap.NewNop())
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	ctx := context.Background()
 
@@ -157,7 +157,7 @@ func TestIntegration_QANCollect(t *testing.T) {
 		Labels:          map[string]string{"team": "obs"},
 		Logger:          zap.NewNop(),
 	}, zap.NewNop())
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	ctx := context.Background()
 
@@ -242,7 +242,9 @@ func TestIntegration_NodeLivenessFalse(t *testing.T) {
 	// then restore it so other tests observe a live node.
 	_, err := pool.Exec(context.Background(), `UPDATE crdb_internal.gossip_liveness SET is_live = false WHERE node_id = 1`)
 	require.NoError(t, err)
-	defer pool.Exec(context.Background(), `UPDATE crdb_internal.gossip_liveness SET is_live = true WHERE node_id = 1`)
+	defer func() {
+		_, _ = pool.Exec(context.Background(), `UPDATE crdb_internal.gossip_liveness SET is_live = true WHERE node_id = 1`)
+	}()
 
 	c := cockroachdb.NewCockroachDBCollector(config.CockroachDBCollectorConfig{
 		Instances: []config.CockroachDBInstanceConfig{inst},
@@ -284,7 +286,7 @@ func TestIntegration_QueryErrorsOnConnectedBackend(t *testing.T) {
 		Instances: []config.CockroachDBInstanceConfig{inst},
 		Logger:    zap.NewNop(),
 	}, zap.NewNop())
-	defer q.Stop()
+	defer func() { _ = q.Stop() }()
 	_, err = q.CollectQAN(context.Background())
 	require.NoError(t, err)
 }
@@ -318,7 +320,7 @@ func TestIntegration_OTLPEmitSuccess(t *testing.T) {
 	c := cockroachdb.NewCockroachDBCollector(config.CockroachDBCollectorConfig{
 		Instances: []config.CockroachDBInstanceConfig{inst},
 	}, zap.NewNop())
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)

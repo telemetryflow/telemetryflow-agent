@@ -264,26 +264,26 @@ func TestConfigErrorMessage(t *testing.T) {
 func TestGetEffectiveEndpoint(t *testing.T) {
 	t.Run("prefers api endpoint", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = "api-host:8080"
+		c.API.Endpoint = "api-host:8080" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		assert.Equal(t, "http://api-host:8080", c.GetEffectiveEndpoint())
 	})
 
 	t.Run("falls back to telemetryflow endpoint", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = ""
+		c.API.Endpoint = "" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		c.TelemetryFlow.Endpoint = "tf-host:4317"
 		assert.Equal(t, "http://tf-host:4317", c.GetEffectiveEndpoint())
 	})
 
 	t.Run("keeps existing scheme", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = "https://secure:443"
+		c.API.Endpoint = "https://secure:443" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		assert.Equal(t, "https://secure:443", c.GetEffectiveEndpoint())
 	})
 
 	t.Run("empty when nothing set", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = ""
+		c.API.Endpoint = "" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		c.TelemetryFlow.Endpoint = ""
 		assert.Equal(t, "", c.GetEffectiveEndpoint())
 	})
@@ -307,7 +307,7 @@ func TestGetBackendEndpoint(t *testing.T) {
 		c := config.DefaultConfig()
 		c.TelemetryFlow.BackendEndpoint = ""
 		c.TelemetryFlow.Endpoint = ""
-		c.API.Endpoint = "https://api:443"
+		c.API.Endpoint = "https://api:443" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		assert.Equal(t, "https://api:443", c.GetBackendEndpoint())
 	})
 
@@ -315,7 +315,7 @@ func TestGetBackendEndpoint(t *testing.T) {
 		c := config.DefaultConfig()
 		c.TelemetryFlow.BackendEndpoint = ""
 		c.TelemetryFlow.Endpoint = ""
-		c.API.Endpoint = ""
+		c.API.Endpoint = "" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		assert.Equal(t, "", c.GetBackendEndpoint())
 	})
 }
@@ -323,16 +323,16 @@ func TestGetBackendEndpoint(t *testing.T) {
 func TestGetEffectiveCredentials(t *testing.T) {
 	c := config.DefaultConfig()
 
-	c.API.APIKeyID = ""
+	c.API.APIKeyID = "" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 	c.TelemetryFlow.APIKeyID = "tf-id"
 	assert.Equal(t, "tf-id", c.GetEffectiveAPIKeyID())
-	c.API.APIKeyID = "api-id"
+	c.API.APIKeyID = "api-id" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 	assert.Equal(t, "api-id", c.GetEffectiveAPIKeyID())
 
-	c.API.APIKeySecret = ""
+	c.API.APIKeySecret = "" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 	c.TelemetryFlow.APIKeySecret = "tf-secret"
 	assert.Equal(t, "tf-secret", c.GetEffectiveAPIKeySecret())
-	c.API.APIKeySecret = "api-secret"
+	c.API.APIKeySecret = "api-secret" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 	assert.Equal(t, "api-secret", c.GetEffectiveAPIKeySecret())
 
 	c.TelemetryFlow.WorkspaceID = "ws"
@@ -434,7 +434,7 @@ func TestGetOTLPEndpoint(t *testing.T) {
 
 	t.Run("bare path override with base host", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = "gateway:4318"
+		c.API.Endpoint = "gateway:4318" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		c.TelemetryFlow.TLS.Enabled = false
 		c.Exporter.OTLP.Traces.Endpoint = "/custom/traces"
 		host, path, useTLS := c.GetOTLPEndpoint("traces")
@@ -445,7 +445,7 @@ func TestGetOTLPEndpoint(t *testing.T) {
 
 	t.Run("default path from base host", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = "gateway:4318"
+		c.API.Endpoint = "gateway:4318" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		c.Exporter.OTLP.EndpointVersion = "v2"
 		host, path, _ := c.GetOTLPEndpoint("logs")
 		assert.Equal(t, "gateway:4318", host)
@@ -454,7 +454,7 @@ func TestGetOTLPEndpoint(t *testing.T) {
 
 	t.Run("base URL with path component prepended", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = "http://gateway:4318/prefix"
+		c.API.Endpoint = "http://gateway:4318/prefix" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		// Clear all metric endpoint overrides so the base-path prepend branch runs.
 		c.Exporter.OTLP.Metrics.Endpoint = ""
 		c.Exporter.OTLP.MetricsEndpoint = ""
@@ -486,7 +486,7 @@ func TestGetOTLPEndpoint(t *testing.T) {
 
 	t.Run("no host falls back to raw values", func(t *testing.T) {
 		c := config.DefaultConfig()
-		c.API.Endpoint = ""
+		c.API.Endpoint = "" //nolint:staticcheck // exercises deprecated API field kept for backward compat
 		c.TelemetryFlow.Endpoint = ""
 		c.Exporter.OTLP.Metrics.Endpoint = ""
 		c.Exporter.OTLP.MetricsEndpoint = ""

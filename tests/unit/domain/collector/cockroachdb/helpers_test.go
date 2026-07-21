@@ -226,8 +226,8 @@ func TestBuildConnString_WithSSLFiles(t *testing.T) {
 // --- Env var resolution ---
 
 func TestResolveEnvVars(t *testing.T) {
-	os.Setenv("CRDB_TEST_ENVVAR", "resolved-value")
-	defer os.Unsetenv("CRDB_TEST_ENVVAR")
+	_ = os.Setenv("CRDB_TEST_ENVVAR", "resolved-value")
+	defer func() { _ = os.Unsetenv("CRDB_TEST_ENVVAR") }()
 
 	tests := []struct {
 		name   string
