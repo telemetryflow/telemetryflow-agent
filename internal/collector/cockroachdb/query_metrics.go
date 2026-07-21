@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectStatementStats(ctx context.Context, pool *pgxpool.Pool, inst *crdbInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectStatementStats(ctx context.Context, pool PgxQuerier, inst *crdbInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 

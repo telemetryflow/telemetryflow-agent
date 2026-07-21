@@ -168,7 +168,7 @@ func (c *PostgreSQLCollector) collectInstance(ctx context.Context, inst *pgInsta
 	}
 
 	if inst.version == 0 {
-		if err := detectVersion(ctx, inst); err != nil {
+		if err := detectVersion(ctx, pool, inst); err != nil {
 			c.logger.Debug("Version detection failed", zap.String("instance", inst.config.Name), zap.Error(err))
 		}
 	}

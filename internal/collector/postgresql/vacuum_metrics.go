@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -32,7 +31,7 @@ import (
 
 // collectVacuumMetrics gathers autovacuum worker counts, vacuum progress,
 // XID wraparound risk, dead-tuple counts and autovacuum configuration.
-func collectVacuumMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectVacuumMetrics(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -105,7 +104,7 @@ func collectVacuumMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgInsta
 }
 
 // collectVacuumWorkers counts active autovacuum workers from pg_stat_activity.
-func collectVacuumWorkers(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectVacuumWorkers(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT count(*) FROM pg_stat_activity WHERE backend_type = 'autovacuum worker'`
 
 	var count int64
@@ -119,7 +118,7 @@ func collectVacuumWorkers(ctx context.Context, pool *pgxpool.Pool, labels map[st
 }
 
 // collectVacuumProgress reports progress of running vacuums from pg_stat_progress_vacuum.
-func collectVacuumProgress(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectVacuumProgress(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT relid::regclass::text AS table_name,
 	                  phase,
 	                  heap_blks_total,
@@ -172,7 +171,7 @@ func collectVacuumProgress(ctx context.Context, pool *pgxpool.Pool, labels map[s
 }
 
 // collectXIDAge reports transaction ID wraparound risk per database.
-func collectXIDAge(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectXIDAge(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT datname,
 	                  age(datfrozenxid) AS xid_age,
 	                  (SELECT setting::bigint FROM pg_settings WHERE name = 'autovacuum_freeze_max_age') AS freeze_max
@@ -207,7 +206,7 @@ func collectXIDAge(ctx context.Context, pool *pgxpool.Pool, labels map[string]st
 }
 
 // collectDeadTuples reports per-table dead tuple counts (top 50).
-func collectDeadTuples(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectDeadTuples(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT schemaname, relname, n_dead_tup, n_live_tup
 	           FROM pg_stat_user_tables
 	           WHERE n_dead_tup > 0
@@ -249,7 +248,7 @@ func collectDeadTuples(ctx context.Context, pool *pgxpool.Pool, labels map[strin
 }
 
 // collectVacuumConfig emits the current autovacuum / vacuum settings as gauge metrics.
-func collectVacuumConfig(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectVacuumConfig(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT name, setting
 	           FROM pg_settings
 	           WHERE name LIKE 'autovacuum%%' OR name LIKE 'vacuum%%'
@@ -301,7 +300,7 @@ func copyLabels(src map[string]string) map[string]string {
 // Per-table XID age
 // ---------------------------------------------------------------------------
 
-func collectTableXIDAge(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectTableXIDAge(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT n.nspname AS schemaname,
 	                  c.relname,
 	                  age(c.relfrozenxid) AS xid_age
@@ -343,7 +342,7 @@ func collectTableXIDAge(ctx context.Context, pool *pgxpool.Pool, labels map[stri
 // Vacuum needed indicator
 // ---------------------------------------------------------------------------
 
-func collectVacuumNeeded(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectVacuumNeeded(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// Read autovacuum settings for threshold and scale factor.
 	var threshold int64
 	var scaleFactor float64
@@ -404,7 +403,7 @@ func collectVacuumNeeded(ctx context.Context, pool *pgxpool.Pool, labels map[str
 // Dead tuple accumulation rate
 // ---------------------------------------------------------------------------
 
-func collectDeadTupleRate(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectDeadTupleRate(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// Sum all dead tuples across user tables.
 	var totalDead int64
 	if err := pool.QueryRow(ctx,
@@ -440,7 +439,7 @@ func collectDeadTupleRate(ctx context.Context, pool *pgxpool.Pool, inst *pgInsta
 // Logical replication subscription metrics
 // ---------------------------------------------------------------------------
 
-func collectSubscriptionMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectSubscriptionMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// pg_stat_subscription is available from PostgreSQL 10+.
 	// Use EXISTS to gracefully handle the case where the view is not present.
 	var viewExists bool

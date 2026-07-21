@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -66,7 +65,7 @@ func fingerprintQuery(query string) string {
 	return fmt.Sprintf("%x", h[:16]) // first 16 bytes = 32 hex chars
 }
 
-func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectQueryAnalytics(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -81,7 +80,7 @@ func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInst
 
 	// Ensure version is detected (fallback if collectInstance didn't set it).
 	if inst.version == 0 {
-		if err := detectVersion(ctx2, inst); err != nil {
+		if err := detectVersion(ctx2, pool, inst); err != nil {
 			logger.Debug("Version detection failed in query analytics",
 				zap.String("instance", inst.config.Name), zap.Error(err))
 		}
@@ -243,7 +242,7 @@ func collectQueryAnalytics(ctx context.Context, pool *pgxpool.Pool, inst *pgInst
 }
 
 // collectWaitEvents queries pg_stat_activity for current wait events.
-func collectWaitEvents(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectWaitEvents(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	query := `
 		SELECT wait_event_type, wait_event, count(*)
 		FROM pg_stat_activity

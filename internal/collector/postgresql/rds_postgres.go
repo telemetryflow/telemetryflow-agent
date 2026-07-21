@@ -397,6 +397,13 @@ func (c *RDSPostgreSQLCollector) collectActivity(ctx context.Context, inst *rdsP
 		_ = detectRDSVersion(ctx, inst, pool, c.logger)
 	}
 
+	return c.collectRDSActivityMetrics(ctx, pool, inst), nil
+}
+
+// collectRDSActivityMetrics runs the RDS activity query-scanning bodies against
+// the supplied querier. It is separated from collectActivity so the dispatch and
+// scan paths can be exercised with a mock pool.
+func (c *RDSPostgreSQLCollector) collectRDSActivityMetrics(ctx context.Context, pool PgxQuerier, inst *rdsPgInstance) []collector.Metric {
 	labels := rdsInstanceLabels(inst)
 	var all []collector.Metric
 
@@ -464,7 +471,7 @@ func (c *RDSPostgreSQLCollector) collectActivity(ctx context.Context, inst *rdsP
 		zap.String("instance", inst.config.Name),
 		zap.Int("metrics", len(all)),
 	)
-	return all, nil
+	return all
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +542,7 @@ func (c *RDSPostgreSQLCollector) collectAllTableStats(ctx context.Context) ([]co
 
 // collectRDSConnectionMetrics collects connection states from pg_stat_activity
 // and max_connections from pg_settings.
-func collectRDSConnectionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *rdsPgInstance, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSConnectionMetrics(ctx context.Context, pool PgxQuerier, inst *rdsPgInstance, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -621,7 +628,7 @@ func collectRDSConnectionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *
 
 // collectRDSTransactionMetrics collects per-database transaction, tuple, cache metrics
 // from pg_stat_database, plus deadlocks.
-func collectRDSTransactionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *rdsPgInstance, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSTransactionMetrics(ctx context.Context, pool PgxQuerier, inst *rdsPgInstance, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -745,7 +752,7 @@ func collectRDSTransactionMetrics(ctx context.Context, pool *pgxpool.Pool, inst 
 }
 
 // collectRDSBgWriterMetrics collects checkpoint and buffer stats from pg_stat_bgwriter.
-func collectRDSBgWriterMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSBgWriterMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -791,7 +798,7 @@ func collectRDSBgWriterMetrics(ctx context.Context, pool *pgxpool.Pool, labels m
 }
 
 // collectRDSWALMetrics collects WAL metrics from pg_stat_wal (PostgreSQL 14+).
-func collectRDSWALMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSWALMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -832,7 +839,7 @@ func collectRDSWALMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[st
 }
 
 // collectRDSLockMetrics collects lock counts by type and mode from pg_locks.
-func collectRDSLockMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSLockMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -897,14 +904,14 @@ func collectRDSLockMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[s
 }
 
 // collectRDSReplicationMetrics collects replication lag from pg_stat_replication.
-func collectRDSReplicationMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectRDSReplicationMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// Reuse the existing replication metrics collection from the base package,
 	// then re-emit with RDS metric name prefix.
 	return collectReplicationMetrics(ctx, pool, labels, logger)
 }
 
 // collectRDSDatabaseSizeMetrics collects per-database size from pg_database_size.
-func collectRDSDatabaseSizeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSDatabaseSizeMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -940,7 +947,7 @@ func collectRDSDatabaseSizeMetrics(ctx context.Context, pool *pgxpool.Pool, labe
 // Version Detection
 // ---------------------------------------------------------------------------
 
-func detectRDSVersion(ctx context.Context, inst *rdsPgInstance, pool *pgxpool.Pool, logger *zap.Logger) error {
+func detectRDSVersion(ctx context.Context, inst *rdsPgInstance, pool PgxQuerier, logger *zap.Logger) error {
 	ctx2, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 

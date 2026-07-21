@@ -79,7 +79,10 @@ func NewKubernetesSync(cfg KubernetesSyncConfig) *KubernetesSync {
 		cfg.Interval = 60 * time.Second
 	}
 	if cfg.Timeout == 0 {
-		cfg.Timeout = 30 * time.Second
+		// A full ClusterState (pods, events, pod/node logs) can be large; give
+		// the gzipped upload generous headroom. Kept below the default 60s
+		// interval so a slow request cannot overrun successive ticks.
+		cfg.Timeout = 50 * time.Second
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = zap.NewNop()
@@ -116,6 +119,13 @@ func (ks *KubernetesSync) Start(ctx context.Context) error {
 	ticker := time.NewTicker(ks.config.Interval)
 	defer ticker.Stop()
 
+	// backoffUntil throttles retries after consecutive failures so a
+	// persistently failing or slow backend is not hammered every interval.
+	var (
+		backoffUntil     time.Time
+		consecutiveFails int
+	)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -123,7 +133,16 @@ func (ks *KubernetesSync) Start(ctx context.Context) error {
 		case <-ks.stopChan:
 			return nil
 		case <-ticker.C:
+			if !backoffUntil.IsZero() && time.Now().Before(backoffUntil) {
+				// Still within the backoff window; skip this tick.
+				continue
+			}
+
 			if err := ks.sendSync(ctx); err != nil {
+				consecutiveFails++
+				wait := syncBackoff(consecutiveFails, ks.config.Interval)
+				backoffUntil = time.Now().Add(wait)
+
 				ks.mu.Lock()
 				ks.lastError = err
 				ks.errorCount++
@@ -132,8 +151,13 @@ func (ks *KubernetesSync) Start(ctx context.Context) error {
 				ks.logger.Warn("Kubernetes state sync failed",
 					zap.Error(err),
 					zap.Int("errorCount", errCount),
+					zap.Int("consecutiveFailures", consecutiveFails),
+					zap.Duration("retryBackoff", wait),
 				)
 			} else {
+				consecutiveFails = 0
+				backoffUntil = time.Time{}
+
 				ks.mu.Lock()
 				ks.lastSent = time.Now()
 				ks.successCount++
@@ -142,6 +166,28 @@ func (ks *KubernetesSync) Start(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// syncBackoff returns an exponentially increasing backoff window based on the
+// number of consecutive failures, capped at maxSyncBackoff. The base interval
+// is used as the unit so backoff never fires more often than normal syncing.
+func syncBackoff(consecutiveFails int, base time.Duration) time.Duration {
+	const maxSyncBackoff = 15 * time.Minute
+	if consecutiveFails <= 1 {
+		return 0
+	}
+	// 2^(n-1) * base: 1 fail -> no extra wait, 2 -> base, 3 -> 2*base, ...
+	wait := base
+	for i := 2; i < consecutiveFails; i++ {
+		wait *= 2
+		if wait >= maxSyncBackoff {
+			return maxSyncBackoff
+		}
+	}
+	if wait > maxSyncBackoff {
+		return maxSyncBackoff
+	}
+	return wait
 }
 
 // Stop gracefully stops the sync loop.
@@ -181,6 +227,16 @@ func (ks *KubernetesSync) sendSync(ctx context.Context) error {
 	defer cancel()
 
 	if err := ks.config.Client.SyncKubernetesState(syncCtx, ks.config.ClusterID, state); err != nil {
+		// Surface payload magnitude so a size-driven timeout can be told apart
+		// from a backend outage without turning on debug logging.
+		ks.logger.Warn("Kubernetes sync request failed; payload magnitude",
+			zap.Int("nodes", len(state.Nodes)),
+			zap.Int("pods", len(state.Pods)),
+			zap.Int("events", len(state.Events)),
+			zap.Int("podLogs", len(state.PodLogs)),
+			zap.Int("nodeLogs", len(state.NodeLogs)),
+			zap.Duration("timeout", ks.config.Timeout),
+		)
 		return fmt.Errorf("cluster %s: %w", ks.config.ClusterID, err)
 	}
 

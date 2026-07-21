@@ -4,16 +4,14 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectServerStatus(ctx context.Context, client *mongo.Client, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
-	admin := client.Database("admin")
+func collectServerStatus(ctx context.Context, api mongoAPI, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var result bson.M
-	if err := admin.RunCommand(ctx, bson.D{{Key: "serverStatus", Value: 1}}).Decode(&result); err != nil {
+	if err := api.RunCommand(ctx, "admin", bson.D{{Key: "serverStatus", Value: 1}}, &result); err != nil {
 		return nil, err
 	}
 

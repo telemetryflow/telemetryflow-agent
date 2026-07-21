@@ -337,6 +337,7 @@ kubernetes:
         interval: 30s
         sync_to_backend: true
         sync_interval: 60s
+        sync_timeout: 50s # per-request POST deadline; raise for large clusters
         nodes: true
         pods: true
         deployments: true

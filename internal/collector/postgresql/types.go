@@ -19,11 +19,21 @@
 package postgresql
 
 import (
+	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
+
+// PgxQuerier is the minimal query surface the collect* functions depend on.
+// Both *pgxpool.Pool and pgxmock's mock pool satisfy this interface, which lets
+// the query-scanning paths be exercised without a live database.
+type PgxQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 type pgInstance struct {
 	config          config.PostgreSQLInstanceConfig

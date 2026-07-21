@@ -268,6 +268,7 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("collectors.kubernetes.metrics_api", defaults.Collector.Kubernetes.MetricsAPI)
 	v.SetDefault("collectors.kubernetes.sync_to_backend", defaults.Collector.Kubernetes.SyncToBackend)
 	v.SetDefault("collectors.kubernetes.sync_interval", defaults.Collector.Kubernetes.SyncInterval)
+	v.SetDefault("collectors.kubernetes.sync_timeout", defaults.Collector.Kubernetes.SyncTimeout)
 
 	// Node Exporter collector
 	v.SetDefault("collectors.node_exporter.enabled", defaults.Collector.NodeExporter.Enabled)

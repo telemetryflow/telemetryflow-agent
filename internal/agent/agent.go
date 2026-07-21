@@ -429,6 +429,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 				k8sSync = exporter.NewKubernetesSync(exporter.KubernetesSyncConfig{
 					ClusterID: cfg.Collector.Kubernetes.ClusterID,
 					Interval:  syncInterval,
+					Timeout:   cfg.Collector.Kubernetes.SyncTimeout,
 					Collector: k8sCollector,
 					Client:    client,
 					Logger:    logger,
@@ -436,6 +437,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 				logger.Info("Kubernetes state sync enabled",
 					zap.String("clusterID", cfg.Collector.Kubernetes.ClusterID),
 					zap.Duration("interval", syncInterval),
+					zap.Duration("timeout", cfg.Collector.Kubernetes.SyncTimeout),
 				)
 			}
 		}
@@ -467,8 +469,17 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	// Add log collector: Fluent Bit (preferred) or native (fallback).
 	// Mutual exclusion — Fluent Bit replaces native when both are enabled.
 	if cfg.Collector.FluentBit.Enabled {
+		// Route Fluent Bit's OTLP output to the same logs endpoint the OTLP exporter
+		// uses. Without this, logs would go to telemetryflow.endpoint + /v1/logs,
+		// bypassing the authenticated v2 ingestion path that resolves the tenant
+		// from the API key.
+		fbCfg := cfg.Collector.FluentBit
+		if cfg.Exporter.OTLP.Logs.Enabled {
+			fbCfg.LogsEndpoint = cfg.Exporter.OTLP.Logs.Endpoint
+		}
+
 		fbCol, err := fluentbitcollector.NewFluentBitCollector(
-			cfg.Collector.FluentBit,
+			fbCfg,
 			cfg.TelemetryFlow,
 			agentID,
 			logger,
@@ -947,6 +958,7 @@ func (a *Agent) Run(ctx context.Context) error {
 				a.k8sSync = exporter.NewKubernetesSync(exporter.KubernetesSyncConfig{
 					ClusterID: regResp.ID,
 					Interval:  syncInterval,
+					Timeout:   a.config.Collector.Kubernetes.SyncTimeout,
 					Collector: a.k8sCollector,
 					Client:    a.client,
 					Logger:    a.logger,

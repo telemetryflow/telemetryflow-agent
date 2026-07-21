@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
-func detectVersion(ctx context.Context, pool *pgxpool.Pool, inst *crdbInstance, logger *zap.Logger) error {
+func detectVersion(ctx context.Context, pool PgxQuerier, inst *crdbInstance, logger *zap.Logger) error {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
