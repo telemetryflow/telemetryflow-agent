@@ -1,4 +1,4 @@
-// Package fluentbit exposes unexported symbols for external test packages.
+// Package remotewrite exposes unexported symbols for external test packages.
 //
 // TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
@@ -15,20 +15,23 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+package remotewrite
 
-package fluentbit
+import (
+	"net/http"
+	"time"
 
-import "os"
+	"github.com/prometheus/prometheus/prompb"
 
-func ParseEndpointExported(endpoint string) (host, port string, tls bool, err error) {
-	return parseEndpoint(endpoint)
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+)
+
+// WriteHandlerExported wraps writeHandler for use by external test packages.
+func WriteHandlerExported(cfg RemoteWriteReceiverConfig, out chan<- []collector.Metric, flushInterval time.Duration) http.HandlerFunc {
+	return writeHandler(cfg, out, flushInterval)
 }
 
-// AppendStderrExported wraps the unexported appendStderr for external test packages.
-func (p *ProcessManager) AppendStderrExported(line string) { p.appendStderr(line) }
-
-// StderrBufferSizeExported exposes the stderr circular-buffer capacity.
-func StderrBufferSizeExported() int { return stderrBufferSize }
-
-// SigtermExported exposes the platform-specific termination signal for tests.
-func SigtermExported() os.Signal { return sigterm() }
+// DecodeWriteRequestExported wraps decodeWriteRequest for use by external test packages.
+func DecodeWriteRequestExported(body []byte) (*prompb.WriteRequest, error) {
+	return decodeWriteRequest(body)
+}

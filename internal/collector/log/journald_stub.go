@@ -32,7 +32,15 @@ import (
 )
 
 // JournaldCollector is a no-op stub on non-Linux platforms.
-type JournaldCollector struct{}
+//
+// It carries a lines channel that mirrors the Linux implementation so that the
+// collector's drain path can be exercised in tests. In production on non-Linux
+// platforms the collector never constructs a JournaldCollector (creation is
+// gated on runtime.GOOS == "linux"), so this channel is never populated at
+// runtime and the stub remains an effective no-op.
+type JournaldCollector struct {
+	lines chan LogEntry
+}
 
 // LogEntry is a structured log line (stub definition for non-Linux).
 type LogEntry struct {
@@ -43,11 +51,11 @@ type LogEntry struct {
 
 // NewJournaldCollector returns a no-op collector on non-Linux.
 func NewJournaldCollector(_ config.JournaldConfig, _ *zap.Logger) *JournaldCollector {
-	return &JournaldCollector{}
+	return &JournaldCollector{lines: make(chan LogEntry, 2048)}
 }
 
-// Lines returns a nil channel (never emits).
-func (j *JournaldCollector) Lines() <-chan LogEntry { return nil }
+// Lines returns the (test-populated) channel of entries.
+func (j *JournaldCollector) Lines() <-chan LogEntry { return j.lines }
 
 // Start is a no-op on non-Linux.
 func (j *JournaldCollector) Start(ctx context.Context) error {
