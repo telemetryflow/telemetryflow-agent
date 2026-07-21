@@ -74,6 +74,12 @@ type Buffer struct {
 	size    int64
 	closed  bool
 
+	// clearGen is bumped whenever the buffer is cleared. flush() captures it
+	// before doing (unlocked) disk I/O and only writes back b.size if the
+	// generation is unchanged, so a flush in flight cannot resurrect the size
+	// of entries that Clear() has since removed.
+	clearGen uint64
+
 	// Channels
 	incoming chan Entry
 	done     chan struct{}
@@ -204,6 +210,7 @@ func (b *Buffer) Clear() {
 
 	b.entries = make([]Entry, 0)
 	b.size = 0
+	b.clearGen++
 }
 
 // Close stops the buffer and flushes remaining data
@@ -261,9 +268,11 @@ func (b *Buffer) flush() error {
 		return nil
 	}
 
-	// Copy entries for serialization
+	// Copy entries for serialization. Capture the clear generation so we can
+	// detect a Clear() that happens while we do unlocked disk I/O below.
 	entries := make([]Entry, len(b.entries))
 	copy(entries, b.entries)
+	gen := b.clearGen
 	b.mu.RUnlock()
 
 	// Write to file
@@ -278,7 +287,11 @@ func (b *Buffer) flush() error {
 	}
 
 	b.mu.Lock()
-	b.size = int64(len(data))
+	// Only record the size if the buffer wasn't cleared during the write above;
+	// otherwise Clear()'s size=0 would be clobbered by this stale value.
+	if b.clearGen == gen {
+		b.size = int64(len(data))
+	}
 	b.mu.Unlock()
 
 	return nil
