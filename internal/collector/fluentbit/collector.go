@@ -69,6 +69,18 @@ func NewFluentBitCollector(
 	}
 	cfg.BinaryPath = binaryPath
 
+	// External config mode: run Fluent Bit with a user-supplied config file and
+	// skip all auto-generation. Validate the file exists so we fail fast at
+	// startup rather than when the subprocess spawns.
+	if cfg.ExternalConfig {
+		if cfg.ConfigFile == "" {
+			return nil, fmt.Errorf("fluent-bit external_config is enabled but config_file is not set")
+		}
+		if _, err := os.Stat(cfg.ConfigFile); err != nil {
+			return nil, fmt.Errorf("fluent-bit external config_file not found at %s: %w", cfg.ConfigFile, err)
+		}
+	}
+
 	// Apply config defaults
 	if cfg.ConfigDir == "" {
 		cfg.ConfigDir = "/tmp/tfo-agent-fluentbit"
@@ -121,21 +133,32 @@ func (c *FluentBitCollector) Start(ctx context.Context) error {
 		c.mu.Unlock()
 	}()
 
-	// Generate config files
-	conf, parsers, err := GenerateConfig(c.cfg, c.tfCfg)
-	if err != nil {
-		return fmt.Errorf("generate fluent-bit config: %w", err)
-	}
+	// Resolve the config path: either a user-supplied external file or a
+	// freshly generated one written into ConfigDir.
+	var configPath string
+	if c.cfg.ExternalConfig {
+		configPath = c.cfg.ConfigFile
+		c.logger.Info("Fluent Bit using external config",
+			zap.String("config_file", configPath),
+			zap.String("binary", c.cfg.BinaryPath),
+		)
+	} else {
+		// Generate config files
+		conf, parsers, err := GenerateConfig(c.cfg, c.tfCfg)
+		if err != nil {
+			return fmt.Errorf("generate fluent-bit config: %w", err)
+		}
 
-	if err := WriteConfigs(c.cfg.ConfigDir, conf, parsers); err != nil {
-		return fmt.Errorf("write fluent-bit config: %w", err)
-	}
+		if err := WriteConfigs(c.cfg.ConfigDir, conf, parsers); err != nil {
+			return fmt.Errorf("write fluent-bit config: %w", err)
+		}
 
-	configPath := filepath.Join(c.cfg.ConfigDir, "fluent-bit.conf")
-	c.logger.Info("Fluent Bit config generated",
-		zap.String("config_dir", c.cfg.ConfigDir),
-		zap.String("binary", c.cfg.BinaryPath),
-	)
+		configPath = filepath.Join(c.cfg.ConfigDir, "fluent-bit.conf")
+		c.logger.Info("Fluent Bit config generated",
+			zap.String("config_dir", c.cfg.ConfigDir),
+			zap.String("binary", c.cfg.BinaryPath),
+		)
+	}
 
 	// Create and start process manager
 	c.process = NewProcessManager(
@@ -162,8 +185,9 @@ func (c *FluentBitCollector) Stop() error {
 		}
 	}
 
-	// Clean up generated config files (non-fatal)
-	if c.cfg.ConfigDir != "" {
+	// Clean up generated config files (non-fatal). In external-config mode the
+	// agent generates nothing, so never touch the user's files/directory.
+	if !c.cfg.ExternalConfig && c.cfg.ConfigDir != "" {
 		_ = os.RemoveAll(c.cfg.ConfigDir)
 	}
 

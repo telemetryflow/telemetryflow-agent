@@ -54,7 +54,10 @@ telemetryflow:
   # TLS settings for backend connection
   tls:
     enabled: true
-    insecure_skip_verify: false
+    # skip_verify disables certificate verification (INSECURE — dev/staging only).
+    # Correct key is skip_verify (NOT insecure_skip_verify).
+    # Can also be set via env: TELEMETRYFLOW_TLS_SKIP_VERIFY=true
+    skip_verify: false
     # cert_file: /path/to/client.crt
     # key_file: /path/to/client.key
     # ca_file: /path/to/ca.crt
@@ -288,6 +291,12 @@ collectors:
     enabled: false
     binary_path: "" # auto-detect from PATH
     config_dir: /tmp/tfo-agent-fluentbit
+    # External config mode: run Fluent Bit with your own config file instead of
+    # the auto-generated one. When external_config is true, config_file is
+    # required and used as-is (never modified/deleted); all input/filter/output
+    # settings below are ignored, so your file must define its own [OUTPUT].
+    external_config: false
+    config_file: "" # e.g. /etc/fluent-bit/fluent-bit.conf (required if external_config: true)
     flush_interval: 5
     log_level: info
     storage_enabled: true
@@ -1422,11 +1431,8 @@ integrations:
       events:
         enabled: false
         endpoint: "/events"
-    # TLS configuration
-    tls:
-      enabled: true
-      skip_verify: false
-      # ca_file: /path/to/ca.crt
+    # TLS configuration (InstanaConfig uses a flat key, not a nested tls block)
+    tls_skip_verify: false
     timeout: 30s
     # Custom tags
     tags:
@@ -1536,10 +1542,8 @@ integrations:
         medium: 3
         low: 4
         info: 5
-    # TLS configuration
-    tls:
-      enabled: true
-      skip_verify: false
+    # TLS configuration (ManageEngineConfig uses a flat key, not a nested tls block)
+    tls_skip_verify: false
     timeout: 30s
     labels:
       environment: production
@@ -1574,13 +1578,12 @@ integrations:
     # Reconnection settings
     auto_reconnect: true
     max_reconnect_interval: 5m
-    # TLS configuration
-    tls:
-      enabled: false
-      ca_file: ""
-      cert_file: ""
-      key_file: ""
-      skip_verify: false
+    # TLS configuration (MQTTConfig uses flat keys, not a nested tls block)
+    tls_enabled: false
+    tls_ca_file: ""
+    tls_cert_file: ""
+    tls_key_file: ""
+    tls_skip_verify: false
     # Message format: json, protobuf
     encoding: json
     batch_size: 100

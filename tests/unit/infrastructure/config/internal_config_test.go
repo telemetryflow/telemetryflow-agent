@@ -511,3 +511,54 @@ func TestSignalEnabledFlags(t *testing.T) {
 	assert.False(t, c.IsMetricsEnabled())
 	assert.False(t, c.IsLogsEnabled())
 }
+
+// TestSkipVerifyKeyMigration verifies that the unified "skip_verify" wording is
+// honored and that the deprecated *_insecure_skip_verify keys still work
+// (backward compatibility) for cAdvisor, Kubelet, and MongoDB instances.
+func TestSkipVerifyKeyMigration(t *testing.T) {
+	t.Run("new keys bind directly", func(t *testing.T) {
+		path := writeConfig(t, `
+telemetryflow:
+  endpoint: "localhost:4317"
+collectors:
+  cadvisor:
+    tls_skip_verify: true
+  kubernetes:
+    kubelet_skip_verify: true
+  mongodb_community:
+    instances:
+      - name: m1
+        uri: "mongodb://localhost:27017"
+        tls_skip_verify: true
+`)
+		cfg, err := config.NewLoader().Load(path)
+		require.NoError(t, err)
+		assert.True(t, cfg.Collector.CAdvisor.InsecureSkipVerify)
+		assert.True(t, cfg.Collector.Kubernetes.KubeletInsecureSkipVerify)
+		require.Len(t, cfg.Collector.MongoDBCommunity.Instances, 1)
+		assert.True(t, cfg.Collector.MongoDBCommunity.Instances[0].TLSInsecureSkipVerify)
+	})
+
+	t.Run("deprecated keys still honored", func(t *testing.T) {
+		path := writeConfig(t, `
+telemetryflow:
+  endpoint: "localhost:4317"
+collectors:
+  cadvisor:
+    insecure_skip_verify: true
+  kubernetes:
+    kubelet_insecure_skip_verify: true
+  mongodb_community:
+    instances:
+      - name: m1
+        uri: "mongodb://localhost:27017"
+        tls_insecure_skip_verify: true
+`)
+		cfg, err := config.NewLoader().Load(path)
+		require.NoError(t, err)
+		assert.True(t, cfg.Collector.CAdvisor.InsecureSkipVerify, "cadvisor old key should migrate")
+		assert.True(t, cfg.Collector.Kubernetes.KubeletInsecureSkipVerify, "kubelet old key should migrate")
+		require.Len(t, cfg.Collector.MongoDBCommunity.Instances, 1)
+		assert.True(t, cfg.Collector.MongoDBCommunity.Instances[0].TLSInsecureSkipVerify, "mongodb old key should migrate")
+	})
+}
