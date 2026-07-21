@@ -171,9 +171,11 @@ integrations:
       - address: "router1.example.com"
         name: "Edge Router 1"
 
+    # walk_oids / get_oids are optional. When omitted, the agent applies the
+    # industry-standard defaults below (system scalars + full IF-MIB tables).
     walk_oids:
       - "1.3.6.1.2.1.2.2" # IF-MIB::ifTable
-      - "1.3.6.1.2.1.1" # SNMPv2-MIB::system
+      - "1.3.6.1.2.1.31.1.1.1" # IF-MIB::ifXTable (64-bit HC counters, ifName)
 
     get_oids:
       - oid: "1.3.6.1.2.1.1.3.0"
@@ -186,24 +188,66 @@ integrations:
 
 ### Default OIDs
 
-| OID                     | Name         | Type    |
-| ----------------------- | ------------ | ------- |
-| 1.3.6.1.2.1.1.3.0       | sysUpTime    | counter |
-| 1.3.6.1.2.1.1.5.0       | sysName      | string  |
-| 1.3.6.1.2.1.2.2.1.10    | ifInOctets   | counter |
-| 1.3.6.1.2.1.2.2.1.16    | ifOutOctets  | counter |
-| 1.3.6.1.4.1.2021.11.9.0 | ssCpuUser    | gauge   |
-| 1.3.6.1.4.1.2021.4.5.0  | memTotalReal | gauge   |
+When no `get_oids` / `walk_oids` are configured, the agent polls a standard
+baseline. Scalars are collected via SNMP **GET**; per-interface metrics are
+collected by **WALK**ing the IF-MIB tables, so a fresh target yields useful
+interface data with no manual OID mapping.
+
+**Scalar GET defaults (SNMPv2-MIB / UCD-SNMP-MIB):**
+
+| OID                      | Name         | Type    | Unit    |
+| ------------------------ | ------------ | ------- | ------- |
+| 1.3.6.1.2.1.1.1.0        | sysDescr     | string  | —       |
+| 1.3.6.1.2.1.1.3.0        | sysUpTime    | counter | ticks   |
+| 1.3.6.1.2.1.1.5.0        | sysName      | string  | —       |
+| 1.3.6.1.4.1.2021.11.9.0  | ssCpuUser    | gauge   | percent |
+| 1.3.6.1.4.1.2021.11.11.0 | ssCpuIdle    | gauge   | percent |
+| 1.3.6.1.4.1.2021.4.5.0   | memTotalReal | gauge   | kB      |
+| 1.3.6.1.4.1.2021.4.6.0   | memAvailReal | gauge   | kB      |
+
+**Interface WALK defaults (IF-MIB — RFC 1213 + RFC 2233):**
+
+| Table root           | Provides                                                            |
+| -------------------- | ------------------------------------------------------------------- |
+| 1.3.6.1.2.1.2.2      | `ifTable` — ifSpeed, ifOperStatus, ifIn/OutOctets, errors, discards |
+| 1.3.6.1.2.1.31.1.1.1 | `ifXTable` — ifName, **ifHCIn/OutOctets** (64-bit), ifHighSpeed     |
+
+> **64-bit counters:** ifXTable HC counters are collected because 32-bit
+> `ifInOctets`/`ifOutOctets` wrap in seconds on ≥1 Gbps links and cannot be
+> used for accurate rate calculation. This matches standard NMS practice
+> (LibreNMS, Observium, Prometheus snmp_exporter).
+
+Each walked row carries an `index` tag (the interface index) so per-interface
+series stay distinct — feeding the platform's **Interface Utilization** view
+(in/out, capacity, errors, discards, oper status) directly.
 
 ### Metrics
 
-| Metric             | Type    | Description         |
-| ------------------ | ------- | ------------------- |
-| `snmp_target_up`   | gauge   | Target reachability |
-| `snmp_sysuptime`   | counter | System uptime ticks |
-| `snmp_ifinoctets`  | counter | Interface bytes in  |
-| `snmp_ifoutoctets` | counter | Interface bytes out |
-| `snmp_sspcuuser`   | gauge   | CPU user percentage |
+| Metric                              | Type    | Source (IF-MIB) | Description                  |
+| ----------------------------------- | ------- | --------------- | ---------------------------- |
+| `snmp_target_up`                    | gauge   | probe           | Target reachability (0/1)    |
+| `snmp_sysuptime`                    | counter | sysUpTime       | System uptime ticks          |
+| `snmp_walk_1_3_6_1_2_1_31_1_1_1_6`  | counter | ifHCInOctets    | Interface bytes in (64-bit)  |
+| `snmp_walk_1_3_6_1_2_1_31_1_1_1_10` | counter | ifHCOutOctets   | Interface bytes out (64-bit) |
+| `snmp_walk_1_3_6_1_2_1_2_2_1_14`    | counter | ifInErrors      | Interface inbound errors     |
+| `snmp_walk_1_3_6_1_2_1_2_2_1_13`    | counter | ifInDiscards    | Interface inbound discards   |
+| `snmp_walk_1_3_6_1_2_1_2_2_1_8`     | gauge   | ifOperStatus    | Interface operational status |
+| `snmp_sscpuuser`                    | gauge   | ssCpuUser       | CPU user percentage          |
+
+> Walk metric names default to `snmp_walk_<oid>`; assign a friendly `name` in a
+> `get_oids`/MIB mapping to rename them.
+
+### Operational Notes
+
+- **Concurrent polling:** targets are polled in parallel (bounded pool) so one
+  slow or timing-out device does not delay the rest of the scrape.
+- **Health check:** `Health()` issues a real SNMP GET for `sysUpTime.0` per
+  target — a device counts as reachable only if it actually answers SNMP (a UDP
+  socket opening is not treated as reachability).
+- **SNMPv3:** privacy (encryption) is enabled whenever `security_level:
+authPriv` is set; auth-only and no-auth levels are honored independently.
+- **Cancellation:** in-flight GET/WALK I/O is bounded by `timeout` and unwound
+  on context cancellation (agent shutdown) so no poll leaks a connection.
 
 ---
 
