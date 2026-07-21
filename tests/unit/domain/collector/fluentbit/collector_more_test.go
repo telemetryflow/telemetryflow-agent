@@ -19,6 +19,7 @@
 package fluentbit_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,7 +127,7 @@ func TestCollect_NoProcess(t *testing.T) {
 		t.Fatalf("new: %v", err)
 	}
 
-	metrics, err := c.Collect(nil)
+	metrics, err := c.Collect(context.Background())
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
