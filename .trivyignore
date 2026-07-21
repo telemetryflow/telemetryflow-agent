@@ -149,3 +149,56 @@ CVE-2026-34743
 # =============================================================================
 CVE-2026-11822
 CVE-2026-11824
+
+# =============================================================================
+# Newly surfaced in the Fluent Bit 5.0.9 image scan (debian trixie 13.6).
+# All are core OS packages that cannot be purged; the agent runs as non-root
+# (UID 10001, nologin) and does not exercise the vulnerable code paths. No
+# fixed version is available from Debian trixie-security at time of writing.
+# =============================================================================
+# perl-base: cannot be purged (required by apt/dpkg). The agent never executes
+# Perl. CVE-2026-13221 (silently incorrect regex) and CVE-2026-57432 (integer
+# overflow in S_measure_struct) are in the Perl interpreter core and are not
+# reachable — no Perl scripts run at runtime.
+CVE-2026-13221
+CVE-2026-57432
+# util-linux / libblkid1 / bsdutils / libmount1 / libsmartcols1 / libuuid1:
+# CVE-2026-53615 — heap use-after-free in libblkid nested partition probing.
+# Core system utilities; the agent does not probe block devices or partitions.
+CVE-2026-53615
+# gzip: CVE-2026-41992 — global buffer overflow in the LZH decompressor. The
+# agent does not decompress untrusted .lzh/.Z archives via gzip.
+CVE-2026-41992
+# libacl1: CVE-2026-54369 — symlink traversal privilege escalation via libacl
+# functions. Requires local ACL operations on attacker-controlled paths; the
+# agent runs non-root and performs no getfacl/setfacl on untrusted trees.
+CVE-2026-54369
+
+# =============================================================================
+# MEDIUM findings in the 5.0.9 image (debian trixie 13.6). Same non-reachable
+# OS-base categories as above — core packages that cannot be purged, agent runs
+# non-root and does not exercise the vulnerable paths. No fix in trixie yet.
+# =============================================================================
+# curl / libcurl: .netrc password lookup, super-cookie injection, Digest
+# header reuse, wrong-connection reuse. Agent uses libcurl only for Fluent Bit
+# HTTP/TLS output + health checks — no .netrc, cookies, or Digest auth.
+CVE-2026-10536
+CVE-2026-11856
+CVE-2026-8924
+CVE-2026-8926
+# bsdutils / util-linux: CVE-2026-13595 — libblkid partition probing. Agent
+# does not probe block devices.
+CVE-2026-13595
+# libp11-kit0: CVE-2026-13757 — stack exhaustion via unbounded recursion in
+# RPC attribute parsing. Agent does not use PKCS#11 modules.
+CVE-2026-13757
+# gzip: CVE-2026-41991 — gzexe insecure temp file. Agent does not run gzexe.
+CVE-2026-41991
+# libacl1 / libattr1: CVE-2026-54370 / CVE-2026-54371 — symlink traversal via
+# getfacl/setfacl/getfattr/setfattr. Agent runs non-root; no ACL/xattr ops on
+# untrusted paths.
+CVE-2026-54370
+CVE-2026-54371
+# libnghttp2-14: CVE-2026-58055 — nghttpx Upgrade request forwarding. Agent
+# does not run the nghttpx proxy.
+CVE-2026-58055
