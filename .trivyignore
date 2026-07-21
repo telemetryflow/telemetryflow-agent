@@ -71,6 +71,19 @@ CVE-2026-5545
 CVE-2026-6253
 CVE-2026-6429
 CVE-2026-7168
+# Fluent Bit 5.0.9 base (curl 8.14.1): no upstream fix available yet. Not
+# reachable from the agent's usage — SFTP/SCP host verification (CVE-2026-12064),
+# proxy auth disclosure (CVE-2026-8927/9079), mTLS reuse bypass (CVE-2026-8932),
+# TLS config mismatch (CVE-2026-8286), curl_easy_pause UAF (CVE-2026-9080),
+# and SSL session cache disclosure (CVE-2026-9545) all require code paths the
+# agent does not exercise (HTTP/TLS output + health checks only).
+CVE-2026-12064
+CVE-2026-8286
+CVE-2026-8927
+CVE-2026-8932
+CVE-2026-9079
+CVE-2026-9080
+CVE-2026-9545
 
 # =============================================================================
 # libssh2-1t64: Integer overflow via large username/password.

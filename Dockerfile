@@ -27,7 +27,7 @@
 # -----------------------------------------------------------------------------
 # NOTE: Fluent Bit is glibc-based — runtime MUST use glibc (Debian), not musl (Alpine).
 # See: https://github.com/fluent/fluent-bit/issues/2464
-FROM fluent/fluent-bit:4.2.3 AS fluent-bit
+FROM fluent/fluent-bit:5.0.9 AS fluent-bit
 
 # -----------------------------------------------------------------------------
 # Stage 2: Builder
@@ -73,7 +73,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
 # IMPORTANT: Do NOT switch to Alpine. Fluent Bit requires glibc and has known
 # issues with musl: memory allocator (jemalloc), Golang plugin loading, and
 # time format parsing. See https://github.com/fluent/fluent-bit/issues/2464
-# NOTE: Fluent Bit 4.x requires GLIBC >= 2.38 — bookworm (2.36) is too old.
+# NOTE: Fluent Bit 5.x requires GLIBC >= 2.38 — bookworm (2.36) is too old.
 FROM debian:trixie-slim
 
 ARG VERSION=1.2.1
@@ -98,7 +98,7 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
     io.telemetryflow.maintainer="Telemetri Data Indonesia"
 
 # Install runtime dependencies and security patches
-# Fluent Bit 4.x requires: libyaml, openssl3, libcurl, libsasl2, libpq
+# Fluent Bit 5.x requires: libyaml, openssl3, libcurl, libsasl2, libpq
 # SECURITY: dist-upgrade ensures all base packages are patched against known CVEs
 # (glibc CVE-2026-5435/CVE-2026-6238, gnutls CVE-2026-42010/CVE-2026-33845,
 # libssh2 CVE-2026-7598, curl CVE-2026-6276, etc.)
