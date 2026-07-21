@@ -1,9 +1,10 @@
-// Package api internal tests exercise the agent HTTP API server, its handlers,
-// middleware, and lifecycle using httptest and fake Kubernetes clients.
+// Package api_test exercises the agent HTTP API server, its handlers,
+// middleware, and lifecycle using httptest and fake Kubernetes clients from an
+// external test package via the exported wrappers in internal/api/exports.go.
 //
 // TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
-package api
+package api_test
 
 import (
 	"context"
@@ -20,35 +21,37 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/telemetryflow/telemetryflow-agent/internal/api"
 )
 
 // fakeAgent is an in-memory AgentProvider double.
 type fakeAgent struct {
-	states      []CollectorState
+	states      []api.CollectorState
 	reloadErr   error
 	running     bool
-	stats       AgentStats
+	stats       api.AgentStats
 	reloadCalls int
 }
 
-func (f *fakeAgent) CollectorStates() []CollectorState { return f.states }
-func (f *fakeAgent) ReloadConfig() error               { f.reloadCalls++; return f.reloadErr }
-func (f *fakeAgent) IsRunning() bool                   { return f.running }
-func (f *fakeAgent) Stats() AgentStats                 { return f.stats }
+func (f *fakeAgent) CollectorStates() []api.CollectorState { return f.states }
+func (f *fakeAgent) ReloadConfig() error                   { f.reloadCalls++; return f.reloadErr }
+func (f *fakeAgent) IsRunning() bool                       { return f.running }
+func (f *fakeAgent) Stats() api.AgentStats                 { return f.stats }
 
-func newTestServer(cfg Config, agent AgentProvider) *Server {
-	return NewServer(cfg, fake.NewSimpleClientset(), zap.NewNop(), agent)
+func newTestServer(cfg api.Config, agent api.AgentProvider) *api.Server {
+	return api.NewServer(cfg, fake.NewSimpleClientset(), zap.NewNop(), agent)
 }
 
-// handler builds the same mux + middleware wiring used in Start, without binding
-// a socket, so handlers/routes/middleware can be exercised via httptest.
-func (s *Server) testHandler() http.Handler {
+// testHandler builds the same mux + middleware wiring used in Start, without
+// binding a socket, so handlers/routes/middleware can be exercised via httptest.
+func testHandler(s *api.Server) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
-	mux.HandleFunc("GET /api/v1/collectors", s.handleCollectors)
-	mux.HandleFunc("POST /api/v1/reload", s.handleReload)
-	mux.HandleFunc("GET /api/v1/pods/{namespace}/{pod}/logs", s.handlePodLogs)
-	return s.authMiddleware(mux)
+	mux.HandleFunc("GET /api/v1/health", s.HandleHealthExported)
+	mux.HandleFunc("GET /api/v1/collectors", s.HandleCollectorsExported)
+	mux.HandleFunc("POST /api/v1/reload", s.HandleReloadExported)
+	mux.HandleFunc("GET /api/v1/pods/{namespace}/{pod}/logs", s.HandlePodLogsExported)
+	return s.AuthMiddlewareExported(mux)
 }
 
 func doReq(t *testing.T, h http.Handler, method, target string, headers map[string]string) *httptest.ResponseRecorder {
@@ -64,8 +67,8 @@ func doReq(t *testing.T, h http.Handler, method, target string, headers map[stri
 
 func TestHandleHealth(t *testing.T) {
 	t.Run("without agent", func(t *testing.T) {
-		s := newTestServer(Config{}, nil)
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/health", nil)
+		s := newTestServer(api.Config{}, nil)
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/health", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d", rr.Code)
 		}
@@ -82,8 +85,8 @@ func TestHandleHealth(t *testing.T) {
 	})
 
 	t.Run("with running agent", func(t *testing.T) {
-		s := newTestServer(Config{}, &fakeAgent{running: true})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/health", nil)
+		s := newTestServer(api.Config{}, &fakeAgent{running: true})
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/health", nil)
 		var body map[string]string
 		_ = json.Unmarshal(rr.Body.Bytes(), &body)
 		if body["agent_running"] != "true" {
@@ -94,34 +97,34 @@ func TestHandleHealth(t *testing.T) {
 
 func TestHandleCollectors(t *testing.T) {
 	t.Run("nil agent", func(t *testing.T) {
-		s := newTestServer(Config{}, nil)
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors", nil)
+		s := newTestServer(api.Config{}, nil)
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors", nil)
 		if rr.Code != http.StatusServiceUnavailable {
 			t.Fatalf("want 503, got %d", rr.Code)
 		}
 	})
 
 	t.Run("nil states", func(t *testing.T) {
-		s := newTestServer(Config{}, &fakeAgent{states: nil})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors", nil)
+		s := newTestServer(api.Config{}, &fakeAgent{states: nil})
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors", nil)
 		if rr.Code != http.StatusServiceUnavailable {
 			t.Fatalf("want 503, got %d", rr.Code)
 		}
 	})
 
 	t.Run("with states", func(t *testing.T) {
-		agent := &fakeAgent{states: []CollectorState{
+		agent := &fakeAgent{states: []api.CollectorState{
 			{Name: "pg", State: "running", FailureCount: 0},
 			{Name: "redis", State: "failed", LastError: "boom", FailureCount: 2, StartedAt: 123},
 		}}
-		s := newTestServer(Config{}, agent)
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors", nil)
+		s := newTestServer(api.Config{}, agent)
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d", rr.Code)
 		}
 		var body struct {
-			Collectors []CollectorState `json:"collectors"`
-			Count      int              `json:"count"`
+			Collectors []api.CollectorState `json:"collectors"`
+			Count      int                  `json:"count"`
 		}
 		if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 			t.Fatal(err)
@@ -134,8 +137,8 @@ func TestHandleCollectors(t *testing.T) {
 
 func TestHandleReload(t *testing.T) {
 	t.Run("nil agent", func(t *testing.T) {
-		s := newTestServer(Config{}, nil)
-		rr := doReq(t, s.testHandler(), http.MethodPost, "/api/v1/reload", nil)
+		s := newTestServer(api.Config{}, nil)
+		rr := doReq(t, testHandler(s), http.MethodPost, "/api/v1/reload", nil)
 		if rr.Code != http.StatusServiceUnavailable {
 			t.Fatalf("want 503, got %d", rr.Code)
 		}
@@ -143,8 +146,8 @@ func TestHandleReload(t *testing.T) {
 
 	t.Run("reload error", func(t *testing.T) {
 		agent := &fakeAgent{reloadErr: errors.New("bad config")}
-		s := newTestServer(Config{}, agent)
-		rr := doReq(t, s.testHandler(), http.MethodPost, "/api/v1/reload", nil)
+		s := newTestServer(api.Config{}, agent)
+		rr := doReq(t, testHandler(s), http.MethodPost, "/api/v1/reload", nil)
 		if rr.Code != http.StatusInternalServerError {
 			t.Fatalf("want 500, got %d", rr.Code)
 		}
@@ -155,8 +158,8 @@ func TestHandleReload(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		agent := &fakeAgent{}
-		s := newTestServer(Config{}, agent)
-		rr := doReq(t, s.testHandler(), http.MethodPost, "/api/v1/reload", nil)
+		s := newTestServer(api.Config{}, agent)
+		rr := doReq(t, testHandler(s), http.MethodPost, "/api/v1/reload", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d", rr.Code)
 		}
@@ -168,8 +171,8 @@ func TestHandleReload(t *testing.T) {
 
 func TestHandlePodLogs(t *testing.T) {
 	t.Run("non-follow returns json lines", func(t *testing.T) {
-		s := newTestServer(Config{}, nil)
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/pods/default/mypod/logs?container=app&timestamps=false", nil)
+		s := newTestServer(api.Config{}, nil)
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/pods/default/mypod/logs?container=app&timestamps=false", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d body=%s", rr.Code, rr.Body.String())
 		}
@@ -189,8 +192,8 @@ func TestHandlePodLogs(t *testing.T) {
 	})
 
 	t.Run("follow streams SSE", func(t *testing.T) {
-		s := newTestServer(Config{}, nil)
-		rr := doReq(t, s.testHandler(), http.MethodGet,
+		s := newTestServer(api.Config{}, nil)
+		rr := doReq(t, testHandler(s), http.MethodGet,
 			"/api/v1/pods/default/mypod/logs?follow=true&tailLines=5&sinceSeconds=30&previous=true", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d", rr.Code)
@@ -201,9 +204,9 @@ func TestHandlePodLogs(t *testing.T) {
 	})
 
 	t.Run("invalid query params fall through to defaults", func(t *testing.T) {
-		s := newTestServer(Config{}, nil)
+		s := newTestServer(api.Config{}, nil)
 		// non-numeric tailLines/sinceSeconds exercise the parse-error branches
-		rr := doReq(t, s.testHandler(), http.MethodGet,
+		rr := doReq(t, testHandler(s), http.MethodGet,
 			"/api/v1/pods/default/mypod/logs?tailLines=abc&sinceSeconds=xyz", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d", rr.Code)
@@ -212,31 +215,27 @@ func TestHandlePodLogs(t *testing.T) {
 
 	t.Run("missing path values rejected", func(t *testing.T) {
 		// Call handler directly with empty path values to hit the guard.
-		s := newTestServer(Config{}, nil)
+		s := newTestServer(api.Config{}, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/pods//_/logs", nil)
 		rr := httptest.NewRecorder()
-		s.handlePodLogs(rr, req)
+		s.HandlePodLogsExported(rr, req)
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("want 400, got %d", rr.Code)
 		}
 	})
 }
 
-// errClientset wraps the fake clientset but we instead trigger the GetLogs
-// error path by requesting logs for a pod on a clientset that returns an error.
-// The fake clientset returns a stream error when the request is malformed; to
-// deterministically hit the error branch we use a reactor-free approach: an
-// injected clientset whose GetLogs stream fails. Simpler: verify the 500 path
-// via a non-flushable writer for the follow branch.
+// TestHandlePodLogs_StreamingNotSupported verifies the 500 path via a
+// non-flushable writer for the follow branch.
 func TestHandlePodLogs_StreamingNotSupported(t *testing.T) {
-	s := newTestServer(Config{}, nil)
+	s := newTestServer(api.Config{}, nil)
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/v1/pods/default/mypod/logs?follow=true", nil)
 	req.SetPathValue("namespace", "default")
 	req.SetPathValue("pod", "mypod")
 	// nonFlusher does not implement http.Flusher.
 	w := &nonFlusher{header: http.Header{}}
-	s.handlePodLogs(w, req)
+	s.HandlePodLogsExported(w, req)
 	if w.status != http.StatusInternalServerError {
 		t.Fatalf("want 500 for non-flushable writer, got %d", w.status)
 	}
@@ -258,11 +257,11 @@ func (n *nonFlusher) Write(b []byte) (int, error) {
 func (n *nonFlusher) WriteHeader(code int) { n.status = code }
 
 func TestAuthMiddleware(t *testing.T) {
-	cfg := Config{APIKey: "secret"}
+	cfg := api.Config{APIKey: "secret"}
 
 	t.Run("health always public", func(t *testing.T) {
 		s := newTestServer(cfg, &fakeAgent{})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/health", nil)
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/health", nil)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("want 200, got %d", rr.Code)
 		}
@@ -270,7 +269,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	t.Run("missing key rejected", func(t *testing.T) {
 		s := newTestServer(cfg, &fakeAgent{})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors", nil)
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors", nil)
 		if rr.Code != http.StatusUnauthorized {
 			t.Fatalf("want 401, got %d", rr.Code)
 		}
@@ -278,7 +277,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	t.Run("wrong key rejected", func(t *testing.T) {
 		s := newTestServer(cfg, &fakeAgent{})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors",
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors",
 			map[string]string{"X-API-Key-ID": "nope"})
 		if rr.Code != http.StatusUnauthorized {
 			t.Fatalf("want 401, got %d", rr.Code)
@@ -286,8 +285,8 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("valid TelemetryFlow key accepted", func(t *testing.T) {
-		s := newTestServer(cfg, &fakeAgent{states: []CollectorState{}})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors",
+		s := newTestServer(cfg, &fakeAgent{states: []api.CollectorState{}})
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors",
 			map[string]string{"X-TelemetryFlow-Key-ID": "secret"})
 		if rr.Code == http.StatusUnauthorized {
 			t.Fatalf("valid key should pass, got 401")
@@ -295,8 +294,8 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("valid Authorization key accepted", func(t *testing.T) {
-		s := newTestServer(cfg, &fakeAgent{states: []CollectorState{}})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors",
+		s := newTestServer(cfg, &fakeAgent{states: []api.CollectorState{}})
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors",
 			map[string]string{"Authorization": "secret"})
 		if rr.Code == http.StatusUnauthorized {
 			t.Fatalf("valid Authorization should pass, got 401")
@@ -304,8 +303,8 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("empty api key disables auth", func(t *testing.T) {
-		s := newTestServer(Config{APIKey: ""}, &fakeAgent{states: []CollectorState{}})
-		rr := doReq(t, s.testHandler(), http.MethodGet, "/api/v1/collectors", nil)
+		s := newTestServer(api.Config{APIKey: ""}, &fakeAgent{states: []api.CollectorState{}})
+		rr := doReq(t, testHandler(s), http.MethodGet, "/api/v1/collectors", nil)
 		if rr.Code == http.StatusUnauthorized {
 			t.Fatalf("empty key should disable auth, got 401")
 		}
@@ -313,13 +312,13 @@ func TestAuthMiddleware(t *testing.T) {
 }
 
 func TestPortAndSetAgent(t *testing.T) {
-	s := newTestServer(Config{Port: 9099}, nil)
+	s := newTestServer(api.Config{Port: 9099}, nil)
 	if s.Port() != 9099 {
 		t.Fatalf("want port 9099, got %d", s.Port())
 	}
 	agent := &fakeAgent{running: true}
 	s.SetAgent(agent)
-	if !s.agent.IsRunning() {
+	if !s.AgentExported().IsRunning() {
 		t.Fatal("SetAgent did not inject agent")
 	}
 	// exercise Stats to keep the interface fully covered
@@ -327,7 +326,7 @@ func TestPortAndSetAgent(t *testing.T) {
 }
 
 func TestStopWithoutStart(t *testing.T) {
-	s := newTestServer(Config{}, nil)
+	s := newTestServer(api.Config{}, nil)
 	if err := s.Stop(); err != nil {
 		t.Fatalf("Stop on nil server should be nil, got %v", err)
 	}
@@ -343,7 +342,7 @@ func TestStartAndStopLifecycle(t *testing.T) {
 	port := probe.Addr().(*net.TCPAddr).Port
 	_ = probe.Close()
 
-	s := newTestServer(Config{Port: port}, &fakeAgent{running: true})
+	s := newTestServer(api.Config{Port: port}, &fakeAgent{running: true})
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan error, 1)
@@ -392,7 +391,7 @@ func TestStartPortInUse(t *testing.T) {
 	defer func() { _ = ln.Close() }()
 	port := ln.Addr().(*net.TCPAddr).Port
 
-	s := newTestServer(Config{Port: port}, &fakeAgent{})
+	s := newTestServer(api.Config{Port: port}, &fakeAgent{})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 

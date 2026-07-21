@@ -1,11 +1,9 @@
-// White-box unit tests for the Confluent Kafka collector. The Build function
-// consumes the unexported metricQuery / dataPoint types, so this test lives in
-// the confluent_kafka package alongside the source.
+// External black-box unit tests for the Confluent Kafka collector.
 //
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-package confluent_kafka
+package confluent_kafka_test
 
 import (
 	"context"
@@ -14,16 +12,17 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	ck "github.com/telemetryflow/telemetryflow-agent/internal/collector/confluent_kafka"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
 
 func TestBuildConfluentKafkaMetrics(t *testing.T) {
-	queries := []metricQuery{
-		{metric: "io.confluent.kafka.server/received_bytes", agg: "SUM", suffix: "received_bytes", typ: collector.MetricTypeCounter, unit: "bytes"},
-		{metric: "io.confluent.kafka.server/sent_records", agg: "SUM", suffix: "sent_records", typ: collector.MetricTypeCounter},
-		{metric: "io.confluent.kafka.server/retained_bytes", agg: "MAX", suffix: "retained_bytes", typ: collector.MetricTypeGauge, unit: "bytes"},
+	queries := []ck.MetricQueryExported{
+		{Metric: "io.confluent.kafka.server/received_bytes", Agg: "SUM", Suffix: "received_bytes", Typ: collector.MetricTypeCounter, Unit: "bytes"},
+		{Metric: "io.confluent.kafka.server/sent_records", Agg: "SUM", Suffix: "sent_records", Typ: collector.MetricTypeCounter},
+		{Metric: "io.confluent.kafka.server/retained_bytes", Agg: "MAX", Suffix: "retained_bytes", Typ: collector.MetricTypeGauge, Unit: "bytes"},
 	}
-	points := []dataPoint{
+	points := []ck.DataPointExported{
 		// Older sample for orders — should be superseded by the newer one.
 		{Timestamp: "2024-01-01T00:00:00Z", Value: 100, Metric: "io.confluent.kafka.server/received_bytes", Subject: map[string]string{"topic": "orders"}},
 		{Timestamp: "2024-01-01T00:01:00Z", Value: 250, Metric: "io.confluent.kafka.server/received_bytes", Subject: map[string]string{"topic": "orders"}},
@@ -32,7 +31,7 @@ func TestBuildConfluentKafkaMetrics(t *testing.T) {
 		{Timestamp: "2024-01-01T00:01:00Z", Value: 999, Metric: "io.confluent.kafka.server/unknown", Subject: map[string]string{"topic": "orders"}},
 	}
 
-	metrics := BuildConfluentKafkaMetrics(
+	metrics := ck.BuildConfluentKafkaMetricsExported(
 		map[string]string{"env": "ci", "kafka_cluster": "lkc-x"},
 		queries, points,
 	)
@@ -57,7 +56,7 @@ func TestBuildConfluentKafkaMetrics(t *testing.T) {
 }
 
 func TestConfluentKafkaCollector_Lifecycle(t *testing.T) {
-	c := NewConfluentKafkaCollector(config.ConfluentKafkaCollectorConfig{Enabled: true}, zap.NewNop())
+	c := ck.NewConfluentKafkaCollector(config.ConfluentKafkaCollectorConfig{Enabled: true}, zap.NewNop())
 	if c.Name() != "confluent_kafka" {
 		t.Fatalf("name=%q", c.Name())
 	}
@@ -79,7 +78,7 @@ func TestConfluentKafkaCollector_Lifecycle(t *testing.T) {
 }
 
 func TestConfluentKafkaCollector_NoInstances(t *testing.T) {
-	c := NewConfluentKafkaCollector(config.ConfluentKafkaCollectorConfig{Enabled: true}, zap.NewNop())
+	c := ck.NewConfluentKafkaCollector(config.ConfluentKafkaCollectorConfig{Enabled: true}, zap.NewNop())
 	_ = c.Start(context.Background())
 	defer func() { _ = c.Stop() }()
 	m, err := c.Collect(context.Background())
@@ -89,5 +88,5 @@ func TestConfluentKafkaCollector_NoInstances(t *testing.T) {
 }
 
 func TestConfluentKafkaCollector_SatisfiesInterface(t *testing.T) {
-	var _ collector.Collector = (*ConfluentKafkaCollector)(nil)
+	var _ collector.Collector = (*ck.ConfluentKafkaCollector)(nil)
 }

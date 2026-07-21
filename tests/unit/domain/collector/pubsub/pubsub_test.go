@@ -1,11 +1,11 @@
-// White-box unit tests for the Pub/Sub collector. The Build function consumes
-// the unexported pubsubMetric / monitoringTimeSeries types, so this test lives
-// in the pubsub package alongside the source.
+// External black-box unit tests for the Pub/Sub collector. Unexported types
+// (pubsubMetric / monitoringTimeSeries) and functions (signJWT) are reached
+// through forwarding wrappers in internal/collector/pubsub/exports.go.
 //
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-package pubsub
+package pubsub_test
 
 import (
 	"context"
@@ -17,51 +17,32 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector/pubsub"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
 
 func int64Ptr(v int64) *int64 { return &v }
 
 func TestBuildPubSubMetrics(t *testing.T) {
-	metrics := []pubsubMetric{
-		{metricType: "pubsub.googleapis.com/subscription/num_undelivered_messages", suffix: "undelivered_messages", typ: collector.MetricTypeGauge},
-		{metricType: "pubsub.googleapis.com/subscription/sent_message_count", suffix: "sent_messages", typ: collector.MetricTypeCounter},
+	metrics := []pubsub.PubSubTestMetric{
+		{MetricType: "pubsub.googleapis.com/subscription/num_undelivered_messages", Suffix: "undelivered_messages", Typ: collector.MetricTypeGauge},
+		{MetricType: "pubsub.googleapis.com/subscription/sent_message_count", Suffix: "sent_messages", Typ: collector.MetricTypeCounter},
 	}
 	end := time.Now()
-	series := []monitoringTimeSeries{
+	series := []pubsub.PubSubTestSeries{
 		{
-			Metric: struct {
-				Type string `json:"type"`
-			}{Type: "pubsub.googleapis.com/subscription/num_undelivered_messages"},
-			Resource: struct {
-				Labels struct {
-					SubscriptionID string `json:"subscription_id"`
-					ProjectID      string `json:"project_id"`
-				} `json:"labels"`
-			}{},
-			Points: []monitoringPoint{
-				{Interval: struct {
-					EndTime   time.Time `json:"endTime"`
-					StartTime time.Time `json:"startTime"`
-				}{EndTime: end.Add(-2 * time.Minute)}, Value: struct {
-					Int64Value  *int64   `json:"int64Value,omitempty"`
-					DoubleValue *float64 `json:"doubleValue,omitempty"`
-				}{Int64Value: int64Ptr(5)}},
-				{Interval: struct {
-					EndTime   time.Time `json:"endTime"`
-					StartTime time.Time `json:"startTime"`
-				}{EndTime: end}, Value: struct {
-					Int64Value  *int64   `json:"int64Value,omitempty"`
-					DoubleValue *float64 `json:"doubleValue,omitempty"`
-				}{Int64Value: int64Ptr(9)}},
+			Type:           "pubsub.googleapis.com/subscription/num_undelivered_messages",
+			SubscriptionID: "orders-sub",
+			Points: []pubsub.PubSubTestPoint{
+				{EndTime: end.Add(-2 * time.Minute), Int64Value: int64Ptr(5)},
+				{EndTime: end, Int64Value: int64Ptr(9)},
 			},
 		},
 	}
-	series[0].Resource.Labels.SubscriptionID = "orders-sub"
 
 	// Apply a filter that excludes the subscription, then one that includes it.
 	t.Run("filter_excludes", func(t *testing.T) {
-		got, err := BuildPubSubMetrics(map[string]string{"env": "ci"}, metrics, series, "^nonexistent-.*")
+		got, err := pubsub.BuildPubSubMetricsExported(map[string]string{"env": "ci"}, metrics, series, "^nonexistent-.*")
 		if err != nil {
 			t.Fatalf("Build: %v", err)
 		}
@@ -71,7 +52,7 @@ func TestBuildPubSubMetrics(t *testing.T) {
 	})
 
 	t.Run("latest_point_selected", func(t *testing.T) {
-		got, err := BuildPubSubMetrics(map[string]string{"env": "ci"}, metrics, series, "")
+		got, err := pubsub.BuildPubSubMetricsExported(map[string]string{"env": "ci"}, metrics, series, "")
 		if err != nil {
 			t.Fatalf("Build: %v", err)
 		}
@@ -95,7 +76,7 @@ func TestSignJWT(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
-	token, err := signJWT(map[string]any{"iss": "test", "aud": "x", "iat": 1, "exp": 2}, key)
+	token, err := pubsub.SignJWTExported(map[string]any{"iss": "test", "aud": "x", "iat": 1, "exp": 2}, key)
 	if err != nil {
 		t.Fatalf("signJWT: %v", err)
 	}
@@ -118,7 +99,7 @@ func splitOnDot(s string) (out []string) {
 }
 
 func TestPubSubCollector_Lifecycle(t *testing.T) {
-	c := NewPubSubCollector(config.PubSubCollectorConfig{Enabled: true}, zap.NewNop())
+	c := pubsub.NewPubSubCollector(config.PubSubCollectorConfig{Enabled: true}, zap.NewNop())
 	if c.Name() != "pubsub" {
 		t.Fatalf("name=%q", c.Name())
 	}
@@ -140,7 +121,7 @@ func TestPubSubCollector_Lifecycle(t *testing.T) {
 }
 
 func TestPubSubCollector_NoInstances(t *testing.T) {
-	c := NewPubSubCollector(config.PubSubCollectorConfig{Enabled: true}, zap.NewNop())
+	c := pubsub.NewPubSubCollector(config.PubSubCollectorConfig{Enabled: true}, zap.NewNop())
 	_ = c.Start(context.Background())
 	defer func() { _ = c.Stop() }()
 	m, err := c.Collect(context.Background())
@@ -150,5 +131,5 @@ func TestPubSubCollector_NoInstances(t *testing.T) {
 }
 
 func TestPubSubCollector_SatisfiesInterface(t *testing.T) {
-	var _ collector.Collector = (*PubSubCollector)(nil)
+	var _ collector.Collector = (*pubsub.PubSubCollector)(nil)
 }
