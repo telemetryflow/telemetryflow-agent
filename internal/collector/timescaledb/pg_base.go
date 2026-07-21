@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectPGBaseMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectPGBaseMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var all []collector.Metric
 
 	if m, err := collectConnectionStats(ctx, pool, labels); err != nil {
@@ -34,7 +33,7 @@ func collectPGBaseMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[st
 	return all, nil
 }
 
-func collectConnectionStats(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectConnectionStats(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -60,7 +59,7 @@ func collectConnectionStats(ctx context.Context, pool *pgxpool.Pool, labels map[
 	}, nil
 }
 
-func collectDatabaseStats(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectDatabaseStats(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -88,7 +87,7 @@ func collectDatabaseStats(ctx context.Context, pool *pgxpool.Pool, labels map[st
 	}, nil
 }
 
-func collectActivityStats(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectActivityStats(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
