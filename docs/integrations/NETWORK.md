@@ -303,12 +303,11 @@ integrations:
     auto_reconnect: true
     max_reconnect_interval: 5m
 
-    tls:
-      enabled: false
-      ca_file: ""
-      cert_file: ""
-      key_file: ""
-      skip_verify: false
+    tls_enabled: false
+    tls_ca_file: ""
+    tls_cert_file: ""
+    tls_key_file: ""
+    tls_skip_verify: false
 
     encoding: json # json, protobuf
     batch_size: 100

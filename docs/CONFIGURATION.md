@@ -322,13 +322,9 @@ exporter:
     compression: "gzip"
     # Request timeout
     timeout: 30s
-    # TLS configuration
-    tls:
-      enabled: false
-      cert_file: ""
-      key_file: ""
-      ca_file: ""
-      tls_skip_verify: false
+    # NOTE: TLS for OTLP export is controlled by the top-level telemetryflow.tls
+    # block (telemetryflow.tls.skip_verify / cert_file / key_file / ca_file).
+    # The OTLP exporter has no separate tls block of its own.
     # Custom headers
     headers:
       X-API-Key: ""
