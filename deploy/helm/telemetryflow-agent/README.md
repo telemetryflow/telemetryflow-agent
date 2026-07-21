@@ -78,7 +78,7 @@ helm install tfo-agent ./deploy/helm/telemetryflow-agent \
 | `config.collectors.kubernetes.pod_conditions`               | Enable per-pod condition metrics                                             | `false`                                          |
 | `config.collectors.kubernetes.node_taints`                  | Enable per-node taint metrics                                                | `false`                                          |
 | `config.collectors.kubernetes.workload_generations`         | Enable Deployment/StatefulSet generation metrics                             | `false`                                          |
-| `config.collectors.kubernetes.kubelet_insecure_skip_verify` | Skip TLS verification for Kubelet connections                                | `false`                                          |
+| `config.collectors.kubernetes.kubelet_skip_verify` | Skip TLS verification for Kubelet connections                                | `false`                                          |
 | `config.collectors.prometheus_scraper.enabled`              | Enable Prometheus pull-based scraper                                         | `false`                                          |
 | `config.collectors.prometheus_scraper.scrape_jobs`          | List of scrape job configurations                                            | `[]`                                             |
 | `config.collectors.remote_write_receiver.enabled`           | Enable Prometheus remote write receiver                                      | `false`                                          |

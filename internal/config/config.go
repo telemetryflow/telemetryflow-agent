@@ -488,7 +488,7 @@ type MongoDBCommunityInstanceConfig struct {
 	TLSCertFile           string            `mapstructure:"tls_cert_file"`
 	TLSKeyFile            string            `mapstructure:"tls_key_file"`
 	TLSCAFile             string            `mapstructure:"tls_ca_file"`
-	TLSInsecureSkipVerify bool              `mapstructure:"tls_insecure_skip_verify"`
+	TLSInsecureSkipVerify bool              `mapstructure:"tls_skip_verify"`
 	Tags                  map[string]string `mapstructure:"tags"`
 }
 
@@ -1058,7 +1058,7 @@ type CAdvisorCollectorConfig struct {
 	MetricNames []string `mapstructure:"metric_names"`
 
 	// InsecureSkipVerify disables TLS certificate verification for kubelet HTTPS endpoints
-	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"`
+	InsecureSkipVerify bool `mapstructure:"tls_skip_verify"`
 
 	// BearerTokenPath is the path to the ServiceAccount token for kubelet auth (auto-detected if empty)
 	BearerTokenPath string `mapstructure:"bearer_token_path"`
@@ -1310,7 +1310,7 @@ type KubernetesCollectorConfig struct {
 	WorkloadGenerations bool `mapstructure:"workload_generations"`
 
 	// KubeletInsecureSkipVerify skips TLS verification for Kubelet connections
-	KubeletInsecureSkipVerify bool `mapstructure:"kubelet_insecure_skip_verify"`
+	KubeletInsecureSkipVerify bool `mapstructure:"kubelet_skip_verify"`
 
 	// ApiServerMetrics enables scraping kube-apiserver /metrics endpoint
 	ApiServerMetrics bool `mapstructure:"apiserver_metrics"`
@@ -1471,6 +1471,16 @@ type FluentBitCollectorConfig struct {
 
 	// ConfigDir is the directory for generated config files (default: /tmp/tfo-agent-fluentbit)
 	ConfigDir string `mapstructure:"config_dir"`
+
+	// ExternalConfig, when true, skips auto-generation and runs Fluent Bit with a
+	// user-supplied config file (ConfigFile). All input/filter/output settings in
+	// this struct are then ignored — the external file is the single source of truth.
+	ExternalConfig bool `mapstructure:"external_config"`
+
+	// ConfigFile is the path to an external, user-managed fluent-bit.conf. Required
+	// when ExternalConfig is true; ignored otherwise. The file is used as-is and is
+	// never modified or deleted by the agent.
+	ConfigFile string `mapstructure:"config_file"`
 
 	// FlushInterval is the output flush interval in seconds (default: 5)
 	FlushInterval int `mapstructure:"flush_interval"`
