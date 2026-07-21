@@ -34,7 +34,7 @@ set -euo pipefail
 # Config
 # ---------------------------------------------------------------------------
 IMAGE="telemetryflow/telemetryflow-agent"
-VERSION="1.2.1"
+VERSION="1.2.2"
 COMMIT=$(git rev-parse --short HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
