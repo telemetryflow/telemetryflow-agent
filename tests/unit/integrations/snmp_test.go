@@ -185,8 +185,11 @@ func TestSNMPExporterHealth(t *testing.T) {
 		assert.Equal(t, "integration disabled", status.Message)
 	})
 
-	t.Run("successful health check - all targets reachable", func(t *testing.T) {
-		// Use localhost which is always reachable via UDP
+	t.Run("health reports structure regardless of reachability", func(t *testing.T) {
+		// Health() now issues a real SNMP GET (sysUpTime.0); a target counts as
+		// reachable only if it actually answers SNMP. No SNMP agent runs in the
+		// test environment, so assert the deterministic structure and the
+		// Healthy == (reachable > 0) invariant rather than assuming reachability.
 		config := integrations.SNMPConfig{
 			Enabled: true,
 			Targets: []integrations.SNMPTarget{
@@ -203,42 +206,19 @@ func TestSNMPExporterHealth(t *testing.T) {
 
 		status, err := exporter.Health(ctx)
 		require.NoError(t, err)
-		assert.True(t, status.Healthy)
 		assert.Contains(t, status.Message, "/1 targets reachable")
 		assert.NotZero(t, status.Latency)
 		assert.NotNil(t, status.Details)
 		assert.Equal(t, "2c", status.Details["version"])
 		assert.Equal(t, 1, status.Details["total_targets"])
-		assert.Equal(t, 1, status.Details["reachable_targets"])
-	})
-
-	t.Run("health check with multiple targets - partial reachability", func(t *testing.T) {
-		config := integrations.SNMPConfig{
-			Enabled: true,
-			Targets: []integrations.SNMPTarget{
-				{Address: "127.0.0.1", Port: 161, Name: "reachable"},
-				{Address: "192.0.2.1", Port: 161, Name: "unreachable"}, // TEST-NET-1, not routable
-			},
-			Port:      161,
-			Community: "public",
-			Version:   "2c",
-		}
-
-		exporter := integrations.NewSNMPExporter(config, logger)
-		err := exporter.Init(ctx)
-		require.NoError(t, err)
-
-		status, err := exporter.Health(ctx)
-		require.NoError(t, err)
-		// Should be healthy if at least one target is reachable
-		assert.True(t, status.Healthy)
-		assert.Equal(t, 2, status.Details["total_targets"])
-		// At least one should be reachable
 		reachable := status.Details["reachable_targets"].(int)
-		assert.GreaterOrEqual(t, reachable, 1)
+		assert.GreaterOrEqual(t, reachable, 0)
+		assert.LessOrEqual(t, reachable, 1)
+		// Healthy is true iff at least one target answered SNMP.
+		assert.Equal(t, reachable > 0, status.Healthy)
 	})
 
-	t.Run("health check with no reachable targets", func(t *testing.T) {
+	t.Run("unreachable targets are not counted as reachable", func(t *testing.T) {
 		config := integrations.SNMPConfig{
 			Enabled: true,
 			Targets: []integrations.SNMPTarget{
@@ -256,8 +236,11 @@ func TestSNMPExporterHealth(t *testing.T) {
 
 		status, err := exporter.Health(ctx)
 		require.NoError(t, err)
-		// May report unhealthy if no targets are reachable (depends on UDP behavior)
-		assert.Contains(t, status.Message, "targets reachable")
+		assert.Equal(t, 2, status.Details["total_targets"])
+		// Non-routable TEST-NET addresses can never answer SNMP.
+		assert.Equal(t, 0, status.Details["reachable_targets"])
+		assert.False(t, status.Healthy)
+		assert.Contains(t, status.Message, "0/2 targets reachable")
 	})
 
 	t.Run("health check with custom port per target", func(t *testing.T) {
@@ -303,8 +286,8 @@ func TestSNMPExporterHealth(t *testing.T) {
 
 		status, err := exporter.Health(ctx)
 		require.NoError(t, err)
-		assert.True(t, status.Healthy)
 		assert.Equal(t, "3", status.Details["version"])
+		assert.Equal(t, 1, status.Details["total_targets"])
 	})
 
 	t.Run("health check measures latency", func(t *testing.T) {
@@ -324,7 +307,6 @@ func TestSNMPExporterHealth(t *testing.T) {
 
 		status, err := exporter.Health(ctx)
 		require.NoError(t, err)
-		assert.True(t, status.Healthy)
 		assert.NotZero(t, status.Latency)
 		assert.NotZero(t, status.LastCheck)
 	})
@@ -346,7 +328,8 @@ func TestSNMPExporterHealth(t *testing.T) {
 
 		status, err := exporter.Health(ctx)
 		require.NoError(t, err)
-		assert.True(t, status.Healthy)
+		assert.NotNil(t, status.Details)
+		assert.Equal(t, 1, status.Details["total_targets"])
 	})
 }
 

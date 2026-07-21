@@ -44,6 +44,10 @@ const (
 	// healthCheckOID (sysUpTime.0) is a universally implemented scalar used to
 	// confirm a target actually answers SNMP, not just that a UDP socket opens.
 	healthCheckOID = "1.3.6.1.2.1.1.3.0"
+
+	// healthProbeTimeout bounds a single health probe so an unreachable device
+	// fails fast instead of blocking for the full (possibly long) poll timeout.
+	healthProbeTimeout = 2 * time.Second
 )
 
 // SNMPConfig contains SNMP integration configuration
@@ -755,6 +759,10 @@ func (s *SNMPExporter) probeTarget(target SNMPTarget) bool {
 	if err != nil {
 		return false
 	}
+	// Health probes must be fast and bounded — override the (possibly long)
+	// poll timeout and disable retries so an unreachable device fails quickly.
+	client.Timeout = healthProbeTimeout
+	client.Retries = 0
 	if err := client.Connect(); err != nil {
 		return false
 	}
@@ -784,12 +792,22 @@ func (s *SNMPExporter) Health(ctx context.Context) (*HealthStatus, error) {
 
 	// UDP is connectionless, so a DialTimeout always "succeeds" — it proves
 	// nothing about the device. Issue a real SNMP GET for sysUpTime.0 instead
-	// so health reflects whether the target actually answers SNMP.
+	// so health reflects whether the target actually answers SNMP. Probes run
+	// concurrently so total latency stays near a single probe timeout.
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for _, target := range s.config.Targets {
-		if s.probeTarget(target) {
-			reachable++
-		}
+		wg.Add(1)
+		go func(target SNMPTarget) {
+			defer wg.Done()
+			if s.probeTarget(target) {
+				mu.Lock()
+				reachable++
+				mu.Unlock()
+			}
+		}(target)
 	}
+	wg.Wait()
 
 	healthy := reachable > 0
 	message := fmt.Sprintf("%d/%d targets reachable", reachable, total)
