@@ -165,3 +165,99 @@ func TestStop_NoProcess(t *testing.T) {
 		t.Error("expected config dir to be cleaned up")
 	}
 }
+
+func TestNewFluentBitCollector_ExternalConfigMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBinary(t, dir, "fluent-bit")
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+
+	cfg := config.FluentBitCollectorConfig{
+		BinaryPath:     bin,
+		ExternalConfig: true, // config_file not set
+	}
+	_, err := fluentbit.NewFluentBitCollector(cfg, config.TelemetryFlowConfig{}, "a", zap.NewNop())
+	if err == nil {
+		t.Fatal("expected error when external_config enabled without config_file")
+	}
+	if !strings.Contains(err.Error(), "config_file is not set") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNewFluentBitCollector_ExternalConfigFileNotFound(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBinary(t, dir, "fluent-bit")
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+
+	cfg := config.FluentBitCollectorConfig{
+		BinaryPath:     bin,
+		ExternalConfig: true,
+		ConfigFile:     filepath.Join(dir, "does-not-exist.conf"),
+	}
+	_, err := fluentbit.NewFluentBitCollector(cfg, config.TelemetryFlowConfig{}, "a", zap.NewNop())
+	if err == nil {
+		t.Fatal("expected error when external config_file does not exist")
+	}
+	if !strings.Contains(err.Error(), "external config_file not found") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNewFluentBitCollector_ExternalConfigValid(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBinary(t, dir, "fluent-bit")
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+
+	confPath := filepath.Join(dir, "fluent-bit.conf")
+	if err := os.WriteFile(confPath, []byte("[SERVICE]\n    flush 5\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.FluentBitCollectorConfig{
+		BinaryPath:     bin,
+		ExternalConfig: true,
+		ConfigFile:     confPath,
+	}
+	c, err := fluentbit.NewFluentBitCollector(cfg, config.TelemetryFlowConfig{}, "a", zap.NewNop())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c == nil {
+		t.Fatal("expected collector")
+	}
+}
+
+func TestStop_ExternalConfigPreservesUserFiles(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFakeBinary(t, dir, "fluent-bit")
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+
+	// User-owned config lives in its own directory that the agent must not touch.
+	userDir := filepath.Join(t.TempDir(), "user-flb")
+	if err := os.MkdirAll(userDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	confPath := filepath.Join(userDir, "fluent-bit.conf")
+	if err := os.WriteFile(confPath, []byte("[SERVICE]\n    flush 5\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := fluentbit.NewFluentBitCollector(
+		config.FluentBitCollectorConfig{
+			BinaryPath:     bin,
+			ExternalConfig: true,
+			ConfigFile:     confPath,
+			ConfigDir:      userDir, // even if ConfigDir points at user files, external mode must not delete
+		},
+		config.TelemetryFlowConfig{}, "a", zap.NewNop())
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if err := c.Stop(); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	// External config file and directory must survive Stop().
+	if _, statErr := os.Stat(confPath); statErr != nil {
+		t.Errorf("external config file was removed: %v", statErr)
+	}
+}

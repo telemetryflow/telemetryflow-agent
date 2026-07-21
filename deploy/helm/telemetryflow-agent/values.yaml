@@ -370,7 +370,7 @@ kubernetes:
         pod_conditions: false
         node_taints: false
         workload_generations: false
-        kubelet_insecure_skip_verify: false
+        kubelet_skip_verify: false
 
     prometheus_server:
       enabled: true

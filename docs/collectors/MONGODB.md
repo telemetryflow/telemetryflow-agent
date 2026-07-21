@@ -237,7 +237,7 @@ mongodb_community:
       tls_cert_file: ""
       tls_key_file: ""
       tls_ca_file: ""
-      tls_insecure_skip_verify: false
+      tls_skip_verify: false
       tags: {}
 ```
 

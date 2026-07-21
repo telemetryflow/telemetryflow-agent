@@ -328,7 +328,7 @@ exporter:
       cert_file: ""
       key_file: ""
       ca_file: ""
-      insecure_skip_verify: false
+      tls_skip_verify: false
     # Custom headers
     headers:
       X-API-Key: ""
@@ -756,7 +756,7 @@ mongodb_community:
       tls_ca_file: "/etc/ssl/mongo-ca.pem"
       tls_cert_file: "/etc/ssl/mongo-client.pem"
       tls_key_file: "/etc/ssl/mongo-client.key"
-      tls_insecure_skip_verify: false
+      tls_skip_verify: false
 ```
 
 ### Alert Rules

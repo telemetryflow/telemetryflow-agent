@@ -71,4 +71,4 @@ kubernetes:
   # coredns_service: ""       # auto-discover if empty
 
   # Kubelet connection
-  # kubelet_insecure_skip_verify: false
+  # kubelet_skip_verify: false
