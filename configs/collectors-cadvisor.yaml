@@ -16,7 +16,7 @@ cadvisor:
   timeout: 10s
 
   # TLS options (uncomment for HTTPS endpoints)
-  # insecure_skip_verify: false
+  # tls_skip_verify: false
   # bearer_token_path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
   # Metric name filter (empty = collect all)

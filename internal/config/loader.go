@@ -126,6 +126,10 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 	// Bind environment variables explicitly for nested configs
 	l.bindEnvVars(v)
 
+	// Honor renamed (deprecated) config keys before unmarshalling so existing
+	// configs keep working after the TLS "skip_verify" wording was unified.
+	migrateDeprecatedConfigKeys(v)
+
 	// Unmarshal into config struct
 	cfg := DefaultConfig()
 	if err := v.Unmarshal(cfg); err != nil {
@@ -158,6 +162,45 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// migrateDeprecatedConfigKeys maps renamed config keys from their old names to
+// the current ones so pre-existing configs keep working. The TLS skip-verify
+// wording was unified to "skip_verify" across collectors; the old
+// *_insecure_skip_verify keys are still honored here (new key wins if both set).
+func migrateDeprecatedConfigKeys(v *viper.Viper) {
+	// Scalar 1:1 renames (old key -> new key).
+	renames := map[string]string{
+		"collectors.cadvisor.insecure_skip_verify":           "collectors.cadvisor.tls_skip_verify",
+		"collectors.kubernetes.kubelet_insecure_skip_verify": "collectors.kubernetes.kubelet_skip_verify",
+	}
+	for oldKey, newKey := range renames {
+		if v.IsSet(oldKey) && !v.IsSet(newKey) {
+			v.Set(newKey, v.Get(oldKey))
+		}
+	}
+
+	// mongodb_community instances is a slice; rename the per-instance key
+	// tls_insecure_skip_verify -> tls_skip_verify inside each element.
+	const instKey = "collectors.mongodb_community.instances"
+	if list, ok := v.Get(instKey).([]interface{}); ok {
+		changed := false
+		for _, item := range list {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if val, has := m["tls_insecure_skip_verify"]; has {
+				if _, present := m["tls_skip_verify"]; !present {
+					m["tls_skip_verify"] = val
+					changed = true
+				}
+			}
+		}
+		if changed {
+			v.Set(instKey, list)
+		}
+	}
 }
 
 // LoadFromFile loads configuration from a specific file

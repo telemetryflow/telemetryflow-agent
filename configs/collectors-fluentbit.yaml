@@ -12,6 +12,15 @@ fluent_bit:
   binary_path: "fluent-bit"
   config_dir: "/tmp/tfo-agent-fluentbit"
 
+  # External config mode (optional).
+  # When external_config is true, the agent does NOT generate fluent-bit.conf.
+  # Instead it launches Fluent Bit with your own config_file as-is (never
+  # modified or deleted). All tail/systemd/kubernetes/custom_* settings below
+  # are ignored — your file is the single source of truth, so it must define
+  # its own [OUTPUT] to reach the TelemetryFlow Platform.
+  # external_config: true
+  # config_file: "/etc/fluent-bit/fluent-bit.conf"
+
   # Fluent Bit engine settings
   flush_interval: 5
   log_level: "info"
