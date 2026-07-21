@@ -132,8 +132,12 @@ jobs:
       - name: Run unit tests
         run: make test-unit-ci
 
+      - name: Check coverage threshold (95%)
+        run: make coverage-check
+
       - name: Upload unit test coverage
         uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: coverage-unit
           path: coverage-unit.out
