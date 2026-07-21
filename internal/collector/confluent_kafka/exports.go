@@ -55,12 +55,7 @@ type DataPointExported struct {
 }
 
 func (p DataPointExported) toInternal() dataPoint {
-	return dataPoint{
-		Timestamp: p.Timestamp,
-		Value:     p.Value,
-		Metric:    p.Metric,
-		Subject:   p.Subject,
-	}
+	return dataPoint(p)
 }
 
 // BuildConfluentKafkaMetricsExported wraps BuildConfluentKafkaMetrics using the
