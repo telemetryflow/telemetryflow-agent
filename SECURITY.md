@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/badge/Version-1.2.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![Coverage](https://img.shields.io/badge/Coverage-61%25-yellow.svg)](CHANGELOG.md)
+[![Coverage](https://img.shields.io/badge/Coverage-78.5%25-yellowgreen.svg)](CHANGELOG.md)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
