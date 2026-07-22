@@ -4,20 +4,18 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectSharding(ctx context.Context, client *mongo.Client, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
-	admin := client.Database("admin")
+func collectSharding(ctx context.Context, api mongoAPI, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var all []collector.Metric
 	prefix := "db.mongodb.sharding."
 
 	// List shards
 	var listShards bson.M
-	if err := admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&listShards); err != nil {
+	if err := api.RunCommand(ctx, "admin", bson.D{{Key: "listShards", Value: 1}}, &listShards); err != nil {
 		return nil, err
 	}
 
@@ -39,8 +37,7 @@ func collectSharding(ctx context.Context, client *mongo.Client, labels map[strin
 
 	// Balancer status
 	var balancerConfig bson.M
-	configDB := client.Database("config")
-	if err := configDB.Collection("settings").FindOne(ctx, bson.D{{Key: "_id", Value: "balancer"}}).Decode(&balancerConfig); err == nil {
+	if err := api.FindOne(ctx, "config", "settings", bson.D{{Key: "_id", Value: "balancer"}}, &balancerConfig); err == nil {
 		if stopped, ok := balancerConfig["stopped"].(bool); ok {
 			if stopped {
 				all = append(all, gauge(prefix+"balancer_enabled", 0, labels))

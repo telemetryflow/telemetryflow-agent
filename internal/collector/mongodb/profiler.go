@@ -5,18 +5,17 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
 // collectSlowQueries reads system.profile for slow queries and emits fingerprint metrics.
-func collectSlowQueries(ctx context.Context, client *mongo.Client, inst *mongoInstance, labels map[string]string, _ *zap.Logger) ([]collector.Metric, error) {
+func collectSlowQueries(ctx context.Context, api mongoAPI, inst *mongoInstance, labels map[string]string, _ *zap.Logger) ([]collector.Metric, error) {
 	prefix := "db.mongodb.query."
 	var all []collector.Metric
 
-	dbs, err := discoverDatabases(ctx, client, inst)
+	dbs, err := discoverDatabases(ctx, api, inst)
 	if err != nil {
 		return nil, err
 	}
@@ -24,18 +23,14 @@ func collectSlowQueries(ctx context.Context, client *mongo.Client, inst *mongoIn
 	fingerprintAgg := map[string]*fpAgg{}
 
 	for _, dbName := range dbs {
-		db := client.Database(dbName)
-
 		// Check if profiler is enabled (level >= 1)
 		var profileResult bson.M
-		if err := db.RunCommand(ctx, bson.D{{Key: "profile", Value: -1}}).Decode(&profileResult); err != nil {
+		if err := api.RunCommand(ctx, dbName, bson.D{{Key: "profile", Value: -1}}, &profileResult); err != nil {
 			continue
 		}
 		if was, ok := profileResult["was"].(int32); !ok || was < 1 {
 			continue
 		}
-
-		coll := db.Collection("system.profile")
 
 		// Query recent slow queries (last profile_interval)
 		since := time.Now().Add(-inst.prevTime.Sub(time.Time{}))
@@ -43,16 +38,11 @@ func collectSlowQueries(ctx context.Context, client *mongo.Client, inst *mongoIn
 			since = time.Now().Add(-60 * time.Second)
 		}
 
-		cursor, err := coll.Find(ctx, bson.D{
+		var profileDocs []bson.M
+		if err := api.Find(ctx, dbName, "system.profile", bson.D{
 			{Key: "ts", Value: bson.D{{Key: "$gte", Value: since}}},
 			{Key: "millis", Value: bson.D{{Key: "$gte", Value: 100}}},
-		})
-		if err != nil {
-			continue
-		}
-
-		var profileDocs []bson.M
-		if err := cursor.All(ctx, &profileDocs); err != nil {
+		}, &profileDocs); err != nil {
 			continue
 		}
 

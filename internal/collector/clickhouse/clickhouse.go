@@ -36,7 +36,10 @@ const collectorName = "clickhouse"
 // instanceState holds the per-instance runtime state: connection, event counters,
 // and query-log watermark.
 type instanceState struct {
-	inst              config.ClickHouseInstanceConfig
+	inst config.ClickHouseInstanceConfig
+	// mu guards conn and the reconnect/back-off fields against concurrent
+	// access by the collection goroutine and Stop().
+	mu                sync.Mutex
 	conn              *connection
 	prevEvents        map[string]float64
 	queryLogWatermark time.Time
@@ -163,12 +166,15 @@ func (c *ClickHouseCollector) Stop() error {
 	c.running = false
 	close(c.stopChan)
 
-	// Close all connections.
+	// Close all connections. Take each instance lock so this cannot race with
+	// an in-flight ensureConnection on the collection goroutine.
 	for _, s := range c.states {
+		s.mu.Lock()
 		if s.conn != nil {
 			s.conn.Close()
 			s.conn = nil
 		}
+		s.mu.Unlock()
 	}
 	return nil
 }
@@ -267,6 +273,10 @@ func (c *ClickHouseCollector) CollectQueryLog(ctx context.Context) ([]collector.
 // ensureConnection returns (or lazily creates) a live connection for the state.
 // It implements exponential back-off: 1s → 2s → 4s → 8s → 16s, capped at 60s.
 func (c *ClickHouseCollector) ensureConnection(ctx context.Context, s *instanceState) (*connection, error) {
+	// Guard conn/back-off state; Stop() may run concurrently with a collection
+	// cycle. advanceBackoff (called below) intentionally does not re-lock.
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.conn != nil {
 		// Quick health check.
 		if err := s.conn.Check(ctx); err == nil {

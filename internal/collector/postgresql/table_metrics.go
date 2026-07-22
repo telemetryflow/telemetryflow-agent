@@ -23,13 +23,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectTableStats(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectTableStats(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -134,7 +133,7 @@ func collectTableStats(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance
 	return metrics, nil
 }
 
-func collectTableStatMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
+func collectTableStatMetrics(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
 	query := `
 		SELECT schemaname, relname,
 		       seq_scan, seq_tup_read, idx_scan, idx_tup_fetch,
@@ -260,7 +259,7 @@ func collectTableStatMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgIn
 	return metrics, nil
 }
 
-func collectTableIOMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectTableIOMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	query := `
 		SELECT schemaname, relname,
 		       heap_blks_read, heap_blks_hit,
@@ -302,7 +301,7 @@ func collectTableIOMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[s
 	return metrics, rows.Err()
 }
 
-func collectIndexMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectIndexMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// -----------------------------------------------------------------------
 	// a) pg_stat_user_indexes — scan & tuple counts
 	// -----------------------------------------------------------------------
@@ -400,7 +399,7 @@ func collectIndexMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[str
 	return metrics, nil
 }
 
-func collectTableSizeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
+func collectTableSizeMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
 	query := `
 		SELECT schemaname, relname,
 		       pg_relation_size(schemaname||'.'||relname)   AS table_size,
@@ -440,7 +439,7 @@ func collectTableSizeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map
 // Table bloat estimation using dead tuple heuristic
 // ---------------------------------------------------------------------------
 
-func collectBloatEstimates(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
+func collectBloatEstimates(ctx context.Context, pool PgxQuerier, labels map[string]string, limit int, logger *zap.Logger) ([]collector.Metric, error) {
 	query := `
 		SELECT s.schemaname, s.relname,
 		       pg_relation_size(s.relid) AS total_size,
@@ -489,7 +488,7 @@ func collectBloatEstimates(ctx context.Context, pool *pgxpool.Pool, labels map[s
 // Index bloat estimation
 // ---------------------------------------------------------------------------
 
-func collectIndexBloatEstimates(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectIndexBloatEstimates(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// Compare actual index page count with an expected minimum based on
 	// reltuples * 8 bytes (a rough B-tree leaf-entry estimate). This heuristic
 	// is deliberately conservative — real index bloat tools use pgstattuple
@@ -545,7 +544,7 @@ func collectIndexBloatEstimates(ctx context.Context, pool *pgxpool.Pool, labels 
 // Unused index detection
 // ---------------------------------------------------------------------------
 
-func collectUnusedIndexes(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectUnusedIndexes(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	// Find indexes that have never been scanned (idx_scan = 0) and are not
 	// backing a primary key or unique constraint.
 	query := `

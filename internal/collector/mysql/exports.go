@@ -19,6 +19,11 @@
 package mysql
 
 import (
+	"context"
+	"database/sql"
+
+	"go.uber.org/zap"
+
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
@@ -239,6 +244,238 @@ type UserStatsRowExport struct {
 	UpdateCmds      float64
 	OtherCmds       float64
 }
+
+// ----------------------------------------------------------------------------
+// Database-backed test seams. These wrap unexported collect functions so that
+// external test packages can drive them with github.com/DATA-DOG/go-sqlmock.
+// ----------------------------------------------------------------------------
+
+// CollectGlobalStatusExport wraps collectGlobalStatus.
+func CollectGlobalStatusExport(ctx context.Context, db *sql.DB) ([]StatusRowExport, map[string]uint64, error) {
+	rows, raw, err := collectGlobalStatus(ctx, db)
+	out := make([]StatusRowExport, len(rows))
+	for i, r := range rows {
+		out[i] = StatusRowExport{Name: r.name, Value: r.value}
+	}
+	return out, raw, err
+}
+
+// CollectGlobalVariablesExport wraps collectGlobalVariables.
+func CollectGlobalVariablesExport(ctx context.Context, db *sql.DB) (map[string]string, error) {
+	return collectGlobalVariables(ctx, db)
+}
+
+// CollectInnoDBStatusExport wraps collectInnoDBStatus.
+func CollectInnoDBStatusExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectInnoDBStatus(ctx, db, labels)
+}
+
+// ParseInnoDBStatusSectionsExport wraps parseInnoDBStatus for direct parsing tests.
+func ParseInnoDBStatusSectionsExport(status string) map[string]string {
+	return parseInnoDBStatus(status)
+}
+
+// ParseBufferPoolSectionExport wraps parseBufferPoolSection.
+func ParseBufferPoolSectionExport(content string, labels map[string]string) []collector.Metric {
+	return parseBufferPoolSection(content, labels)
+}
+
+// ParseRowOperationsSectionExport wraps parseRowOperationsSection.
+func ParseRowOperationsSectionExport(content string, labels map[string]string) []collector.Metric {
+	return parseRowOperationsSection(content, labels)
+}
+
+// ExtractNumberExport wraps extractNumber.
+func ExtractNumberExport(line string) float64 { return extractNumber(line) }
+
+// CollectReplicationStatusExport wraps collectReplicationStatus.
+func CollectReplicationStatusExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectReplicationStatus(ctx, db, labels)
+}
+
+// ToStrExport wraps toStr.
+func ToStrExport(v interface{}) string { return toStr(v) }
+
+// CollectGaleraStatusExport wraps collectGaleraStatus.
+func CollectGaleraStatusExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectGaleraStatus(ctx, db, labels)
+}
+
+// CollectSchemaExport wraps collectSchema.
+func CollectSchemaExport(ctx context.Context, db *sql.DB, cfg config.MySQLInstanceConfig, labels map[string]string) ([]collector.Metric, error) {
+	return collectSchema(ctx, db, cfg, labels, zap.NewNop())
+}
+
+// GetAutoIncrMaxExport wraps getAutoIncrMax.
+func GetAutoIncrMaxExport(engine string) int64 { return getAutoIncrMax(engine) }
+
+// CollectQueryAnalyticsExport wraps collectQueryAnalytics against an exported instance.
+func CollectQueryAnalyticsExport(ctx context.Context, db *sql.DB, inst *MySQLInstanceExport, labels map[string]string) ([]collector.Metric, error) {
+	return collectQueryAnalytics(ctx, db, (*mysqlInstance)(inst), labels, zap.NewNop())
+}
+
+// SetPrevDigestExport seeds a previous digest snapshot on the exported instance.
+func SetPrevDigestExport(inst *MySQLInstanceExport, digest string, countStar, sumTimerWait, rowsSent, rowsExam uint64) {
+	real := (*mysqlInstance)(inst)
+	if real.prevDigests == nil {
+		real.prevDigests = make(map[string]*digestSnapshot)
+	}
+	real.prevDigests[digest] = &digestSnapshot{
+		CountStar:    countStar,
+		SumTimerWait: sumTimerWait,
+		SumRowsSent:  rowsSent,
+		SumRowsExam:  rowsExam,
+	}
+}
+
+// MariaDB collect wrappers.
+
+func DetectMariaDBEnginesExport(ctx context.Context, db *sql.DB) (*MariaDBExtensionExport, error) {
+	ext := initMariaDBExtension()
+	err := detectMariaDBEngines(ctx, db, ext)
+	return (*MariaDBExtensionExport)(ext), err
+}
+
+func DetectMariaDBPluginsExport(ctx context.Context, db *sql.DB, vars map[string]string) (*MariaDBExtensionExport, error) {
+	ext := initMariaDBExtension()
+	err := detectMariaDBPlugins(ctx, db, ext, vars)
+	return (*MariaDBExtensionExport)(ext), err
+}
+
+func CollectMariaDBQueryCacheExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBQueryCache(ctx, db, labels)
+}
+
+func CollectMariaDBAriaExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBAria(ctx, db, labels)
+}
+
+func CollectMariaDBColumnStoreExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBColumnStore(ctx, db, labels)
+}
+
+func CollectMariaDBSpiderExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBSpider(ctx, db, labels)
+}
+
+func CollectMariaDBThreadPoolExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBThreadPool(ctx, db, labels)
+}
+
+func CollectMariaDBMultiSourceReplicationExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBMultiSourceReplication(ctx, db, labels)
+}
+
+func CollectMariaDBUserStatsExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectMariaDBUserStats(ctx, db, labels)
+}
+
+// Percona collect wrappers.
+
+func DetectPerconaPluginsExport(ctx context.Context, db *sql.DB) (*PerconaExtensionExport, error) {
+	ext := initPerconaExtension()
+	err := detectPerconaPlugins(ctx, db, ext)
+	return (*PerconaExtensionExport)(ext), err
+}
+
+func CollectPerconaQueryResponseTimeExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaQueryResponseTime(ctx, db, labels)
+}
+
+func CollectPerconaUserStatsExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaUserStats(ctx, db, labels)
+}
+
+func CollectPerconaThreadPoolExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaThreadPool(ctx, db, labels)
+}
+
+func CollectPerconaPXCExport(ctx context.Context, db *sql.DB, rawStatus map[string]uint64, vars, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaPXC(ctx, db, rawStatus, vars, labels)
+}
+
+func CollectPerconaXtraBackupExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaXtraBackup(ctx, db, labels)
+}
+
+func CollectPerconaAuditExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaAudit(ctx, db, labels)
+}
+
+func CollectPerconaEnhancedSlowQueryExport(ctx context.Context, db *sql.DB, labels map[string]string) ([]collector.Metric, error) {
+	return collectPerconaEnhancedSlowQuery(ctx, db, labels)
+}
+
+// DetectFlavorExport wraps detectFlavor on a collector's first instance and
+// returns the detected flavor/version.
+func DetectFlavorExport(c *MySQLCollector, ctx context.Context, db *sql.DB) (string, string, error) {
+	inst := c.instances[0]
+	err := c.detectFlavor(ctx, inst, db)
+	return inst.flavor, inst.version, err
+}
+
+// SetInstanceDBExport injects a *sql.DB into the first instance.
+func SetInstanceDBExport(c *MySQLCollector, db *sql.DB) { c.instances[0].db = db }
+
+// SetInstanceFlavorExport sets the flavor of the first instance.
+func SetInstanceFlavorExport(c *MySQLCollector, flavor string) { c.instances[0].flavor = flavor }
+
+// PrimeMariaDBExport enables all MariaDB sub-collectors on the first instance.
+func PrimeMariaDBExport(c *MySQLCollector) {
+	ext := initMariaDBExtension()
+	ext.queryCacheEnabled = true
+	ext.ariaStatsEnabled = true
+	ext.columnStoreStatsEnabled = true
+	ext.spiderStatsEnabled = true
+	ext.threadPoolStatsEnabled = true
+	ext.userStatsEnabled = true
+	c.instances[0].mariadb = ext
+}
+
+// PrimePerconaExport enables all Percona sub-collectors on the first instance.
+func PrimePerconaExport(c *MySQLCollector) {
+	ext := initPerconaExtension()
+	ext.queryResponseTimeEnabled = true
+	ext.userStatsEnabled = true
+	ext.enhancedSlowQueryEnabled = true
+	ext.auditMetricsEnabled = true
+	c.instances[0].percona = ext
+}
+
+// CollectMariaDBExport wraps collectMariaDB for the first instance (detection runs).
+func CollectMariaDBExport(c *MySQLCollector, ctx context.Context, db *sql.DB, labels, vars map[string]string) []collector.Metric {
+	return c.collectMariaDB(ctx, c.instances[0], db, labels, vars)
+}
+
+// CollectPerconaExport wraps collectPercona for the first instance (detection runs).
+func CollectPerconaExport(c *MySQLCollector, ctx context.Context, db *sql.DB, labels, vars map[string]string, rawStatus map[string]uint64) []collector.Metric {
+	return c.collectPercona(ctx, c.instances[0], db, labels, vars, rawStatus)
+}
+
+// CollectInstanceExport wraps collectInstance for the first instance.
+func CollectInstanceExport(c *MySQLCollector, ctx context.Context) ([]collector.Metric, error) {
+	return c.collectInstance(ctx, c.instances[0])
+}
+
+// SetInstancePrevStatusExport seeds prevStatus so rate computation runs.
+func SetInstancePrevStatusExport(c *MySQLCollector, prev map[string]uint64) {
+	c.instances[0].prevStatus = prev
+}
+
+// EnsureConnectionErrExport exercises ensureConnection and returns the error.
+func EnsureConnectionErrExport(c *MySQLCollector, ctx context.Context) error {
+	_, err := c.ensureConnection(ctx, c.instances[0])
+	return err
+}
+
+// AdvanceBackoffExport exercises advanceBackoff on the first instance.
+func AdvanceBackoffExport(c *MySQLCollector) { c.advanceBackoff(c.instances[0]) }
+
+// FingerprintMySQLExport wraps fingerprintMySQL.
+func FingerprintMySQLExport(digestText string) string { return fingerprintMySQL(digestText) }
+
+// SetQANInstanceDBExport injects a *sql.DB into the first QAN instance.
+func SetQANInstanceDBExport(c *QANMySQLCollector, db *sql.DB) { c.instances[0].db = db }
 
 // ComputeUserStatsFromRows emits per-user metrics from exported row data.
 func ComputeUserStatsFromRows(rows []UserStatsRowExport, labels map[string]string) []collector.Metric {

@@ -23,13 +23,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectLockMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectLockMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var metrics []collector.Metric
 
 	if m, err := collectLocksByType(ctx, pool, labels); err != nil {
@@ -57,7 +56,7 @@ func collectLockMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[stri
 // Lock counts grouped by lock type
 // ---------------------------------------------------------------------------
 
-func collectLocksByType(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectLocksByType(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -93,7 +92,7 @@ func collectLocksByType(ctx context.Context, pool *pgxpool.Pool, labels map[stri
 // Lock counts grouped by mode
 // ---------------------------------------------------------------------------
 
-func collectLocksByMode(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectLocksByMode(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -129,7 +128,7 @@ func collectLocksByMode(ctx context.Context, pool *pgxpool.Pool, labels map[stri
 // Blocked queries: count and longest wait
 // ---------------------------------------------------------------------------
 
-func collectBlockedQueryMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectBlockedQueryMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

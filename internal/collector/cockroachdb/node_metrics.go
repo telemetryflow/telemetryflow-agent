@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectNodeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectNodeMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -47,7 +46,7 @@ func collectNodeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[stri
 	return metrics, nil
 }
 
-func collectNodeMetricsFallback(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectNodeMetricsFallback(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var isLive bool
 	err := pool.QueryRow(ctx, `SELECT is_live FROM crdb_internal.gossip_liveness WHERE node_id = 1`).Scan(&isLive)
 	if err != nil {
@@ -59,7 +58,7 @@ func collectNodeMetricsFallback(ctx context.Context, pool *pgxpool.Pool, labels 
 	}, nil
 }
 
-func collectSQLMetrics(ctx context.Context, pool *pgxpool.Pool, inst *crdbInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectSQLMetrics(ctx context.Context, pool PgxQuerier, inst *crdbInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -133,7 +132,7 @@ func collectSQLMetrics(ctx context.Context, pool *pgxpool.Pool, inst *crdbInstan
 	return metrics, nil
 }
 
-func collectStoreMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectStoreMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

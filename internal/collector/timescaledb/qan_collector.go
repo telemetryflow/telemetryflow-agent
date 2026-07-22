@@ -135,16 +135,22 @@ func (c *QANTimescaleDBCollector) collectInstance(ctx context.Context, inst *qan
 	if err != nil {
 		return nil, err
 	}
+	return collectQANBuckets(ctx, pool, inst, c.cfg.TopQueriesLimit, c.cfg.Labels)
+}
 
+// collectQANBuckets runs the pg_stat_statements delta calculation against an
+// already-established querier. Split from collectInstance so it can be tested
+// without a live connection.
+func collectQANBuckets(ctx context.Context, q PgxQuerier, inst *qanTsInstance, topQueriesLimit int, globalLabels map[string]string) ([]qan.QANMetricsBucket, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	var extExists bool
-	if err := pool.QueryRow(ctx2, "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements')").Scan(&extExists); err != nil || !extExists {
+	if err := q.QueryRow(ctx2, "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements')").Scan(&extExists); err != nil || !extExists {
 		return nil, nil
 	}
 
-	limit := c.cfg.TopQueriesLimit
+	limit := topQueriesLimit
 	candidatePool := limit * 3
 	if candidatePool > 1000 {
 		candidatePool = 1000
@@ -153,7 +159,7 @@ func (c *QANTimescaleDBCollector) collectInstance(ctx context.Context, inst *qan
 		candidatePool = limit
 	}
 
-	rows, err := pool.Query(ctx2, `
+	rows, err := q.Query(ctx2, `
 		SELECT queryid, query, calls, total_exec_time, min_exec_time, max_exec_time,
 		       rows, shared_blks_hit, shared_blks_read
 		FROM pg_stat_statements
@@ -177,7 +183,7 @@ func (c *QANTimescaleDBCollector) collectInstance(ctx context.Context, inst *qan
 
 	currentSnapshot := make(map[string]*tsSnapshot)
 	var buckets []qan.QANMetricsBucket
-	labels := c.instanceLabels(inst)
+	labels := qanInstanceLabels(inst, globalLabels)
 
 	for rows.Next() {
 		var s tsSnapshot
@@ -280,9 +286,9 @@ func (c *QANTimescaleDBCollector) ensureConnection(ctx context.Context, inst *qa
 	return pool, nil
 }
 
-func (c *QANTimescaleDBCollector) instanceLabels(inst *qanTsInstance) map[string]string {
+func qanInstanceLabels(inst *qanTsInstance, globalLabels map[string]string) map[string]string {
 	labels := make(map[string]string)
-	for k, v := range c.cfg.Labels {
+	for k, v := range globalLabels {
 		labels[k] = v
 	}
 	labels["timescaledb_instance"] = inst.config.Name

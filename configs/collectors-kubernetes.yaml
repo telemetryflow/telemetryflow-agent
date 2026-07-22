@@ -64,6 +64,9 @@ kubernetes:
   # Backend sync
   sync_to_backend: true
   sync_interval: 60s
+  # Per-request deadline for a single state-sync POST. Keep below sync_interval.
+  # Raise this if large clusters hit "context deadline exceeded" on sync.
+  sync_timeout: 50s
 
   # Control plane metrics
   apiserver_metrics: true

@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -32,7 +31,7 @@ import (
 // collectReplicationMetrics gathers streaming replication lag, replication slot
 // status and WAL retention from a PostgreSQL primary instance.
 // On standby instances (pg_is_in_recovery() = true) the function returns nil.
-func collectReplicationMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectReplicationMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -67,7 +66,7 @@ func collectReplicationMetrics(ctx context.Context, pool *pgxpool.Pool, labels m
 
 // collectReplicationLag queries pg_stat_replication for each connected standby
 // and emits lag durations and byte-based lag.
-func collectReplicationLag(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectReplicationLag(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT pid,
 	                  usename,
 	                  application_name,
@@ -152,7 +151,7 @@ func collectReplicationLag(ctx context.Context, pool *pgxpool.Pool, labels map[s
 
 // collectReplicationLagBytes emits byte-based replication lag for each standby
 // using pg_wal_lsn_diff(sent_lsn, replay_lsn).
-func collectReplicationLagBytes(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectReplicationLagBytes(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT application_name,
 	                  client_addr::text,
 	                  state,
@@ -189,7 +188,7 @@ func collectReplicationLagBytes(ctx context.Context, pool *pgxpool.Pool, labels 
 
 // collectReplicationSlots queries pg_replication_slots for slot status and
 // WAL retention.
-func collectReplicationSlots(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectReplicationSlots(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	const q = `SELECT slot_name,
 	                  slot_type,
 	                  active,

@@ -26,19 +26,19 @@ import (
 	"time"
 )
 
-func detectVersion(ctx context.Context, inst *pgInstance) error {
+func detectVersion(ctx context.Context, q PgxQuerier, inst *pgInstance) error {
 	ctx2, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var versionNum int
-	err := inst.pool.QueryRow(ctx2, "SELECT current_setting('server_version_num')::int").Scan(&versionNum)
+	err := q.QueryRow(ctx2, "SELECT current_setting('server_version_num')::int").Scan(&versionNum)
 	if err != nil {
 		return fmt.Errorf("postgresql %s: detect version: %w", inst.config.Name, err)
 	}
 	inst.version = versionNum
 
 	var versionStr string
-	if err := inst.pool.QueryRow(ctx2, "SHOW server_version").Scan(&versionStr); err == nil {
+	if err := q.QueryRow(ctx2, "SHOW server_version").Scan(&versionStr); err == nil {
 		inst.versionStr = strings.TrimSpace(versionStr)
 	} else {
 		inst.versionStr = strconv.Itoa(versionNum)

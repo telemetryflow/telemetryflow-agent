@@ -191,7 +191,13 @@ func (c *QANPostgreSQLCollector) collectInstance(ctx context.Context, inst *qanP
 	if err != nil {
 		return nil, err
 	}
+	return c.collectQANBuckets(ctx, pool, inst)
+}
 
+// collectQANBuckets runs the pg_stat_statements query-scanning body against the
+// supplied querier and computes delta buckets. It is separated from
+// collectInstance so the scan/delta path can be exercised with a mock pool.
+func (c *QANPostgreSQLCollector) collectQANBuckets(ctx context.Context, pool PgxQuerier, inst *qanPgInstance) ([]qan.QANMetricsBucket, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 

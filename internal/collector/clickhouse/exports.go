@@ -19,7 +19,19 @@ package clickhouse
 
 import (
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
+
+// Connection is an exported alias of the unexported connection type so external
+// tests can build one directly and exercise Execute/Check/Close against an
+// httptest server. Its methods (Execute, Check, Close) are already exported.
+type Connection = connection
+
+// NewConnectionExported builds a connection for external tests, exposing the
+// unexported newConnection constructor (including its TLS configuration paths).
+func NewConnectionExported(inst config.ClickHouseInstanceConfig) (*Connection, error) {
+	return newConnection(inst)
+}
 
 // ToFloat64Exported exports toFloat64 for external tests.
 func ToFloat64Exported(v interface{}) (float64, error) {

@@ -4,20 +4,18 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
 // collectCurrentOp executes db.currentOp({$all: true}) and emits operation metrics.
-func collectCurrentOp(ctx context.Context, client *mongo.Client, labels map[string]string, _ *zap.Logger) ([]collector.Metric, error) {
-	admin := client.Database("admin")
+func collectCurrentOp(ctx context.Context, api mongoAPI, labels map[string]string, _ *zap.Logger) ([]collector.Metric, error) {
 	var result bson.M
-	if err := admin.RunCommand(ctx, bson.D{
+	if err := api.RunCommand(ctx, "admin", bson.D{
 		{Key: "currentOp", Value: true},
 		{Key: "$all", Value: true},
-	}).Decode(&result); err != nil {
+	}, &result); err != nil {
 		return nil, err
 	}
 

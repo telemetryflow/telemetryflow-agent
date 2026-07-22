@@ -13,18 +13,23 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 # Test configuration
-COVERAGE_THRESHOLD=80
+COVERAGE_THRESHOLD=95
 TIMEOUT=5m
+# Source packages to measure coverage for. The unit tests live in external
+# packages (tests/unit/...), so without -coverpkg the profile only covers those
+# test packages ("[no statements]"). Instrument the real source packages so the
+# threshold reflects actual source coverage.
+COVERPKG="./internal/...,./pkg/..."
 
 echo -e "${GREEN}Running TelemetryFlow Agent Tests${NC}"
 
 # Unit tests
 echo -e "${YELLOW}Running unit tests...${NC}"
-go test -v -timeout ${TIMEOUT} -coverprofile=coverage-unit.out ./tests/unit/...
+go test -v -timeout ${TIMEOUT} -coverpkg="${COVERPKG}" -coverprofile=coverage-unit.out ./tests/unit/...
 
 # Integration tests
 echo -e "${YELLOW}Running integration tests...${NC}"
-go test -v -timeout ${TIMEOUT} -coverprofile=coverage-integration.out ./tests/integration/...
+go test -v -timeout ${TIMEOUT} -coverpkg="${COVERPKG}" -coverprofile=coverage-integration.out ./tests/integration/...
 
 # E2E tests (skip in short mode)
 if [ "$1" != "short" ]; then

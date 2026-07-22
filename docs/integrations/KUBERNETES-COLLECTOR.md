@@ -493,7 +493,7 @@ spec:
     - name: app
       image: my-app:latest
     - name: tfo-agent
-      image: telemetryflow/telemetryflow-agent:1.1.8
+      image: telemetryflow/telemetryflow-agent:1.2.2
       env:
         - name: TELEMETRYFLOW_K8S_ENABLED
           value: "true"

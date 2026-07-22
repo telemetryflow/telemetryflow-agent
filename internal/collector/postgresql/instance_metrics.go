@@ -23,13 +23,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectInstanceMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectInstanceMetrics(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var all []collector.Metric
 
 	if m, err := collectConnectionMetrics(ctx, pool, inst, labels); err != nil {
@@ -71,7 +70,7 @@ func collectInstanceMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgIns
 // Connection metrics from pg_stat_activity
 // ---------------------------------------------------------------------------
 
-func collectConnectionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string) ([]collector.Metric, error) {
+func collectConnectionMetrics(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -157,7 +156,7 @@ func collectConnectionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgI
 // Transaction / tuple / cache metrics from pg_stat_database
 // ---------------------------------------------------------------------------
 
-func collectTransactionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pgInstance, labels map[string]string) ([]collector.Metric, error) {
+func collectTransactionMetrics(ctx context.Context, pool PgxQuerier, inst *pgInstance, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -282,7 +281,7 @@ func collectTransactionMetrics(ctx context.Context, pool *pgxpool.Pool, inst *pg
 // Background writer metrics from pg_stat_bgwriter
 // ---------------------------------------------------------------------------
 
-func collectBgWriterMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectBgWriterMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -331,7 +330,7 @@ func collectBgWriterMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[
 // WAL metrics from pg_stat_wal (PostgreSQL 14+)
 // ---------------------------------------------------------------------------
 
-func collectWALMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectWALMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -375,7 +374,7 @@ func collectWALMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[strin
 // Database size metrics
 // ---------------------------------------------------------------------------
 
-func collectDatabaseSizeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectDatabaseSizeMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

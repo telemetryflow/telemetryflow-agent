@@ -147,62 +147,68 @@ func (c *TimescaleDBCollector) collectInstance(ctx context.Context, inst *tsdbIn
 	if err != nil {
 		return nil, err
 	}
+	return collectInstanceMetrics(ctx, pool, inst, c.logger), nil
+}
 
+// collectInstanceMetrics runs version detection and every metric collection
+// against an already-established querier. Split out from collectInstance so it
+// can be exercised without a live connection.
+func collectInstanceMetrics(ctx context.Context, q PgxQuerier, inst *tsdbInstance, logger *zap.Logger) []collector.Metric {
 	if inst.pgVersion == 0 {
-		if err := detectPGVersion(ctx, inst); err != nil {
-			c.logger.Debug("PG version detection failed", zap.String("instance", inst.config.Name), zap.Error(err))
+		if err := detectPGVersion(ctx, q, inst); err != nil {
+			logger.Debug("PG version detection failed", zap.String("instance", inst.config.Name), zap.Error(err))
 		}
 	}
 
 	if inst.tsdbVer == "" {
-		if err := detectTimescaleDB(ctx, inst); err != nil {
-			c.logger.Debug("TimescaleDB detection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
+		if err := detectTimescaleDB(ctx, q, inst); err != nil {
+			logger.Debug("TimescaleDB detection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 		}
 	}
 
 	labels := instanceLabels(inst)
 	var all []collector.Metric
 
-	pgMetrics, err := collectPGBaseMetrics(ctx, pool, labels, c.logger)
+	pgMetrics, err := collectPGBaseMetrics(ctx, q, labels, logger)
 	if err != nil {
-		c.logger.Warn("PG base metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
+		logger.Warn("PG base metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, pgMetrics...)
 	}
 
-	htMetrics, err := collectHypertables(ctx, pool, labels, c.logger)
+	htMetrics, err := collectHypertables(ctx, q, labels, logger)
 	if err != nil {
-		c.logger.Debug("Hypertable metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
+		logger.Debug("Hypertable metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, htMetrics...)
 	}
 
-	compMetrics, err := collectCompression(ctx, pool, labels, c.logger)
+	compMetrics, err := collectCompression(ctx, q, labels, logger)
 	if err != nil {
-		c.logger.Debug("Compression metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
+		logger.Debug("Compression metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, compMetrics...)
 	}
 
-	caggMetrics, err := collectContinuousAggregates(ctx, pool, labels, c.logger)
+	caggMetrics, err := collectContinuousAggregates(ctx, q, labels, logger)
 	if err != nil {
-		c.logger.Debug("CAGG metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
+		logger.Debug("CAGG metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, caggMetrics...)
 	}
 
-	retMetrics, err := collectRetention(ctx, pool, labels, c.logger)
+	retMetrics, err := collectRetention(ctx, q, labels, logger)
 	if err != nil {
-		c.logger.Debug("Retention metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
+		logger.Debug("Retention metrics skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, retMetrics...)
 	}
 
-	c.logger.Debug("TimescaleDB instance collected",
+	logger.Debug("TimescaleDB instance collected",
 		zap.String("instance", inst.config.Name),
 		zap.Int("metrics", len(all)),
 	)
-	return all, nil
+	return all
 }
 
 func (c *TimescaleDBCollector) collectAllChunks(ctx context.Context) ([]collector.Metric, error) {
@@ -239,19 +245,19 @@ func (c *TimescaleDBCollector) collectAllJobs(ctx context.Context) ([]collector.
 	return all, nil
 }
 
-func detectPGVersion(ctx context.Context, inst *tsdbInstance) error {
+func detectPGVersion(ctx context.Context, q PgxQuerier, inst *tsdbInstance) error {
 	ctx2, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var versionNum int
-	err := inst.pool.QueryRow(ctx2, "SHOW server_version_num").Scan(&versionNum)
+	err := q.QueryRow(ctx2, "SHOW server_version_num").Scan(&versionNum)
 	if err != nil {
 		return fmt.Errorf("timescaledb %s: detect PG version: %w", inst.config.Name, err)
 	}
 	inst.pgVersion = versionNum
 
 	var versionStr string
-	if err := inst.pool.QueryRow(ctx2, "SHOW server_version").Scan(&versionStr); err == nil {
+	if err := q.QueryRow(ctx2, "SHOW server_version").Scan(&versionStr); err == nil {
 		inst.pgVersionS = strings.TrimSpace(versionStr)
 	} else {
 		inst.pgVersionS = strconv.Itoa(versionNum)
@@ -259,12 +265,12 @@ func detectPGVersion(ctx context.Context, inst *tsdbInstance) error {
 	return nil
 }
 
-func detectTimescaleDB(ctx context.Context, inst *tsdbInstance) error {
+func detectTimescaleDB(ctx context.Context, q PgxQuerier, inst *tsdbInstance) error {
 	ctx2, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var version string
-	err := inst.pool.QueryRow(ctx2,
+	err := q.QueryRow(ctx2,
 		"SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'",
 	).Scan(&version)
 	if err != nil {
