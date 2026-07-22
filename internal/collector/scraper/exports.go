@@ -18,9 +18,13 @@
 package scraper
 
 import (
+	"context"
+	"crypto/tls"
 	"io"
+	"net/http"
 
 	dto "github.com/prometheus/client_model/go"
+	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
@@ -58,4 +62,31 @@ func BuildSourceValueExported(m collector.Metric, sourceLabels []string) string 
 // BuildScrapeURLExported exposes buildScrapeURL for testing.
 func BuildScrapeURLExported(target, scrapePath string) string {
 	return buildScrapeURL(target, scrapePath)
+}
+
+// ScrapeTargetExported exposes scrapeTarget for testing.
+func ScrapeTargetExported(ctx context.Context, client *http.Client, target string, cfg ScrapeJobConfig) ([]collector.Metric, error) {
+	return scrapeTarget(ctx, client, target, cfg)
+}
+
+// BuildTLSConfigExported exposes buildTLSConfig for testing.
+func BuildTLSConfigExported(cfg TLSConfig) (*tls.Config, error) {
+	return buildTLSConfig(cfg)
+}
+
+// NewScrapeJobExported exposes newScrapeJob for testing.
+func NewScrapeJobExported(cfg ScrapeJobConfig, out chan<- []collector.Metric, logger *zap.Logger) (*ScrapeJob, error) {
+	return newScrapeJob(cfg, out, logger)
+}
+
+// BearerRoundTripperExported returns a RoundTripper that injects a bearer token,
+// exposing bearerRoundTripper for testing.
+func BearerRoundTripperExported(token string, next http.RoundTripper) http.RoundTripper {
+	return &bearerRoundTripper{token: token, next: next}
+}
+
+// BasicAuthRoundTripperExported returns a RoundTripper that injects basic auth,
+// exposing basicAuthRoundTripper for testing.
+func BasicAuthRoundTripperExported(username, password string, next http.RoundTripper) http.RoundTripper {
+	return &basicAuthRoundTripper{username: username, password: password, next: next}
 }

@@ -158,6 +158,18 @@ func TestParsePrometheusText_Invalid(t *testing.T) {
 	}
 }
 
+func TestParsePrometheusText_ErrorNoFamilies(t *testing.T) {
+	// Malformed input that produces a parse error and zero families should
+	// surface an error from parsePrometheusText.
+	metrics, err := scraper.ParsePrometheusTextExported(strings.NewReader("# TYPE metric_a counter\nmetric_a{ 1\n"))
+	if err == nil {
+		t.Fatal("expected parse error for malformed input")
+	}
+	if len(metrics) != 0 {
+		t.Errorf("expected 0 metrics on error, got %d", len(metrics))
+	}
+}
+
 func TestConvertFamily(t *testing.T) {
 	t.Run("counter", func(t *testing.T) {
 		family := &dto.MetricFamily{
