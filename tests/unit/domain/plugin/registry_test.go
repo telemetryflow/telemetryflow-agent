@@ -19,6 +19,8 @@
 package plugin_test
 
 import (
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -232,6 +234,123 @@ func TestRegistryStopAll(t *testing.T) {
 		// Verify plugins were stopped
 		assert.True(t, p1.(*mockPlugin).stopped)
 		assert.True(t, p2.(*mockPlugin).stopped)
+	})
+}
+
+// errorPlugin returns an error from Stop to exercise error paths.
+type errorPlugin struct {
+	info    plugin.Info
+	initErr error
+}
+
+func (e *errorPlugin) Info() plugin.Info                   { return e.info }
+func (e *errorPlugin) Init(_ map[string]interface{}) error { return e.initErr }
+func (e *errorPlugin) Start() error                        { return nil }
+func (e *errorPlugin) Stop() error                         { return errors.New("stop failed") }
+
+func newErrorPlugin(name string) plugin.Factory {
+	return func() plugin.Plugin {
+		return &errorPlugin{info: plugin.Info{Name: name, Type: plugin.TypeCollector, Version: "1.0.0"}}
+	}
+}
+
+func TestMockPluginLifecycle(t *testing.T) {
+	t.Run("should exercise Init and Start", func(t *testing.T) {
+		registry := plugin.NewRegistry()
+		_ = registry.Register("lifecycle", newMockPlugin("lifecycle", plugin.TypeExtension))
+
+		p, err := registry.Get("lifecycle")
+		require.NoError(t, err)
+
+		require.NoError(t, p.Init(map[string]interface{}{"key": "value"}))
+		require.NoError(t, p.Start())
+		require.NoError(t, p.Stop())
+
+		mp := p.(*mockPlugin)
+		assert.True(t, mp.started)
+		assert.True(t, mp.stopped)
+	})
+
+	t.Run("should confirm mockPlugin satisfies Plugin interface", func(t *testing.T) {
+		var _ plugin.Plugin = &mockPlugin{}
+		var _ plugin.Plugin = &errorPlugin{}
+	})
+}
+
+func TestRegistryStopAllError(t *testing.T) {
+	t.Run("should aggregate errors from failing plugins", func(t *testing.T) {
+		registry := plugin.NewRegistry()
+		_ = registry.Register("bad-plugin", newErrorPlugin("bad-plugin"))
+
+		_, err := registry.Get("bad-plugin")
+		require.NoError(t, err)
+
+		err = registry.StopAll()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "errors stopping plugins")
+		assert.Contains(t, err.Error(), "bad-plugin")
+
+		// Instances map is reset even when Stop fails.
+		assert.NotPanics(t, func() { _ = registry.StopAll() })
+	})
+
+	t.Run("should return nil when no instances exist", func(t *testing.T) {
+		registry := plugin.NewRegistry()
+		require.NoError(t, registry.StopAll())
+	})
+}
+
+func TestDefaultRegistryFunctions(t *testing.T) {
+	name := "default-registry-plugin"
+
+	t.Run("should register and retrieve from default registry", func(t *testing.T) {
+		err := plugin.Register(name, newMockPlugin(name, plugin.TypeExporter))
+		require.NoError(t, err)
+
+		p, err := plugin.Get(name)
+		require.NoError(t, err)
+		assert.Equal(t, name, p.Info().Name)
+
+		assert.Contains(t, plugin.List(), name)
+		assert.Contains(t, plugin.ListByType(plugin.TypeExporter), name)
+	})
+
+	t.Run("should error retrieving unknown plugin from default registry", func(t *testing.T) {
+		_, err := plugin.Get("no-such-default-plugin")
+		require.Error(t, err)
+	})
+
+	t.Run("should error on duplicate default registration", func(t *testing.T) {
+		err := plugin.Register(name, newMockPlugin(name, plugin.TypeExporter))
+		require.Error(t, err)
+	})
+}
+
+func TestRegistryGetCachedConcurrent(t *testing.T) {
+	t.Run("should return cached instance under concurrent access", func(t *testing.T) {
+		registry := plugin.NewRegistry()
+		_ = registry.Register("concurrent", newMockPlugin("concurrent", plugin.TypeCollector))
+
+		// Prime the cache, then hammer Get concurrently to exercise the
+		// fast-path (RLock cache hit) branch.
+		first, err := registry.Get("concurrent")
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		results := make([]plugin.Plugin, 50)
+		for i := range results {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				p, _ := registry.Get("concurrent")
+				results[idx] = p
+			}(i)
+		}
+		wg.Wait()
+
+		for _, p := range results {
+			assert.Same(t, first, p)
+		}
 	})
 }
 

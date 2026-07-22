@@ -19,10 +19,12 @@
 package pubsub
 
 import (
+	"context"
 	"crypto/rsa"
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
 
 // PubSubTestMetric is a test-visible representation of the internal
@@ -85,4 +87,67 @@ func BuildPubSubMetricsExported(labels map[string]string, metrics []PubSubTestMe
 // SignJWTExported wraps signJWT for external test packages.
 func SignJWTExported(claims map[string]any, key *rsa.PrivateKey) (string, error) {
 	return signJWT(claims, key)
+}
+
+// SetEndpointsExported overrides the OAuth token and Cloud Monitoring base URLs
+// for tests (e.g. httptest servers) and returns a restore func. Behavior is
+// unchanged in production, which keeps the real Google defaults.
+func SetEndpointsExported(tokenURL, monitoringBase string) (restore func()) {
+	prevToken, prevMon := oauthTokenURL, monitoringBaseURL
+	oauthTokenURL = tokenURL
+	monitoringBaseURL = monitoringBase
+	return func() {
+		oauthTokenURL = prevToken
+		monitoringBaseURL = prevMon
+	}
+}
+
+// ParseRSAPrivateKeyExported wraps parseRSAPrivateKey for external test packages.
+func ParseRSAPrivateKeyExported(pemBytes []byte) (*rsa.PrivateKey, error) {
+	return parseRSAPrivateKey(pemBytes)
+}
+
+// LoadCredentialsExported wraps loadCredentials, returning the resolved client
+// email so external tests can assert credential resolution without exposing
+// the unexported serviceAccount type.
+func LoadCredentialsExported(inst config.PubSubInstanceConfig) (string, error) {
+	sa, err := loadCredentials(inst)
+	if err != nil {
+		return "", err
+	}
+	return sa.clientEmail, nil
+}
+
+// GetAccessTokenExported wraps getAccessToken, building the serviceAccount from
+// an email and key so external tests can drive the OAuth grant against an
+// httptest server.
+func GetAccessTokenExported(ctx context.Context, email string, key *rsa.PrivateKey) (string, error) {
+	return getAccessToken(ctx, &serviceAccount{clientEmail: email, privateKey: key})
+}
+
+// TruncateExported wraps truncate for external test packages.
+func TruncateExported(s string, n int) string {
+	return truncate(s, n)
+}
+
+// CompileFilterExported wraps compileFilter, reporting whether a non-nil regex
+// was produced.
+func CompileFilterExported(filter string) (matched bool, err error) {
+	re, err := compileFilter(filter)
+	return re != nil, err
+}
+
+// LatestPointEndTimeExported wraps latestPoint over exported test points,
+// returning the selected point's end time and whether one was found.
+func LatestPointEndTimeExported(points []PubSubTestPoint) (time.Time, bool) {
+	mps := make([]monitoringPoint, 0, len(points))
+	for _, p := range points {
+		var mp monitoringPoint
+		mp.Interval.EndTime = p.EndTime
+		mp.Value.Int64Value = p.Int64Value
+		mp.Value.DoubleValue = p.DoubleValue
+		mps = append(mps, mp)
+	}
+	lp, ok := latestPoint(mps)
+	return lp.Interval.EndTime, ok
 }

@@ -84,6 +84,13 @@ func (c *QANRDSPostgreSQLCollector) InstanceLabelsExported(t *RDSPgTestInstance)
 	return c.instanceLabels(t.inner)
 }
 
+// CollectQANBucketsExported drives the unexported collectQANBuckets scan/delta
+// body against the supplied querier for the given test instance, returning the
+// resulting buckets so external tests can exercise the path with a mock pool.
+func (c *QANRDSPostgreSQLCollector) CollectQANBucketsExported(ctx context.Context, q PgxQuerier, t *RDSPgTestInstance) ([]qan.QANMetricsBucket, error) {
+	return c.collectQANBuckets(ctx, q, t.inner)
+}
+
 // SetInstances replaces the collector's instance list with the given test instances.
 func (c *QANRDSPostgreSQLCollector) SetInstances(ts ...*RDSPgTestInstance) {
 	insts := make([]*qanRdsPgInstance, len(ts))

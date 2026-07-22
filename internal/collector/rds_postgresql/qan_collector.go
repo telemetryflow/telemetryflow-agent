@@ -22,12 +22,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
 )
+
+// PgxQuerier is the minimal query surface the collect* functions depend on.
+// Both *pgxpool.Pool and pgxmock's mock pool satisfy this interface, which lets
+// the query-scanning paths be exercised without a live database.
+type PgxQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 // QANRDSPostgreSQLCollector collects query analytics from pg_stat_statements
 // on Amazon RDS PostgreSQL with delta calculation.
@@ -152,7 +161,13 @@ func (c *QANRDSPostgreSQLCollector) collectInstance(ctx context.Context, inst *q
 	if err != nil {
 		return nil, err
 	}
+	return c.collectQANBuckets(ctx, pool, inst)
+}
 
+// collectQANBuckets runs the pg_stat_statements query-scanning body against the
+// supplied querier and computes delta buckets. It is separated from
+// collectInstance so the scan/delta path can be exercised with a mock pool.
+func (c *QANRDSPostgreSQLCollector) collectQANBuckets(ctx context.Context, pool PgxQuerier, inst *qanRdsPgInstance) ([]qan.QANMetricsBucket, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 

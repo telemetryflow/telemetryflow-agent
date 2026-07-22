@@ -122,6 +122,68 @@ func TestCollectCPUMetrics(t *testing.T) {
 	}
 }
 
+func TestCollectCPUMetrics_PercpuFallback(t *testing.T) {
+	// OnlineCPUs == 0 forces fallback to len(PercpuUsage).
+	stats := containertypes.StatsResponse{
+		CPUStats: containertypes.CPUStats{
+			CPUUsage:    containertypes.CPUUsage{TotalUsage: 2000000000, PercpuUsage: []uint64{1, 1}},
+			SystemUsage: 10000000000,
+			OnlineCPUs:  0,
+		},
+		PreCPUStats: containertypes.CPUStats{
+			CPUUsage:    containertypes.CPUUsage{TotalUsage: 1000000000},
+			SystemUsage: 8000000000,
+		},
+	}
+	metrics := docker.CollectCPUMetricsExported(&stats, map[string]string{})
+	online := findMetric(metrics, "container.cpu.online_cpus")
+	if online == nil || online.Value != 2 {
+		t.Errorf("online_cpus fallback = %+v, want 2", online)
+	}
+}
+
+func TestCollectCPUMetrics_SingleCPUFallbackNoPercent(t *testing.T) {
+	// OnlineCPUs and PercpuUsage both empty -> numCPUs defaults to 1.
+	// systemDelta == 0 -> no usage_percent metric emitted.
+	stats := containertypes.StatsResponse{
+		CPUStats: containertypes.CPUStats{
+			CPUUsage:    containertypes.CPUUsage{TotalUsage: 500},
+			SystemUsage: 8000000000,
+		},
+		PreCPUStats: containertypes.CPUStats{
+			CPUUsage:    containertypes.CPUUsage{TotalUsage: 100},
+			SystemUsage: 8000000000, // equal -> systemDelta 0
+		},
+	}
+	metrics := docker.CollectCPUMetricsExported(&stats, map[string]string{})
+	if findMetric(metrics, "container.cpu.usage_percent") != nil {
+		t.Error("usage_percent should be omitted when systemDelta <= 0")
+	}
+	online := findMetric(metrics, "container.cpu.online_cpus")
+	if online == nil || online.Value != 1 {
+		t.Errorf("online_cpus single fallback = %+v, want 1", online)
+	}
+}
+
+func TestCollectMemoryMetrics_NoLimit(t *testing.T) {
+	// Limit == 0 skips usage_percent; missing rss/cache skip those metrics.
+	stats := containertypes.StatsResponse{
+		MemoryStats: containertypes.MemoryStats{Usage: 1000, Limit: 0},
+	}
+	metrics := docker.CollectMemoryMetricsExported(&stats, map[string]string{})
+	if findMetric(metrics, "container.memory.usage_percent") != nil {
+		t.Error("usage_percent should be omitted when limit is 0")
+	}
+	if findMetric(metrics, "container.memory.rss") != nil {
+		t.Error("rss should be omitted when absent from stats")
+	}
+	// working_set falls back to usage when usage <= inactive_file.
+	ws := findMetric(metrics, "container.memory.working_set")
+	if ws == nil || ws.Value != 1000 {
+		t.Errorf("working_set fallback = %+v, want 1000", ws)
+	}
+}
+
 func TestCollectMemoryMetrics(t *testing.T) {
 	stats := newTestStatsResponse()
 	labels := map[string]string{"container_name": "web"}

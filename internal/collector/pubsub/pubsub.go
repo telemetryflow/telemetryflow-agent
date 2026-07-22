@@ -40,6 +40,13 @@ import (
 
 const collectorName = "pubsub"
 
+// Endpoint URLs are package-level vars so external tests can point them at an
+// httptest server. In production they retain their real Google API defaults.
+var (
+	oauthTokenURL     = "https://oauth2.googleapis.com/token"
+	monitoringBaseURL = "https://monitoring.googleapis.com"
+)
+
 // pubsubMetric maps a Cloud Monitoring metric type to its emitted suffix.
 type pubsubMetric struct {
 	metricType string
@@ -272,7 +279,7 @@ func getAccessToken(ctx context.Context, sa *serviceAccount) (string, error) {
 	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
 	form.Set("assertion", assertion)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/token", strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, oauthTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -357,7 +364,7 @@ type monitoringResponse struct {
 // Monitoring filters by a single metric.type.
 func queryMonitoring(ctx context.Context, projectID, token string, metrics []pubsubMetric, start, end time.Time) ([]monitoringTimeSeries, error) {
 	hc := &http.Client{Timeout: 30 * time.Second}
-	base := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries", projectID)
+	base := fmt.Sprintf("%s/v3/projects/%s/timeSeries", monitoringBaseURL, projectID)
 
 	var all []monitoringTimeSeries
 	for _, m := range metrics {
