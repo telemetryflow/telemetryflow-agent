@@ -18,6 +18,7 @@ package mongodb
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -50,6 +51,21 @@ func NewTestInstance(name string) *TestInstance {
 		},
 	}
 }
+
+// SetPrevTime seeds the per-instance prevTime so rate/window branches that
+// depend on a prior snapshot can be exercised without a network connection.
+func (ti *TestInstance) SetPrevTime(t time.Time) { ti.inst.prevTime = t }
+
+// SetDiscovered seeds the database discovery cache so the cached-hit branch of
+// discoverDatabases can be exercised.
+func (ti *TestInstance) SetDiscovered(dbs []string, at time.Time) {
+	ti.inst.discoveredDBs = dbs
+	ti.inst.discoveredAt = at
+}
+
+// CanonicalizeExported exposes the internal canonicalize helper so its default
+// (non-string/map/slice) branch can be exercised directly.
+func CanonicalizeExported(v interface{}) string { return canonicalize(v) }
 
 // CollectServerStatusExported drives collectServerStatus through the fake API.
 func CollectServerStatusExported(ctx context.Context, api MongoAPI, labels map[string]string) ([]collector.Metric, error) {

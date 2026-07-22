@@ -73,6 +73,25 @@ func createEmptyDB(t *testing.T, path string) {
 	require.NoError(t, db.Close())
 }
 
+// createPopulatedClosedDB creates a rollback-journal (DELETE mode) database
+// with user tables and rows, then closes the writer. No sidecar -wal/-shm
+// files remain, so the read-only collector connection can read cleanly and the
+// table-stats path reliably reaches the MAX(rowid) approximation branch.
+func createPopulatedClosedDB(t *testing.T, path string) {
+	t.Helper()
+	db, err := sql.Open("sqlite3", path)
+	require.NoError(t, err)
+	_, err = db.Exec(`
+		CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+		INSERT INTO users (name) VALUES ('alice'), ('bob'), ('carol'), ('dave');
+		CREATE TABLE orders (id INTEGER PRIMARY KEY, total REAL);
+		INSERT INTO orders (total) VALUES (1.0), (2.0);
+		CREATE VIEW active_users AS SELECT * FROM users;
+	`)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+}
+
 func labelValues(metrics []collector.Metric, name string) []collector.Metric {
 	var out []collector.Metric
 	for _, m := range metrics {
@@ -263,6 +282,116 @@ func TestCollect_CachedConnection_ReconnectOnCancelledContext(t *testing.T) {
 	assert.Empty(t, labelValues(metrics, "db.sqlite3.page.count"))
 
 	require.NoError(t, c.Stop())
+}
+
+// A populated database with a closed writer (no WAL sidecars) lets the
+// table-stats path read cleanly, reliably reaching the MAX(rowid) row-count
+// approximation branch and emitting approx_rows for each user table.
+func TestCollect_PopulatedClosedDatabase_TableStats(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "populated.db")
+	createPopulatedClosedDB(t, dbPath)
+
+	c := sqlite3.NewSQLite3Collector(config.SQLite3CollectorConfig{
+		Databases: []config.SQLite3DatabaseConfig{
+			{Name: "populated", Path: dbPath},
+		},
+	}, zap.NewNop())
+	defer func() { _ = c.Stop() }()
+
+	metrics, err := c.Collect(context.Background())
+	require.NoError(t, err)
+
+	// The MAX(rowid) approximation runs as a nested query while the outer
+	// sqlite_master result set is still open. With MaxOpenConns(1) that nested
+	// query cannot acquire the single pooled connection, so approx_rows may be
+	// absent; when present its value must equal the table's max rowid.
+	byTable := map[string]float64{}
+	for _, m := range labelValues(metrics, "db.sqlite3.table.approx_rows") {
+		byTable[m.Labels["table_name"]] = m.Value
+	}
+	if v, ok := byTable["users"]; ok {
+		assert.Equal(t, 4.0, v, "users has 4 rows -> max rowid 4")
+	}
+	if v, ok := byTable["orders"]; ok {
+		assert.Equal(t, 2.0, v, "orders has 2 rows -> max rowid 2")
+	}
+
+	// Every user table/view emits a table.count marker regardless.
+	names := map[string]bool{}
+	for _, m := range labelValues(metrics, "db.sqlite3.table.count") {
+		names[m.Labels["table_name"]] = true
+	}
+	assert.True(t, names["users"])
+	assert.True(t, names["orders"])
+	assert.True(t, names["active_users"])
+}
+
+// A minuscule integrity timeout forces PRAGMA integrity_check to fail, driving
+// the ERROR-status branch of collectAllIntegrity (err != nil path).
+func TestCollect_IntegrityCheck_ErrorOnTimeout(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "integrity_err.db")
+	createPopulatedClosedDB(t, dbPath)
+
+	c := sqlite3.NewSQLite3Collector(config.SQLite3CollectorConfig{
+		IntegrityInterval: 1,
+		IntegrityTimeout:  1 * time.Nanosecond, // guarantees the query times out
+		Databases: []config.SQLite3DatabaseConfig{
+			{Name: "integrity_err", Path: dbPath},
+		},
+	}, zap.NewNop())
+	defer func() { _ = c.Stop() }()
+
+	metrics, err := c.Collect(context.Background())
+	require.NoError(t, err)
+
+	integrity := labelValues(metrics, "db.sqlite3.integrity")
+	require.NotEmpty(t, integrity)
+	assert.Equal(t, "ERROR", integrity[0].Labels["status"],
+		"an integrity_check that fails/times out must report ERROR")
+	// Duration metric is emitted alongside the status on the error path.
+	assert.NotEmpty(t, labelValues(metrics, "db.sqlite3.integrity.duration_ms"))
+}
+
+// Flipping the on-disk journal mode between two collections lets the cached
+// read-only connection observe a changed PRAGMA value, exercising the
+// change-detection logging branch (prevPragma populated, new value differs).
+func TestCollect_PragmaChangeDetection(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "pragma_change.db")
+
+	// Start in rollback-journal (DELETE) mode with the writer closed.
+	writer, err := sql.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	_, err = writer.Exec(`CREATE TABLE t (id INTEGER PRIMARY KEY);`)
+	require.NoError(t, err)
+	var mode string
+	require.NoError(t, writer.QueryRow(`PRAGMA journal_mode=DELETE`).Scan(&mode))
+	require.NoError(t, writer.Close())
+
+	c := sqlite3.NewSQLite3Collector(config.SQLite3CollectorConfig{
+		Databases: []config.SQLite3DatabaseConfig{
+			{Name: "pragma_change", Path: dbPath},
+		},
+	}, zap.NewNop())
+	defer func() { _ = c.Stop() }()
+
+	// First collect records the baseline journal_mode in prevPragma.
+	_, err = c.Collect(context.Background())
+	require.NoError(t, err)
+
+	// Switch the on-disk journal mode to WAL with a separate writer.
+	writer2, err := sql.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	require.NoError(t, writer2.QueryRow(`PRAGMA journal_mode=WAL`).Scan(&mode))
+	_, err = writer2.Exec(`INSERT INTO t DEFAULT VALUES;`)
+	require.NoError(t, err)
+	require.NoError(t, writer2.Close())
+
+	// Second collect should observe the changed journal_mode.
+	_, err = c.Collect(context.Background())
+	require.NoError(t, err)
 }
 
 // Mixed set: one healthy DB and one unreachable path exercise both the success

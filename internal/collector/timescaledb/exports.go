@@ -47,6 +47,14 @@ func (c *TimescaleDBCollector) ForceBackoffAllExport() {
 	}
 }
 
+// EnsureConnectionNoBackoffExport invokes ensureConnection against an instance
+// that is NOT in back-off, so a config that fails pgxpool.ParseConfig exercises
+// the parse-error branch (advanceBackoff + error return) without any network.
+func (c *TimescaleDBCollector) EnsureConnectionNoBackoffExport(ctx context.Context, inst *TsdbInstanceExport) error {
+	_, err := c.ensureConnection(ctx, (*tsdbInstance)(inst))
+	return err
+}
+
 // EnsureConnectionExport invokes ensureConnection against an instance that is
 // already in back-off, covering the early back-off return without a live DB.
 func (c *TimescaleDBCollector) EnsureConnectionExport(ctx context.Context, inst *TsdbInstanceExport) error {

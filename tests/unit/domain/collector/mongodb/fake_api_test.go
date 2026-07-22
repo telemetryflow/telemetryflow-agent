@@ -38,6 +38,11 @@ type fakeAPI struct {
 	find map[string]cannedSlice
 	// aggregate results keyed by "db.coll" -> slice of docs.
 	aggregate map[string]cannedSlice
+	// aggregateSeq keyed by "db.coll" -> per-call results (call N returns
+	// element N, clamped to the last). Takes precedence over aggregate when set.
+	aggregateSeq map[string][]cannedSlice
+	// aggregateCalls tracks how many times each aggregateSeq key was invoked.
+	aggregateCalls map[string]int
 	// listCollections results keyed by "db".
 	listCollections map[string]cannedNames
 }
@@ -63,6 +68,8 @@ func newFakeAPI() *fakeAPI {
 		findOne:         map[string]cannedResult{},
 		find:            map[string]cannedSlice{},
 		aggregate:       map[string]cannedSlice{},
+		aggregateSeq:    map[string][]cannedSlice{},
+		aggregateCalls:  map[string]int{},
 		listCollections: map[string]cannedNames{},
 	}
 }
@@ -113,6 +120,18 @@ func (f *fakeAPI) Find(_ context.Context, db, coll string, _ interface{}, out in
 
 func (f *fakeAPI) Aggregate(_ context.Context, db, coll string, _ interface{}, out interface{}) error {
 	key := db + "." + coll
+	if seq, ok := f.aggregateSeq[key]; ok && len(seq) > 0 {
+		i := f.aggregateCalls[key]
+		f.aggregateCalls[key]++
+		if i >= len(seq) {
+			i = len(seq) - 1
+		}
+		res := seq[i]
+		if res.err != nil {
+			return res.err
+		}
+		return decodeSlice(res.docs, out)
+	}
 	res, ok := f.aggregate[key]
 	if !ok {
 		return fmt.Errorf("fakeAPI: no canned Aggregate for %q", key)
