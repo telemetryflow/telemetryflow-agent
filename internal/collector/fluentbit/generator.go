@@ -194,9 +194,12 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	}
 
 	// ── [OUTPUT] opentelemetry — push to TFO Platform ───────────────────
-	host, port, tls, err := parseEndpoint(tfCfg.Endpoint)
+	// Prefer the configured OTLP logs endpoint so logs land on the same host and
+	// API version as metrics and traces. Falls back to telemetryflow.endpoint with
+	// the OTEL-standard /v1/logs path when unset, preserving prior behaviour.
+	host, port, tls, logsURI, err := resolveLogsOutput(cfg.LogsEndpoint, tfCfg.Endpoint)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to parse TelemetryFlow endpoint: %w", err)
+		return "", "", err
 	}
 
 	b.WriteString("[OUTPUT]\n")
@@ -204,7 +207,7 @@ func GenerateConfig(cfg config.FluentBitCollectorConfig, tfCfg config.TelemetryF
 	b.WriteString("    match             *\n")
 	fmt.Fprintf(&b, "    host              %s\n", host)
 	fmt.Fprintf(&b, "    port              %s\n", port)
-	b.WriteString("    logs_uri          /v1/logs\n")
+	fmt.Fprintf(&b, "    logs_uri          %s\n", logsURI)
 
 	if tls {
 		b.WriteString("    tls               on\n")
@@ -263,8 +266,35 @@ func WriteConfigs(configDir, conf, parsers string) error {
 	return nil
 }
 
-// parseEndpoint extracts host, port, and TLS flag from an endpoint string.
-// Supports formats: "host:port", "https://host:port", "grpc://host:port"
+// resolveLogsOutput determines the [OUTPUT] target for logs.
+//
+// When logsEndpoint is set (from exporter.otlp.logs.endpoint) its host, port,
+// scheme and path are used verbatim — this is what routes logs to the TFO
+// Platform's authenticated /v2/logs ingestion. When it is empty, the agent falls
+// back to the TelemetryFlow endpoint with the OTEL community /v1/logs path.
+func resolveLogsOutput(logsEndpoint, tfEndpoint string) (host, port string, tls bool, logsURI string, err error) {
+	if logsEndpoint == "" {
+		host, port, tls, err = parseEndpoint(tfEndpoint)
+		if err != nil {
+			return "", "", false, "", fmt.Errorf("failed to parse TelemetryFlow endpoint: %w", err)
+		}
+		return host, port, tls, "/v1/logs", nil
+	}
+
+	host, port, tls, err = parseEndpoint(logsEndpoint)
+	if err != nil {
+		return "", "", false, "", fmt.Errorf("failed to parse OTLP logs endpoint: %w", err)
+	}
+
+	// Extract the path; parseEndpoint intentionally discards it.
+	logsURI = "/v1/logs"
+	if u, parseErr := url.Parse(logsEndpoint); parseErr == nil && u.Path != "" && u.Path != "/" {
+		logsURI = u.Path
+	}
+
+	return host, port, tls, logsURI, nil
+}
+
 func parseEndpoint(endpoint string) (host, port string, tls bool, err error) {
 	if endpoint == "" {
 		return "localhost", "4318", false, nil

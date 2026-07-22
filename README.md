@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/badge/Version-1.2.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![Coverage](https://img.shields.io/badge/Coverage-61%25-yellow.svg)](CHANGELOG.md)
+[![Coverage](https://img.shields.io/badge/Coverage-60.3%25-yellow.svg)](CHANGELOG.md)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -61,7 +61,7 @@ graph LR
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
 | **TFO-Agent**     | v1.2.2  | SDK v1.43.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.2.1  | SDK v1.43.0        | Go instrumentation SDK      |
+| **TFO-Go-SDK**    | v1.2.2  | SDK v1.43.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.2.0  | Collector v0.151.0 | Central telemetry collector |
 
 ## Features
@@ -146,7 +146,7 @@ docker build \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.1.8 .
+  -t telemetryflow/telemetryflow-agent:1.2.2 .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -156,7 +156,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.1.8
+  telemetryflow/telemetryflow-agent:1.2.2
 ```
 
 ### OTEL Collector Ports

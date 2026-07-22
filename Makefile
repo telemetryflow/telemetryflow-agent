@@ -39,6 +39,13 @@ GOMOD := $(GOCMD) mod
 GORUN := $(GOCMD) run
 GOINSTALL := $(GOCMD) install
 
+# Coverage configuration
+# COVERPKG instruments the real source packages; unit tests live in external
+# packages (tests/unit/...), so without it the profile has "[no statements]".
+COVERPKG := ./internal/...,./pkg/...
+# Minimum total statement coverage required by `make coverage-check`.
+COVERAGE_THRESHOLD ?= 95
+
 # =============================================================================
 # Build Flags (uses internal/version package)
 # =============================================================================
@@ -78,7 +85,7 @@ NC := \033[0m
 	validate-config \
 	install uninstall \
 	ci ci-lint ci-test ci-build ci-release \
-	security govulncheck coverage-merge coverage-report \
+	security govulncheck coverage-merge coverage-report coverage-check \
 	test-unit-ci test-integration-ci test-e2e-ci \
 	docker docker-build docker-push docker-run \
 	deploy-k8s undeploy-k8s \
@@ -278,12 +285,12 @@ test: test-unit test-integration
 ## Run unit tests only
 test-unit:
 	@echo "$(GREEN)Running unit tests...$(NC)"
-	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-unit.out ./tests/unit/...
+	@$(GOTEST) -v -timeout 5m -coverpkg=$(COVERPKG) -coverprofile=coverage-unit.out ./tests/unit/...
 
 ## Run integration tests only
 test-integration:
 	@echo "$(GREEN)Running integration tests...$(NC)"
-	@$(GOTEST) -v -timeout 5m -coverprofile=coverage-integration.out ./tests/integration/...
+	@$(GOTEST) -v -timeout 5m -coverpkg=$(COVERPKG) -coverprofile=coverage-integration.out ./tests/integration/...
 
 ## Run E2E tests only
 test-e2e:
@@ -535,18 +542,34 @@ ci-lint: deps-verify fmt-check vet staticcheck security
 	@echo "$(GREEN)CI lint pipeline completed$(NC)"
 
 ## CI: Complete test pipeline
-ci-test: test-unit-ci test-integration-ci
+ci-test: test-unit-ci coverage-check test-integration-ci
 	@echo "$(GREEN)CI test pipeline completed$(NC)"
 
 ## CI: Run unit tests with race detection and coverage
 test-unit-ci:
 	@echo "$(GREEN)Running unit tests (CI mode with race detection)...$(NC)"
-	@$(GOTEST) -v -race -timeout 10m -coverprofile=coverage-unit.out -covermode=atomic ./tests/unit/...
+	@$(GOTEST) -v -race -timeout 10m -coverpkg=$(COVERPKG) -coverprofile=coverage-unit.out -covermode=atomic ./tests/unit/...
 
 ## CI: Run integration tests with race detection and coverage
 test-integration-ci:
 	@echo "$(GREEN)Running integration tests (CI mode)...$(NC)"
-	@$(GOTEST) -v -race -timeout 10m -coverprofile=coverage-integration.out -covermode=atomic ./tests/integration/...
+	@$(GOTEST) -v -race -timeout 10m -coverpkg=$(COVERPKG) -coverprofile=coverage-integration.out -covermode=atomic ./tests/integration/...
+
+## CI: Fail if total statement coverage is below COVERAGE_THRESHOLD (default 95%)
+coverage-check:
+	@echo "$(GREEN)Checking coverage threshold ($(COVERAGE_THRESHOLD)%)...$(NC)"
+	@if [ ! -f coverage-unit.out ]; then \
+		echo "$(RED)coverage-unit.out not found — run 'make test-unit-ci' first$(NC)"; exit 1; \
+	fi
+	@COVERAGE=$$($(GOCMD) tool cover -func=coverage-unit.out | awk '/^total:/ {print $$3}' | tr -d '%'); \
+	if [ -z "$$COVERAGE" ]; then \
+		echo "$(RED)Could not determine total coverage from coverage-unit.out$(NC)"; exit 1; \
+	fi; \
+	echo "Total coverage: $$COVERAGE% (threshold $(COVERAGE_THRESHOLD)%)"; \
+	if awk "BEGIN{exit !($$COVERAGE < $(COVERAGE_THRESHOLD))}"; then \
+		echo "$(RED)Coverage $$COVERAGE% is below threshold $(COVERAGE_THRESHOLD)%$(NC)"; exit 1; \
+	fi; \
+	echo "$(GREEN)Coverage $$COVERAGE% meets threshold $(COVERAGE_THRESHOLD)%$(NC)"
 
 ## CI: Run E2E tests
 test-e2e-ci:

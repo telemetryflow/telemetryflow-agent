@@ -4,30 +4,28 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectCollStats(ctx context.Context, client *mongo.Client, inst *mongoInstance, baseLabels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectCollStats(ctx context.Context, api mongoAPI, inst *mongoInstance, baseLabels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var all []collector.Metric
 	prefix := "db.mongodb."
 
 	// Discover databases
-	dbs, err := discoverDatabases(ctx, client, inst)
+	dbs, err := discoverDatabases(ctx, api, inst)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, dbName := range dbs {
-		db := client.Database(dbName)
 		dbLabels := copyLabels(baseLabels)
 		dbLabels["database"] = dbName
 
 		// dbStats
 		var dbStats bson.M
-		if err := db.RunCommand(ctx, bson.D{{Key: "dbStats", Value: 1}}).Decode(&dbStats); err == nil {
+		if err := api.RunCommand(ctx, dbName, bson.D{{Key: "dbStats", Value: 1}}, &dbStats); err == nil {
 			all = append(all,
 				gauge(prefix+"database.document_count", asFloat(dbStats["objects"]), dbLabels),
 				gauge(prefix+"database.data_size_bytes", asFloat(dbStats["dataSize"]), dbLabels),
@@ -39,7 +37,7 @@ func collectCollStats(ctx context.Context, client *mongo.Client, inst *mongoInst
 		}
 
 		// List collections
-		collections, err := db.ListCollectionNames(ctx, bson.D{})
+		collections, err := api.ListCollectionNames(ctx, dbName, bson.D{})
 		if err != nil {
 			continue
 		}
@@ -49,9 +47,9 @@ func collectCollStats(ctx context.Context, client *mongo.Client, inst *mongoInst
 			collLabels["collection"] = collName
 
 			var collStats bson.M
-			if err := db.RunCommand(ctx, bson.D{
+			if err := api.RunCommand(ctx, dbName, bson.D{
 				{Key: "collStats", Value: collName},
-			}).Decode(&collStats); err != nil {
+			}, &collStats); err != nil {
 				continue
 			}
 
@@ -79,15 +77,10 @@ func collectCollStats(ctx context.Context, client *mongo.Client, inst *mongoInst
 			}
 
 			// Per-index stats via $indexStats
-			coll := db.Collection(collName)
-			cursor, err := coll.Aggregate(ctx, bson.A{
-				bson.D{{Key: "$indexStats", Value: bson.M{}}},
-			})
-			if err != nil {
-				continue
-			}
 			var indexStats []bson.M
-			if err := cursor.All(ctx, &indexStats); err != nil {
+			if err := api.Aggregate(ctx, dbName, collName, bson.A{
+				bson.D{{Key: "$indexStats", Value: bson.M{}}},
+			}, &indexStats); err != nil {
 				continue
 			}
 			for _, idx := range indexStats {
@@ -113,14 +106,14 @@ func collectCollStats(ctx context.Context, client *mongo.Client, inst *mongoInst
 	return all, nil
 }
 
-func discoverDatabases(ctx context.Context, client *mongo.Client, inst *mongoInstance) ([]string, error) {
+func discoverDatabases(ctx context.Context, api mongoAPI, inst *mongoInstance) ([]string, error) {
 	// Use cached discovery if fresh (< collstats_interval)
 	if len(inst.discoveredDBs) > 0 && !inst.discoveredAt.IsZero() {
 		return inst.discoveredDBs, nil
 	}
 
 	var result bson.M
-	if err := client.Database("admin").RunCommand(ctx, bson.D{{Key: "listDatabases", Value: 1}}).Decode(&result); err != nil {
+	if err := api.RunCommand(ctx, "admin", bson.D{{Key: "listDatabases", Value: 1}}, &result); err != nil {
 		return nil, err
 	}
 

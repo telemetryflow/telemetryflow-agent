@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -15,11 +14,11 @@ import (
 // collectQueryMetrics queries system.profile for all queries (not just slow),
 // aggregates by fingerprint, computes rates from previous snapshot,
 // and emits per-fingerprint metrics for QAN consumption.
-func collectQueryMetrics(ctx context.Context, client *mongo.Client, inst *mongoInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectQueryMetrics(ctx context.Context, api mongoAPI, inst *mongoInstance, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	prefix := "db.mongodb.query."
 	var all []collector.Metric
 
-	dbs, err := discoverDatabases(ctx, client, inst)
+	dbs, err := discoverDatabases(ctx, api, inst)
 	if err != nil {
 		return nil, err
 	}
@@ -39,11 +38,9 @@ func collectQueryMetrics(ctx context.Context, client *mongo.Client, inst *mongoI
 	fingerprintAgg := map[string]*fpAggEntry{}
 
 	for _, dbName := range dbs {
-		db := client.Database(dbName)
-
 		// Check if profiler is enabled (level >= 1)
 		var profileResult bson.M
-		if err := db.RunCommand(ctx, bson.D{{Key: "profile", Value: -1}}).Decode(&profileResult); err != nil {
+		if err := api.RunCommand(ctx, dbName, bson.D{{Key: "profile", Value: -1}}, &profileResult); err != nil {
 			logger.Debug("Cannot read profiler status",
 				zap.String("instance", inst.config.Name),
 				zap.String("database", dbName),
@@ -59,18 +56,16 @@ func collectQueryMetrics(ctx context.Context, client *mongo.Client, inst *mongoI
 			continue
 		}
 
-		coll := db.Collection("system.profile")
-
 		// Query recent entries since last collection
 		since := time.Now().Add(-60 * time.Second)
 		if !inst.prevTime.IsZero() {
 			since = inst.prevTime
 		}
 
-		cursor, err := coll.Find(ctx, bson.D{
+		var profileDocs []bson.M
+		if err := api.Find(ctx, dbName, "system.profile", bson.D{
 			{Key: "ts", Value: bson.D{{Key: "$gte", Value: since}}},
-		})
-		if err != nil {
+		}, &profileDocs); err != nil {
 			logger.Debug("Cannot query system.profile",
 				zap.String("instance", inst.config.Name),
 				zap.String("database", dbName),
@@ -78,13 +73,6 @@ func collectQueryMetrics(ctx context.Context, client *mongo.Client, inst *mongoI
 			)
 			continue
 		}
-
-		var profileDocs []bson.M
-		if err := cursor.All(ctx, &profileDocs); err != nil {
-			_ = cursor.Close(ctx)
-			continue
-		}
-		_ = cursor.Close(ctx)
 
 		for _, doc := range profileDocs {
 			queryDoc, _ := doc["query"].(map[string]interface{})

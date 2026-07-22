@@ -5,17 +5,14 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectReplication(ctx context.Context, client *mongo.Client, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
-	admin := client.Database("admin")
-
+func collectReplication(ctx context.Context, api mongoAPI, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	var rsStatus bson.M
-	if err := admin.RunCommand(ctx, bson.D{{Key: "replSetGetStatus", Value: 1}}).Decode(&rsStatus); err != nil {
+	if err := api.RunCommand(ctx, "admin", bson.D{{Key: "replSetGetStatus", Value: 1}}, &rsStatus); err != nil {
 		// Error code 76 = Not running with --replSet (standalone)
 		return nil, err
 	}
@@ -69,7 +66,7 @@ func collectReplication(ctx context.Context, client *mongo.Client, labels map[st
 	}
 
 	// Oplog metrics
-	oplogMetrics, err := collectOplogMetrics(ctx, client, labels)
+	oplogMetrics, err := collectOplogMetrics(ctx, api, labels)
 	if err != nil {
 		logger.Debug("Oplog metrics collection skipped", zap.Error(err))
 	} else {
@@ -79,14 +76,12 @@ func collectReplication(ctx context.Context, client *mongo.Client, labels map[st
 	return all, nil
 }
 
-func collectOplogMetrics(ctx context.Context, client *mongo.Client, labels map[string]string) ([]collector.Metric, error) {
-	localDB := client.Database("local")
-
+func collectOplogMetrics(ctx context.Context, api mongoAPI, labels map[string]string) ([]collector.Metric, error) {
 	// Get oplog stats
 	var stats bson.M
-	if err := localDB.RunCommand(ctx, bson.D{
+	if err := api.RunCommand(ctx, "local", bson.D{
 		{Key: "collStats", Value: "oplog.rs"},
-	}).Decode(&stats); err != nil {
+	}, &stats); err != nil {
 		// Try alternative approach
 		return nil, err
 	}
@@ -113,23 +108,13 @@ func collectOplogMetrics(ctx context.Context, client *mongo.Client, labels map[s
 		bson.D{{Key: "$project", Value: bson.D{{Key: "ts", Value: 1}}}},
 	}
 
-	oplogCol := localDB.Collection("oplog.rs")
-
-	cursor, err := oplogCol.Aggregate(ctx, firstPipeline)
-	if err != nil {
-		return all, nil
-	}
 	var first []bson.M
-	if err := cursor.All(ctx, &first); err != nil || len(first) == 0 {
+	if err := api.Aggregate(ctx, "local", "oplog.rs", firstPipeline, &first); err != nil || len(first) == 0 {
 		return all, nil
 	}
 
-	cursor2, err := oplogCol.Aggregate(ctx, lastPipeline)
-	if err != nil {
-		return all, nil
-	}
 	var last []bson.M
-	if err := cursor2.All(ctx, &last); err != nil || len(last) == 0 {
+	if err := api.Aggregate(ctx, "local", "oplog.rs", lastPipeline, &last); err != nil || len(last) == 0 {
 		return all, nil
 	}
 

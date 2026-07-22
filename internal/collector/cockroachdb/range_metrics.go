@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
 
-func collectRangeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+func collectRangeMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -46,7 +45,7 @@ func collectRangeMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[str
 	return metrics, nil
 }
 
-func collectLeaseholderMetrics(ctx context.Context, pool *pgxpool.Pool, labels map[string]string) ([]collector.Metric, error) {
+func collectLeaseholderMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT
 			lease_holder,

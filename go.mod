@@ -178,6 +178,7 @@ require (
 	github.com/gosnmp/gosnmp v1.44.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/microsoft/go-mssqldb v1.10.0
+	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/prometheus/prometheus v0.313.1
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 	modernc.org/sqlite v1.23.1

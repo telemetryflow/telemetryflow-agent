@@ -54,6 +54,11 @@ type KubernetesCollector struct {
 	// Last collected cluster state (for sync to backend)
 	lastState *ClusterState
 
+	// lastMetricsSource records the usage-metrics data source used on the
+	// previous collection (metrics_api | kubelet_fallback | unavailable) so
+	// the fallback path is logged only on transition, not every tick.
+	lastMetricsSource string
+
 	// kubeletFetcher retrieves /stats/summary from each node's kubelet.
 	// nil means network collection is skipped (e.g. in unit tests).
 	kubeletFetcher KubeletProxyFunc

@@ -146,19 +146,20 @@ func (c *MongoDBCollector) collectInstance(ctx context.Context, inst *mongoInsta
 	if err != nil {
 		return nil, err
 	}
+	api := newClientAPI(client)
 
 	labels := instanceLabels(inst)
 	var all []collector.Metric
 
 	// serverStatus metrics
-	if m, err := collectServerStatus(ctx, client, labels, c.logger); err != nil {
+	if m, err := collectServerStatus(ctx, api, labels, c.logger); err != nil {
 		c.logger.Debug("serverStatus collection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, m...)
 	}
 
 	// WiredTiger detail metrics
-	if m, err := collectWiredTiger(ctx, client, labels, c.logger); err != nil {
+	if m, err := collectWiredTiger(ctx, api, labels, c.logger); err != nil {
 		c.logger.Debug("WiredTiger collection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, m...)
@@ -166,7 +167,7 @@ func (c *MongoDBCollector) collectInstance(ctx context.Context, inst *mongoInsta
 
 	// Replication metrics (only for replica sets)
 	if inst.isReplicaSet {
-		if m, err := collectReplication(ctx, client, labels, c.logger); err != nil {
+		if m, err := collectReplication(ctx, api, labels, c.logger); err != nil {
 			c.logger.Debug("Replication collection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 		} else {
 			all = append(all, m...)
@@ -175,7 +176,7 @@ func (c *MongoDBCollector) collectInstance(ctx context.Context, inst *mongoInsta
 
 	// Sharding metrics (only for mongos)
 	if inst.isSharded {
-		if m, err := collectSharding(ctx, client, labels, c.logger); err != nil {
+		if m, err := collectSharding(ctx, api, labels, c.logger); err != nil {
 			c.logger.Debug("Sharding collection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 		} else {
 			all = append(all, m...)
@@ -183,14 +184,14 @@ func (c *MongoDBCollector) collectInstance(ctx context.Context, inst *mongoInsta
 	}
 
 	// Current operations (db.currentOp)
-	if m, err := collectCurrentOp(ctx, client, labels, c.logger); err != nil {
+	if m, err := collectCurrentOp(ctx, api, labels, c.logger); err != nil {
 		c.logger.Debug("currentOp collection skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, m...)
 	}
 
 	// Slow query profiler (system.profile)
-	if m, err := collectSlowQueries(ctx, client, inst, labels, c.logger); err != nil {
+	if m, err := collectSlowQueries(ctx, api, inst, labels, c.logger); err != nil {
 		c.logger.Debug("Slow query profiler skipped", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
 		all = append(all, m...)
@@ -218,7 +219,7 @@ func (c *MongoDBCollector) collectAllQueryMetrics(ctx context.Context) ([]collec
 		if err != nil {
 			continue
 		}
-		metrics, err := collectQueryMetrics(ctx, client, inst, instanceLabels(inst), c.logger)
+		metrics, err := collectQueryMetrics(ctx, newClientAPI(client), inst, instanceLabels(inst), c.logger)
 		if err != nil {
 			c.logger.Warn("Query metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
 			continue
@@ -235,7 +236,7 @@ func (c *MongoDBCollector) collectAllCollStats(ctx context.Context) ([]collector
 		if err != nil {
 			continue
 		}
-		metrics, err := collectCollStats(ctx, client, inst, instanceLabels(inst), c.logger)
+		metrics, err := collectCollStats(ctx, newClientAPI(client), inst, instanceLabels(inst), c.logger)
 		if err != nil {
 			c.logger.Warn("CollStats failed", zap.String("instance", inst.config.Name), zap.Error(err))
 			continue

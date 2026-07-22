@@ -160,6 +160,7 @@ data:
         pv_io_stats: true                 # PV usage + IOPS from Kubelet volume stats
         sync_to_backend: true
         sync_interval: 60s
+        sync_timeout: 50s    # per-request POST deadline; raise for large clusters
         cluster_name: ""     # auto-detected from CLUSTER_NAME env or hostname
         cluster_provider: "" # auto-detected from env/filesystem heuristics
         # cluster_id is auto-registered on startup (find-or-create)

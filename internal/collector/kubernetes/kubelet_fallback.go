@@ -23,6 +23,7 @@ package kubernetes
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -72,24 +73,57 @@ func init() {
 // was used, and adds a metrics_source="kubelet" label to all metrics produced
 // via the fallback path.
 func collectUsageMetricsWithFallback(ctx context.Context, k *KubernetesCollector) ([]collector.Metric, error) {
+	// metricsAPIErr carries the reason the metrics-server path was rejected, so
+	// it can be logged as the cause when the source transitions to fallback.
+	var metricsAPIErr error
 	if k.cfg.MetricsAPI && k.metricsClient != nil {
 		metrics, err := tryMetricsAPI(ctx, k)
 		if err == nil {
-			k8sMetricsSourceGauge.WithLabelValues(sourceMetricsAPI).Set(1)
+			k.setMetricsSource(sourceMetricsAPI, nil)
 			return metrics, nil
 		}
-		k.logger.Warn("metrics-server unavailable, falling back to kubelet", zap.Error(err))
+		metricsAPIErr = err
 	}
 
 	// Fallback: collect directly from each node's Kubelet.
 	metrics, err := collectFromKubelet(ctx, k)
 	if err != nil {
-		k8sMetricsSourceGauge.WithLabelValues(sourceUnavailable).Set(1)
+		k.setMetricsSource(sourceUnavailable, err)
 		return nil, err
 	}
 
-	k8sMetricsSourceGauge.WithLabelValues(sourceKubeletFallback).Set(1)
+	k.setMetricsSource(sourceKubeletFallback, metricsAPIErr)
 	return metrics, nil
+}
+
+// setMetricsSource records the active usage-metrics source, updates the
+// self-observability gauge, and emits a Warn only when the source changes so a
+// persistently missing metrics-server does not spam a log line every cycle.
+func (k *KubernetesCollector) setMetricsSource(source string, cause error) {
+	k.mu.Lock()
+	changed := k.lastMetricsSource != source
+	k.lastMetricsSource = source
+	k.mu.Unlock()
+
+	if changed {
+		switch source {
+		case sourceKubeletFallback:
+			k.logger.Warn("metrics-server unavailable, falling back to kubelet", zap.Error(cause))
+		case sourceUnavailable:
+			k.logger.Warn("usage metrics unavailable from both metrics-server and kubelet", zap.Error(cause))
+		case sourceMetricsAPI:
+			k.logger.Info("usage metrics now sourced from metrics-server")
+		}
+	}
+
+	// Keep exactly one gauge series set to 1.
+	for _, s := range []string{sourceMetricsAPI, sourceKubeletFallback, sourceUnavailable} {
+		val := 0.0
+		if s == source {
+			val = 1.0
+		}
+		k8sMetricsSourceGauge.WithLabelValues(s).Set(val)
+	}
 }
 
 // tryMetricsAPI fetches node and pod usage metrics from the metrics.k8s.io API.
@@ -97,9 +131,14 @@ func collectUsageMetricsWithFallback(ctx context.Context, k *KubernetesCollector
 func tryMetricsAPI(ctx context.Context, k *KubernetesCollector) ([]collector.Metric, error) {
 	cluster := k.cfg.ClusterName
 
-	nodeMetricsMap := fetchNodeMetrics(ctx, k.metricsClient, k.logger)
+	nodeMetricsMap, err := fetchNodeMetrics(ctx, k.metricsClient, k.logger)
+	if err != nil {
+		// Surface the underlying reason (RBAC, APIService unavailable, not
+		// installed) instead of a generic "no data" error.
+		return nil, fmt.Errorf("%w: %v", errMetricsServerUnavailable, err)
+	}
 	if len(nodeMetricsMap) == 0 {
-		// fetchNodeMetrics swallows errors; treat empty result as unavailable.
+		// API reachable but returned zero nodes; still treat as unavailable.
 		return nil, errMetricsServerUnavailable
 	}
 

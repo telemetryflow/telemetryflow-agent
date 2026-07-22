@@ -266,6 +266,9 @@ collectors:
     # Sync resource state to TFO backend (populates PostgreSQL K8s entities)
     sync_to_backend: true
     sync_interval: 60s
+    # Per-request deadline for a single state-sync POST (keep below sync_interval).
+    # Raise if large clusters hit "context deadline exceeded" during sync.
+    sync_timeout: 50s
     # Cluster metadata (auto-detected if empty)
     cluster_name: ""
     cluster_provider: "" # eks, gke, aks, k3s, self-managed, etc.

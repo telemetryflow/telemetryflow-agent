@@ -133,7 +133,13 @@ func (c *QANCockroachDBCollector) collectInstance(ctx context.Context, inst *qan
 	if err != nil {
 		return nil, err
 	}
+	return c.collectInstanceRows(ctx, pool, inst)
+}
 
+// collectInstanceRows runs the statement-statistics query against pool and
+// builds QAN buckets. It is split from collectInstance so the scanning logic
+// can be unit-tested against a mock querier.
+func (c *QANCockroachDBCollector) collectInstanceRows(ctx context.Context, pool PgxQuerier, inst *qanCrdbInstance) ([]qan.QANMetricsBucket, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 

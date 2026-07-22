@@ -1259,6 +1259,10 @@ type KubernetesCollectorConfig struct {
 	// SyncInterval is how often to sync resource state to backend
 	SyncInterval time.Duration `mapstructure:"sync_interval"`
 
+	// SyncTimeout is the per-request deadline for a single state-sync POST to
+	// the backend. Defaults to 50s (kept below the 60s SyncInterval) when unset.
+	SyncTimeout time.Duration `mapstructure:"sync_timeout"`
+
 	// ClusterName overrides auto-detected cluster name
 	ClusterName string `mapstructure:"cluster_name"`
 
@@ -1484,6 +1488,13 @@ type FluentBitCollectorConfig struct {
 
 	// FlushInterval is the output flush interval in seconds (default: 5)
 	FlushInterval int `mapstructure:"flush_interval"`
+
+	// LogsEndpoint is the full OTLP logs URL the [OUTPUT] section targets, e.g.
+	// https://api.example.com/v2/logs. Not read from the fluent_bit YAML block —
+	// it is populated at wiring time from exporter.otlp.logs.endpoint so logs follow
+	// the same endpoint as metrics and traces. When empty, the output falls back to
+	// telemetryflow.endpoint with the OTEL-standard /v1/logs path.
+	LogsEndpoint string `mapstructure:"-"`
 
 	// LogLevel is the Fluent Bit log verbosity (debug, info, warn, error; default: info)
 	LogLevel string `mapstructure:"log_level"`
@@ -2706,6 +2717,7 @@ func DefaultConfig() *Config {
 				NodeLogSources:    []string{"kubelet", "kube-proxy", "containerd"},
 				SyncToBackend:     true,
 				SyncInterval:      60 * time.Second,
+				SyncTimeout:       50 * time.Second,
 				ExcludeNamespaces: []string{"kube-system"},
 				ApiServerMetrics:  true,
 				CoreDNSMetrics:    true,

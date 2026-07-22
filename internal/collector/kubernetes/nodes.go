@@ -22,6 +22,7 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
@@ -52,7 +53,7 @@ func collectNodes(
 	// Pre-fetch metrics-server node metrics if enabled
 	var nodeMetricsMap map[string]nodeMetrics
 	if cfg.MetricsAPI && mc != nil {
-		nodeMetricsMap = fetchNodeMetrics(ctx, mc, logger)
+		nodeMetricsMap, _ = fetchNodeMetrics(ctx, mc, logger)
 	}
 
 	var metrics []collector.Metric
@@ -302,12 +303,12 @@ type nodeMetrics struct {
 	memoryBytes int64
 }
 
-func fetchNodeMetrics(ctx context.Context, mc metricsv.Interface, logger *zap.Logger) map[string]nodeMetrics {
+func fetchNodeMetrics(ctx context.Context, mc metricsv.Interface, logger *zap.Logger) (map[string]nodeMetrics, error) {
 	result := make(map[string]nodeMetrics)
 	nmList, err := mc.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		logger.Debug("Failed to fetch node metrics from metrics-server", zap.Error(err))
-		return result
+		return result, fmt.Errorf("list node metrics: %w", err)
 	}
 	for _, nm := range nmList.Items {
 		result[nm.Name] = nodeMetrics{
@@ -315,7 +316,7 @@ func fetchNodeMetrics(ctx context.Context, mc metricsv.Interface, logger *zap.Lo
 			memoryBytes: nm.Usage.Memory().Value(),
 		}
 	}
-	return result
+	return result, nil
 }
 
 func countPodsOnNode(ctx context.Context, cs kubernetes.Interface, nodeName string) int {
