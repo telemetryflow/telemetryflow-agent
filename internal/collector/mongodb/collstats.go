@@ -93,7 +93,7 @@ func collectCollStats(ctx context.Context, api mongoAPI, inst *mongoInstance, ba
 						counter(prefix+"index.accesses", asFloat(accesses["ops"]), idxLabels),
 					)
 					if since, ok := accesses["since"].(bson.DateTime); ok {
-						idxLabels["index_since"] = since.Time().Format("2006-01-02T15:04:05Z")
+						idxLabels["index_since"] = since.Time().UTC().Format("2006-01-02T15:04:05Z")
 					}
 				}
 				if size, ok := idx["size"]; ok {
