@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -28,6 +29,7 @@ type Server struct {
 	config    Config
 	clientset kubernetes.Interface
 	logger    *zap.Logger
+	mu        sync.Mutex // guards server
 	server    *http.Server
 	agent     AgentProvider
 }
@@ -84,20 +86,23 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("GET /api/v1/pods/{namespace}/{pod}/logs", s.handlePodLogs)
 
 	addr := fmt.Sprintf("0.0.0.0:%d", s.config.Port)
-	s.server = &http.Server{
+	srv := &http.Server{
 		Addr:         addr,
 		Handler:      s.authMiddleware(mux),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 0, // No timeout for SSE streaming
 		IdleTimeout:  120 * time.Second,
 	}
+	s.mu.Lock()
+	s.server = srv
+	s.mu.Unlock()
 
 	s.logger.Info("Agent API server starting", zap.String("addr", addr))
 
 	// Start server in goroutine, wait for context cancellation
 	errCh := make(chan error, 1)
 	go func() {
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
 	}()
@@ -112,13 +117,16 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Stop gracefully shuts down the server.
 func (s *Server) Stop() error {
-	if s.server == nil {
+	s.mu.Lock()
+	srv := s.server
+	s.mu.Unlock()
+	if srv == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	s.logger.Info("Agent API server shutting down")
-	return s.server.Shutdown(ctx)
+	return srv.Shutdown(ctx)
 }
 
 // Port returns the configured port.

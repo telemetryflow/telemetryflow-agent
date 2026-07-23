@@ -66,16 +66,22 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.running = true
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	ctx = m.ctx
+	// Snapshot the FSMs under the lock so concurrent ApplyDiff writes to
+	// m.fsms cannot race with the iteration below.
+	fsms := make([]*CollectorFSM, 0, len(m.fsms))
+	for _, fsm := range m.fsms {
+		fsms = append(fsms, fsm)
+	}
 	m.mu.Unlock()
 
-	for _, fsm := range m.fsms {
+	for _, fsm := range fsms {
 		go m.runFSM(ctx, fsm)
 	}
 
 	go m.runRetryLoop(ctx)
 
 	m.logger.Info("supervisor started",
-		zap.Int("collectors", len(m.fsms)),
+		zap.Int("collectors", len(fsms)),
 	)
 	return nil
 }

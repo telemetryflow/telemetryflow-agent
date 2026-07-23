@@ -246,7 +246,7 @@ func TestNewKubernetesDisabledEnv(t *testing.T) {
 // sync_to_backend auto-flip). The collector itself fails to construct outside a
 // cluster (warn+skip), leaving the agent valid.
 func TestNewKubernetesAutoDetect(t *testing.T) {
-	os.Unsetenv("TELEMETRYFLOW_K8S_ENABLED")
+	_ = os.Unsetenv("TELEMETRYFLOW_K8S_ENABLED")
 	t.Setenv("KUBERNETES_SERVICE_HOST", "10.0.0.1")
 
 	cfg := config.DefaultConfig()
@@ -482,7 +482,7 @@ func TestRunKubernetesRegistrationRetry(t *testing.T) {
 
 	// Wait for the retry goroutine to register (first backoff is 15s).
 	require.Eventually(t, func() bool {
-		return ag.Config().Collector.Kubernetes.ClusterID == "retry-uuid"
+		return ag.KubernetesClusterID() == "retry-uuid"
 	}, 25*time.Second, 250*time.Millisecond)
 
 	cancel()
@@ -562,7 +562,7 @@ func TestRunComponentError(t *testing.T) {
 	// Bind on all interfaces (":0") so the agent's ":port" server collides.
 	ln, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	occupiedPort := ln.Addr().(*net.TCPAddr).Port
 
 	cfg := config.DefaultConfig()
@@ -586,7 +586,7 @@ func TestRunComponentError(t *testing.T) {
 func TestRunAgentAPIError(t *testing.T) {
 	ln, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	occupiedPort := ln.Addr().(*net.TCPAddr).Port
 
 	cfg := config.DefaultConfig()

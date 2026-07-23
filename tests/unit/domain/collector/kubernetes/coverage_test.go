@@ -450,9 +450,9 @@ func richClientset() *fake.Clientset {
 			LoadBalancer: corev1.LoadBalancerStatus{Ingress: []corev1.LoadBalancerIngress{{IP: "203.0.113.5"}, {Hostname: "lb.example.com"}}},
 		},
 	}
-	endpoints := &corev1.Endpoints{
+	endpoints := &corev1.Endpoints{ //nolint:staticcheck // collector still consumes the v1 Endpoints API
 		ObjectMeta: metav1.ObjectMeta{Name: "app-svc", Namespace: "default"},
-		Subsets: []corev1.EndpointSubset{{
+		Subsets: []corev1.EndpointSubset{{ //nolint:staticcheck // collector still consumes the v1 Endpoints API
 			Addresses:         []corev1.EndpointAddress{{IP: "10.1.1.2", NodeName: strPtr2("node-a"), TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "rich-pod"}}},
 			NotReadyAddresses: []corev1.EndpointAddress{{IP: "10.1.1.3", NodeName: strPtr2("node-a"), TargetRef: &corev1.ObjectReference{Kind: "Pod", Name: "pending-pod"}}},
 			Ports:             []corev1.EndpointPort{{Name: "http", Port: 8080, Protocol: corev1.ProtocolTCP}},

@@ -945,7 +945,6 @@ func (a *Agent) Run(ctx context.Context) error {
 					)
 					continue
 				}
-				a.config.Collector.Kubernetes.ClusterID = regResp.ID
 				a.logger.Info("Kubernetes cluster registered (retry succeeded)",
 					zap.String("clusterID", regResp.ID),
 					zap.String("name", regResp.Name),
@@ -955,6 +954,7 @@ func (a *Agent) Run(ctx context.Context) error {
 					syncInterval = 60 * time.Second
 				}
 				a.mu.Lock()
+				a.config.Collector.Kubernetes.ClusterID = regResp.ID
 				a.k8sSync = exporter.NewKubernetesSync(exporter.KubernetesSyncConfig{
 					ClusterID: regResp.ID,
 					Interval:  syncInterval,
@@ -1333,6 +1333,15 @@ func (a *Agent) Config() *config.Config {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.config
+}
+
+// KubernetesClusterID returns the current Kubernetes cluster ID under the
+// agent lock. It exists so callers can observe the value that the background
+// registration-retry goroutine may mutate without racing on the field.
+func (a *Agent) KubernetesClusterID() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.config.Collector.Kubernetes.ClusterID
 }
 
 type agentProviderAdapter struct {

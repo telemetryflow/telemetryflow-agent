@@ -711,6 +711,51 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 		}
 	}
 
+	// Conntrack + sockstat from /proc (Linux only). Surfaced by the platform
+	// Network views (INF10021 conntrack, INF10022 sockstat).
+	if runtime.GOOS == "linux" {
+		if data, err := os.ReadFile("/proc/sys/net/netfilter/nf_conntrack_count"); err == nil {
+			info.ConntrackEntries = parseUint64(strings.TrimSpace(string(data)))
+		}
+		if data, err := os.ReadFile("/proc/sys/net/netfilter/nf_conntrack_max"); err == nil {
+			info.ConntrackLimit = parseUint64(strings.TrimSpace(string(data)))
+		}
+
+		// /proc/net/sockstat lines: "sockets: used N", "TCP: inuse A ... tw C ...", "UDP: inuse D ..."
+		if data, err := os.ReadFile("/proc/net/sockstat"); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) < 3 {
+					continue
+				}
+				switch fields[0] {
+				case "sockets:":
+					// sockets: used N
+					if fields[1] == "used" {
+						info.SockstatSocketsUsed = parseUint64(fields[2])
+					}
+				case "TCP:":
+					// TCP: inuse A orphan B tw C alloc D mem E
+					for i := 1; i+1 < len(fields); i += 2 {
+						switch fields[i] {
+						case "inuse":
+							info.SockstatTCPInuse = parseUint64(fields[i+1])
+						case "tw":
+							info.SockstatTCPTimeWait = parseUint64(fields[i+1])
+						}
+					}
+				case "UDP:":
+					// UDP: inuse D mem E
+					for i := 1; i+1 < len(fields); i += 2 {
+						if fields[i] == "inuse" {
+							info.SockstatUDPInuse = parseUint64(fields[i+1])
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Per-interface network info
 	netInterfaces, err := net.Interfaces()
 	if err == nil {

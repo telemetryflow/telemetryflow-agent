@@ -315,7 +315,7 @@ func TestCollectReplication_OplogLastEmpty(t *testing.T) {
 	f.runCommand["local|collStats"] = cannedResult{doc: bson.M{"size": int64(2048)}}
 	f.aggregateSeq["local.oplog.rs"] = []cannedSlice{
 		{docs: []bson.M{{"ts": bson.Timestamp{T: 100}}}}, // first
-		{docs: []bson.M{}},                               // last (empty)
+		{docs: []bson.M{}}, // last (empty)
 	}
 
 	metrics, err := mongodb.CollectReplicationExported(context.Background(), f, nil)
