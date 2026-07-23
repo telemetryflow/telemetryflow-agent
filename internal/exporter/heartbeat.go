@@ -388,6 +388,16 @@ func mapSystemInfoToPayload(info *collector.SystemInfo, tags, labels map[string]
 		TCPConnectionsClosing:     info.TCPConnectionsClosing,
 		TCPRetransmits:            info.TCPRetransmits,
 
+		// Conntrack (nf_conntrack table)
+		ConntrackEntries: info.ConntrackEntries,
+		ConntrackLimit:   info.ConntrackLimit,
+
+		// Sockstat (/proc/net/sockstat)
+		SockstatTCPInuse:    info.SockstatTCPInuse,
+		SockstatTCPTimeWait: info.SockstatTCPTimeWait,
+		SockstatUDPInuse:    info.SockstatUDPInuse,
+		SockstatSocketsUsed: info.SockstatSocketsUsed,
+
 		// Process Information
 		ProcessCount:    info.ProcessCount,
 		ProcessRunning:  info.ProcessRunning,

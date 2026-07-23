@@ -45,6 +45,10 @@ GOINSTALL := $(GOCMD) install
 COVERPKG := ./internal/...,./pkg/...
 # Minimum total statement coverage required by `make coverage-check`.
 COVERAGE_THRESHOLD ?= 95
+# Host OS, used to relax the coverage gate on platforms that cannot compile the
+# Linux-only collectors (e.g. darwin), where total coverage is structurally
+# lower. The gate stays strict on Linux and whenever CI is set.
+HOST_OS := $(shell uname -s)
 
 # =============================================================================
 # Build Flags (uses internal/version package)
@@ -567,6 +571,10 @@ coverage-check:
 	fi; \
 	echo "Total coverage: $$COVERAGE% (threshold $(COVERAGE_THRESHOLD)%)"; \
 	if awk "BEGIN{exit !($$COVERAGE < $(COVERAGE_THRESHOLD))}"; then \
+		if [ "$(HOST_OS)" != "Linux" ] && [ -z "$$CI" ]; then \
+			echo "$(YELLOW)Coverage $$COVERAGE% is below threshold $(COVERAGE_THRESHOLD)% — non-fatal on $(HOST_OS) (Linux-only collectors uncompiled); gate is enforced on Linux/CI$(NC)"; \
+			exit 0; \
+		fi; \
 		echo "$(RED)Coverage $$COVERAGE% is below threshold $(COVERAGE_THRESHOLD)%$(NC)"; exit 1; \
 	fi; \
 	echo "$(GREEN)Coverage $$COVERAGE% meets threshold $(COVERAGE_THRESHOLD)%$(NC)"

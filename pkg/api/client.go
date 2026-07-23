@@ -474,6 +474,16 @@ type SystemInfoPayload struct {
 	TCPConnectionsClosing     uint32 `json:"tcpConnectionsClosing,omitempty"`
 	TCPRetransmits            uint64 `json:"tcpRetransmits,omitempty"`
 
+	// Conntrack (nf_conntrack table) — Linux-only
+	ConntrackEntries uint64 `json:"conntrackEntries,omitempty"`
+	ConntrackLimit   uint64 `json:"conntrackLimit,omitempty"`
+
+	// Sockstat (/proc/net/sockstat) — Linux-only
+	SockstatTCPInuse    uint64 `json:"sockstatTcpInuse,omitempty"`
+	SockstatTCPTimeWait uint64 `json:"sockstatTcpTimeWait,omitempty"`
+	SockstatUDPInuse    uint64 `json:"sockstatUdpInuse,omitempty"`
+	SockstatSocketsUsed uint64 `json:"sockstatSocketsUsed,omitempty"`
+
 	// Per-interface metrics
 	NetworkInterfaces []NetworkInterfaceInfoPayload `json:"networkInterfaces,omitempty"`
 

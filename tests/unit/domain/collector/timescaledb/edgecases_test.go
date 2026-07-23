@@ -50,7 +50,7 @@ func TestResolveEnvVars_EnvSetAndNoDefault(t *testing.T) {
 		t.Errorf("expected resolved (env wins over default), got %q", got)
 	}
 	// Sanity: unset var with no default resolves to empty string.
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	if got := tsdb.ResolveEnvVarsExport("${" + key + "}"); got != "" {
 		t.Errorf("expected empty for unset no-default var, got %q", got)
 	}
