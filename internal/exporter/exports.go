@@ -19,10 +19,12 @@
 package exporter
 
 import (
+	"github.com/IBM/sarama"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
 )
 
 // Exported wrappers for unexported symbols, exposed for external test packages.
@@ -60,4 +62,28 @@ func BaseResourceAttrsExported() []attribute.KeyValue {
 type MetricPointExported struct {
 	M     collector.Metric
 	Attrs attribute.Set
+}
+
+// SaramaConfigExported returns the resolved sarama.Config that NewKafkaOutput
+// would use to build a producer. Tests use it to assert auth / compression /
+// acks settings without dialing a real broker.
+func SaramaConfigExported(cfg KafkaOutputConfig) (*sarama.Config, error) {
+	return buildSaramaConfig(cfg)
+}
+
+// EncodeExported runs the KafkaOutput encoder for the configured Format
+// without requiring a producer. Useful for asserting the byte payload that
+// each format (json / otlp_proto / prometheus_rw) produces.
+func EncodeExported(cfg KafkaOutputConfig, metrics []plugin.Metric) ([]byte, error) {
+	if cfg.Format == "" {
+		cfg.Format = KafkaFormatJSON
+	}
+	o := &KafkaOutput{cfg: cfg}
+	return o.encode(metrics)
+}
+
+// KafkaKeyForExported exposes the per-message key selection logic so tests
+// can verify partition-affinity behaviour without an instance.
+func KafkaKeyForExported(m plugin.Metric) string {
+	return kafkaKeyFor(m)
 }
