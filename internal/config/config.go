@@ -56,8 +56,27 @@ type Config struct {
 	// When disabled (default), QAN collectors and forwarder have zero overhead.
 	QAN qan.QANConfig `mapstructure:"qan"`
 
+	// Persister enables plugin state persistence across agent restarts.
+	// When Statefile is empty (default), persistence is disabled. StatefulPlugins
+	// (e.g. log tail offsets in M3) opt in via the plugin.StatefulPlugin mixin.
+	Persister PersisterConfig `mapstructure:"persister"`
+
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
+}
+
+// PersisterConfig controls plugin state persistence.
+type PersisterConfig struct {
+	// Enabled gates persister wiring. When false the Persister is not created.
+	Enabled bool `mapstructure:"enabled"`
+
+	// Statefile is the JSON path where plugin state is stored atomically.
+	// Default: /var/lib/tfo-agent/state.json when Enabled.
+	Statefile string `mapstructure:"statefile"`
+
+	// SaveInterval is the periodic save cadence in addition to shutdown save.
+	// Default: 5m.
+	SaveInterval time.Duration `mapstructure:"save_interval"`
 }
 
 // AgentAPIConfig contains the Agent HTTP API server settings for real-time K8s queries.

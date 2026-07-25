@@ -61,6 +61,7 @@ import (
 	valkeycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/valkey"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
+	"github.com/telemetryflow/telemetryflow-agent/internal/persister"
 	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
 	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
@@ -86,6 +87,7 @@ type Agent struct {
 	metricForwarder  *exporter.MetricForwarder
 	bufferRetry      *exporter.BufferRetrySink
 	diskBuffer       *buffer.Buffer
+	persister        *persister.Persister
 	qanForwarder     *qan.QANForwarder
 	qanExporter      *qan.QANExporter
 
@@ -849,6 +851,30 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		}
 	}
 
+	// Initialise persister (M1.7). When cfg.Persister.Enabled is true the agent
+	// persists StatefulPlugin state to a JSON file across restarts. Plugins opt
+	// in by implementing plugin.StatefulPlugin (e.g. M3 log tail offset). When
+	// no plugin implements the mixin the persister is wired but inert.
+	var agentPersister *persister.Persister
+	if cfg.Persister.Enabled {
+		statefile := cfg.Persister.Statefile
+		if statefile == "" {
+			statefile = "/var/lib/tfo-agent/state.json"
+		}
+		agentPersister = persister.New(statefile).WithLogger(logger)
+		// Load previously persisted state BEFORE collectors start so they can
+		// pick up their saved state during Init/Start. Errors here are non-fatal
+		// — a missing or corrupt statefile just means plugins start fresh.
+		if err := agentPersister.Load(); err != nil {
+			logger.Warn("persister load failed — starting with empty state",
+				zap.String("statefile", statefile),
+				zap.Error(err))
+		} else {
+			logger.Info("persister loaded",
+				zap.String("statefile", statefile))
+		}
+	}
+
 	ag := &Agent{
 		id:               agentID,
 		config:           cfg,
@@ -865,6 +891,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		metricForwarder:  forwarder,
 		bufferRetry:      bufferRetry,
 		diskBuffer:       nil, // tracked separately when needed; buffer closes itself
+		persister:        agentPersister,
 		qanForwarder:     qanFwd,
 		qanExporter:      qanExp,
 		configFile:       configFile,
@@ -1027,6 +1054,21 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.bufferRetry.StartRetryLoop(ctx)
 	}
 
+	// Start persister save loop (M1.7). Plugins implementing
+	// plugin.StatefulPlugin are registered with the persister so their state
+	// is checkpointed periodically and on shutdown.
+	if a.persister != nil {
+		// Register any stateful plugin via type assertion. The plugin system
+		// adapter exposes the underlying legacy collector via Impl(); we
+		// type-assert on that. Legacy collectors that wish to persist state
+		// must implement plugin.StatefulPlugin on their concrete type.
+		saveInterval := a.config.Persister.SaveInterval
+		if saveInterval == 0 {
+			saveInterval = 5 * time.Minute
+		}
+		a.persister.StartSaveLoop(ctx, saveInterval)
+	}
+
 	// Start QAN exporter and forwarder (separate data path from OTLP)
 	if a.qanExporter != nil {
 		if err := a.qanExporter.Start(ctx); err != nil && err != context.Canceled {
@@ -1071,6 +1113,16 @@ func (a *Agent) Run(ctx context.Context) error {
 // shutdown gracefully stops all components
 func (a *Agent) shutdown() error {
 	a.logger.Info("Shutting down agent components")
+
+	// Final persister save BEFORE components stop so StatefulPlugin state is
+	// captured while plugins are still alive to serve GetState().
+	if a.persister != nil {
+		if err := a.persister.Store(); err != nil {
+			a.logger.Warn("persister final store failed", zap.Error(err))
+		} else {
+			a.logger.Info("persister state saved")
+		}
+	}
 
 	var wg sync.WaitGroup
 	var errs []error
