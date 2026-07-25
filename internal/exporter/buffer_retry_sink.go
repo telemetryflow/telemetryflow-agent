@@ -21,6 +21,7 @@ import (
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/buffer"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/selfstat"
 )
 
 // BufferRetryConfig controls the retry wrapper.
@@ -93,6 +94,7 @@ func (s *BufferRetrySink) Export(ctx context.Context, metrics []collector.Metric
 		s.log.Warn("export failed, buffering for retry",
 			zap.Int("metrics", len(metrics)),
 			zap.Error(err))
+		selfstat.AgentMetricsDropped.Incr(int64(len(metrics)))
 		entry := retryEntry{MsgType: "metrics", Metrics: metrics, ResourceAttrs: attrs}
 		if s.cfg.Buffer != nil {
 			if perr := s.persist(entry); perr != nil {
@@ -125,7 +127,9 @@ func (s *BufferRetrySink) enqueueInMemoryRetry(e retryEntry) {
 	defer s.mu.Unlock()
 	if len(s.retryQueue) >= 100 {
 		s.log.Warn("in-memory retry queue full, dropping oldest")
+		evicted := s.retryQueue[0]
 		s.retryQueue = s.retryQueue[1:]
+		selfstat.AgentMetricsDropped.Incr(int64(len(evicted.Metrics)))
 	}
 	s.retryQueue = append(s.retryQueue, e)
 }
