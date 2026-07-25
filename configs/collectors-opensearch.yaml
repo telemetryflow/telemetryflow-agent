@@ -1,0 +1,33 @@
+# TelemetryFlow Agent - OpenSearch Collector Configuration
+#
+# Example configuration for monitoring OpenSearch clusters (the AWS-backed
+# fork of Elasticsearch). Mirrors the Elasticsearch collector and targets
+# the same REST API. Collects cluster health, node stats, and index metrics.
+
+opensearch:
+  enabled: false
+
+  # Global interval for cluster scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Production cluster (full node + index stats)
+    - name: "os-prod"
+      url: "http://opensearch-prod.internal:9200"
+      username: "admin"
+      password: "${OPENSEARCH_ADMIN_PASSWORD}"
+      timeout: 10s
+      cluster_health_only: false
+      # TLS options (uncomment for HTTPS endpoints)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Analytics cluster (health only to reduce load)
+    - name: "os-analytics"
+      url: "http://opensearch-analytics.internal:9200"
+      username: "admin"
+      password: "${OPENSEARCH_ADMIN_PASSWORD}"
+      timeout: 10s
+      cluster_health_only: true
+      # tls_enabled: true
+      # tls_skip_verify: false

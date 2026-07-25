@@ -1,0 +1,35 @@
+# TelemetryFlow Agent - Couchbase Collector Configuration
+#
+# Example configuration for monitoring Couchbase clusters via the admin REST
+# API. Collects cluster, node, and per-bucket resource metrics.
+
+couchbase:
+  enabled: false
+
+  # Global interval for cluster scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Production cluster (per-bucket stats enabled)
+    - name: "cb-prod"
+      url: "http://couchbase-prod.internal:8091"
+      username: "metrics"
+      password: "${CB_METRICS_PASSWORD}"
+      timeout: 10s
+      buckets:
+        - "sessions"
+        - "users"
+        - "carts"
+      # TLS options (uncomment for HTTPS Admin UI)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Reporting cluster (cluster health only, no per-bucket drilldown)
+    - name: "cb-reporting"
+      url: "http://couchbase-reporting.internal:8091"
+      username: "metrics"
+      password: "${CB_METRICS_PASSWORD}"
+      timeout: 10s
+      buckets: []  # empty = skip per-bucket collection
+      # tls_enabled: true
+      # tls_skip_verify: false

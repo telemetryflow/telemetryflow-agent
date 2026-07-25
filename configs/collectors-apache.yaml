@@ -1,0 +1,29 @@
+# TelemetryFlow Agent - Apache HTTP Server Collector Configuration
+#
+# Example configuration for monitoring Apache HTTPD instances via the
+# mod_status server-status endpoint (auto format). Collects busy/idle
+# workers, total accesses, uptime, and CPU load.
+
+apache:
+  enabled: false
+
+  # Global interval for server-status scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Primary web node (server-status protected by basic auth)
+    - name: "apache-web-1"
+      url: "http://apache-web-1.internal/server-status?auto"
+      timeout: 5s
+      username: "metrics"
+      password: "${APACHE_BASIC_PASSWORD}"
+      # TLS options (uncomment for HTTPS endpoints)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Secondary web node (open server-status)
+    - name: "apache-web-2"
+      url: "http://apache-web-2.internal/server-status?auto"
+      timeout: 5s
+      # tls_enabled: true
+      # tls_skip_verify: false

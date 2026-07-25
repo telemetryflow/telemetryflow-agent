@@ -1,0 +1,33 @@
+# TelemetryFlow Agent - Nginx Web Server Collector Configuration
+#
+# Example configuration for monitoring Nginx OSS instances via the
+# stub_status endpoint. Collects active connections, request rates,
+# and connection state counters (reading / writing / waiting).
+
+nginx:
+  enabled: false
+
+  # Global interval for stub_status scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Primary edge node (auth + custom headers enabled)
+    - name: "nginx-edge-1"
+      url: "http://nginx-edge-1.internal:8080/stub_status"
+      timeout: 5s
+      # Basic auth credentials (when stub_status is behind auth)
+      username: "metrics"
+      password: "${NGINX_BASIC_PASSWORD}"
+      # Custom HTTP headers (e.g. internal gateway tokens)
+      headers:
+        X-Internal-Token: "${NGINX_GATEWAY_TOKEN}"
+      # TLS options (uncomment for HTTPS endpoints)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Secondary edge node (load-balanced pair)
+    - name: "nginx-edge-2"
+      url: "http://nginx-edge-2.internal:8080/stub_status"
+      timeout: 5s
+      # tls_enabled: true
+      # tls_skip_verify: false

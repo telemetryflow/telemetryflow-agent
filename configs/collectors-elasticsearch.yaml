@@ -1,0 +1,36 @@
+# TelemetryFlow Agent - Elasticsearch Collector Configuration (INPUT direction)
+#
+# Example configuration for SCRAPING Elasticsearch clusters to collect cluster
+# health, node stats, and index-level metrics via the REST API.
+#
+# NOTE: This is the INPUT (collector) direction — monitoring Elasticsearch itself.
+# It is distinct from `integrations.elasticsearch` in tfo-agent.yaml, which is the
+# OUTPUT direction (exporting telemetry TO Elasticsearch as a storage backend).
+
+elasticsearch:
+  enabled: false
+
+  # Global interval for cluster scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Production cluster (full node + index stats)
+    - name: "es-prod"
+      url: "http://elasticsearch-prod.internal:9200"
+      username: "elastic"
+      password: "${ELASTIC_PASSWORD}"
+      timeout: 10s
+      cluster_health_only: false
+      # TLS options (uncomment for HTTPS endpoints)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Logging cluster (health only to reduce load)
+    - name: "es-logs"
+      url: "http://elasticsearch-logs.internal:9200"
+      username: "elastic"
+      password: "${ELASTIC_PASSWORD}"
+      timeout: 10s
+      cluster_health_only: true
+      # tls_enabled: true
+      # tls_skip_verify: false

@@ -1,0 +1,33 @@
+# TelemetryFlow Agent - InfluxDB Collector Configuration (INPUT direction)
+#
+# Example configuration for SCRAPING InfluxDB v1/v2 instances to collect
+# their internal health metrics via the /debug/vars runtime endpoint.
+#
+# NOTE: This is the INPUT (collector) direction — monitoring InfluxDB itself.
+# It is distinct from `integrations.influxdb` in tfo-agent.yaml, which is the
+# OUTPUT direction (exporting telemetry TO InfluxDB as a storage backend).
+
+influxdb:
+  enabled: false
+
+  # Global interval for /debug/vars scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # InfluxDB v2 primary (token auth)
+    - name: "influxdb-primary"
+      url: "http://influxdb-primary.internal:8086"
+      token: "${INFLUXDB_V2_TOKEN}"
+      timeout: 10s
+      # TLS options (uncomment for HTTPS endpoints)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # InfluxDB v1 replica (basic auth)
+    - name: "influxdb-replica"
+      url: "http://influxdb-replica.internal:8086"
+      username: "metrics"
+      password: "${INFLUXDB_V1_PASSWORD}"
+      timeout: 10s
+      # tls_enabled: true
+      # tls_skip_verify: false

@@ -1,0 +1,62 @@
+# TelemetryFlow Agent - Generic SQL Collector Configuration
+#
+# Example configuration for running user-defined SQL queries against any
+# database/sql driver (postgres, mysql, sqlite3, sqlserver, ...) and emitting
+# one metric per result row. Useful for business KPIs that live in OLTP DBs.
+#
+# Each row in a query result becomes a metric:
+#   - value_column  -> numeric value of the metric
+#   - label_columns -> remaining columns become metric labels
+
+sql_generic:
+  enabled: false
+
+  # Global interval for query execution (default: 30s)
+  interval: 30s
+
+  instances:
+    # Application OLTP database (PostgreSQL)
+    - name: "app-db"
+      driver: "postgres"
+      dsn: "host=app-db-primary.internal port=5432 user=metrics password=${PG_PASSWORD} dbname=app sslmode=require"
+      timeout: 10s
+      queries:
+        # Active sessions in the last 5 minutes (gauge: point-in-time count)
+        - metric: "app.sessions.active"
+          type: "gauge"
+          sql: "SELECT count(*) AS value FROM sessions WHERE last_seen > NOW() - INTERVAL '5 minutes'"
+          value_column: "value"
+          unit: "sessions"
+
+        # Revenue captured today (gauge: resets at day boundary)
+        - metric: "app.revenue.today_cents"
+          type: "gauge"
+          sql: |
+            SELECT COALESCE(SUM(amount_cents), 0) AS value
+            FROM charges
+            WHERE created_at::date = CURRENT_DATE
+              AND status = 'captured'
+          value_column: "value"
+          unit: "cents"
+
+        # Order count per status (one metric per row, labeled by status)
+        - metric: "app.orders.count"
+          type: "gauge"
+          sql: "SELECT status, count(*) AS value FROM orders GROUP BY status"
+          value_column: "value"
+          label_columns:
+            - "status"
+          unit: "orders"
+
+    # Analytics replica (MySQL, read-only)
+    - name: "analytics-replica"
+      driver: "mysql"
+      dsn: "metrics:${MYSQL_PASSWORD}@tcp(analytics-replica.internal:3306)/reporting?tls=skip-verify"
+      timeout: 30s
+      queries:
+        # Lifetime events ingested (counter: monotonically increasing)
+        - metric: "reporting.events.ingested_total"
+          type: "counter"
+          sql: "SELECT count(*) AS value FROM events"
+          value_column: "value"
+          unit: "events"
