@@ -7,10 +7,10 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.2.2-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.0--dev-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
 [![Coverage](https://img.shields.io/badge/Coverage-91.3%25-green.svg)](CHANGELOG.md)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -114,6 +114,13 @@ telemetryflow-agent/
 │   │   └── system/          # System metrics collector
 │   ├── config/              # Configuration management
 │   ├── exporter/            # OTLP data exporters
+│   ├── migration/           # Versioned config schema migration framework (M1)
+│   ├── persister/           # Disk-backed plugin state persistence (M1)
+│   ├── pipeline/            # Channel-based metric pipeline engine (M1)
+│   ├── plugin/              # Typed plugin contracts and registry (M1)
+│   ├── processor/           # Processor plugins (M1 + M3)
+│   ├── secret/              # SecretStore backends: env, file, vault (M1)
+│   ├── selfstat/            # Internal self-observability stats (M1)
 │   └── version/             # Version and banner info
 ├── pkg/                     # LEGO Building Blocks (reusable)
 │   ├── api/                 # HTTP API client
@@ -135,14 +142,21 @@ telemetryflow-agent/
 
 ### Key Packages
 
-| Package              | Description                          |
-| -------------------- | ------------------------------------ |
-| `cmd/tfo-agent`      | Main entry point with Cobra CLI      |
-| `internal/agent`     | Core agent lifecycle management      |
-| `internal/collector` | Telemetry collectors                 |
-| `internal/config`    | Configuration parsing and validation |
-| `internal/exporter`  | OTLP exporters                       |
-| `pkg/plugin`         | Plugin registry for extensibility    |
+| Package                | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `cmd/tfo-agent`        | Main entry point with Cobra CLI                                   |
+| `internal/agent`       | Core agent lifecycle management                                   |
+| `internal/collector`   | Telemetry collectors                                              |
+| `internal/config`      | Configuration parsing and validation                              |
+| `internal/exporter`    | OTLP exporters                                                    |
+| `internal/plugin`      | Typed plugin contracts (`Collector`, `Output`, `Processor`, etc.) |
+| `internal/pipeline`    | Channel-based metric pipeline engine (M1)                         |
+| `internal/processor`   | Processor plugins (filter, rename, starlark, multiline, …)        |
+| `internal/persister`   | Disk-backed plugin state persistence (M1)                         |
+| `internal/selfstat`    | Internal self-observability stats (M1)                            |
+| `internal/secret`      | SecretStore backends (env, file, vault) (M1)                      |
+| `internal/migration`   | Config schema migration framework (M1)                            |
+| `pkg/plugin`           | Plugin registry for extensibility                                 |
 
 ## Making Changes
 
@@ -166,6 +180,24 @@ git merge upstream/main
 # Create your branch
 git checkout -b feature/your-feature-name
 ```
+
+### Adding a New Collector / Processor / Output
+
+The agent ships a typed plugin contract layer in `internal/plugin/types.go` that supersedes the legacy `collector.Collector` interface. New work should target the typed contracts (`Collector`, `ServiceCollector`, `StreamingProcessor`, `SyncProcessor`, `Aggregator`, `Output`, `Parser`, `Serializer`, `SecretStore`) and self-register via `init()` so the registry picks them up automatically. The capability mixins (`Initializer`, `PluginWithID`, `StatefulPlugin`, `ProbePlugin`, `ParserPlugin`, `SerializerPlugin`) are opt-in.
+
+The reference collector pattern is `internal/collector/memcache/memcache.go` — copy that layout (config struct with `DefaultConfig()` + `Init()` + `Collect()` / `Start()`/`Stop()` for service collectors) and register from an `init()` block:
+
+```go
+import "github.com/telemetryflow/telemetryflow/telemetryflow-agent/internal/plugin"
+
+func init() {
+    plugin.Register("memcache", func() plugin.Plugin { return &Memcache{} })
+}
+```
+
+For processors, mirror one of the existing implementations under `internal/processor/` (e.g. `filter`, `rename`, `starlark`, `multiline`). Processors implement `plugin.Processor` and are wired into the channel-based pipeline engine (`internal/pipeline/`); the `pipeline.pre_processors` / `pipeline.post_processors` config lists select them by name. New outputs implement `plugin.Output` and plug into the same DAG.
+
+A `CollectorAdapter` (`internal/plugin/adapter.go`) wraps the legacy `collector.Collector` interface, so existing collectors do not need a rewrite to participate in the new pipeline. Use the typed contracts for any greenfield work.
 
 ### Commit Messages
 
