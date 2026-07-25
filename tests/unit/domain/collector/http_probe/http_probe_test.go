@@ -1,7 +1,7 @@
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
-package http_probe
+package http_probe_test
 
 import (
 	"context"
@@ -14,12 +14,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/collector/http_probe"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
 
-func newCollector(t *testing.T, targets []config.HTTPProbeTarget) *HTTPProbeCollector {
+func newCollector(t *testing.T, targets []config.HTTPProbeTarget) *http_probe.HTTPProbeCollector {
 	t.Helper()
-	c := NewHTTPProbeCollector(config.HTTPProbeCollectorConfig{
+	c := http_probe.NewHTTPProbeCollector(config.HTTPProbeCollectorConfig{
 		Enabled:  true,
 		Interval: 30 * time.Second,
 		Targets:  targets,
@@ -291,9 +292,10 @@ func TestProbeContextCancellation(t *testing.T) {
 }
 
 func TestCollectorLifecycle(t *testing.T) {
-	c := NewHTTPProbeCollector(config.HTTPProbeCollectorConfig{}, zap.NewNop())
-	if c.Name() != collectorName {
-		t.Fatalf("name = %q, want %q", c.Name(), collectorName)
+	c := http_probe.NewHTTPProbeCollector(config.HTTPProbeCollectorConfig{}, zap.NewNop())
+	const wantName = "http_probe"
+	if c.Name() != wantName {
+		t.Fatalf("name = %q, want %q", c.Name(), wantName)
 	}
 	if c.IsRunning() {
 		t.Fatal("should not be running before start")

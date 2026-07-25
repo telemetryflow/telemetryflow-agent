@@ -26,9 +26,9 @@ func DefaultConfig() Config { return Config{} }
 
 // Drop is a StreamingProcessor.
 type Drop struct {
-	cfg  Config
-	res  []*regexp.Regexp
-	acc  plugin.Accumulator
+	cfg Config
+	res []*regexp.Regexp
+	acc plugin.Accumulator
 }
 
 // New compiles patterns and returns the processor.

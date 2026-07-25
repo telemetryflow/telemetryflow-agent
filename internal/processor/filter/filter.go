@@ -25,9 +25,9 @@ const (
 // match (AND within a rule). Across rules, semantics are OR (any match fires
 // the action).
 type Rule struct {
-	Action      Action     `yaml:"action" json:"action"`
-	MetricName  string     `yaml:"metric_name,omitempty" json:"metric_name,omitempty"`     // regex; empty = any
-	Tag         *TagMatch  `yaml:"tag,omitempty" json:"tag,omitempty"`                     // tag key+value regex
+	Action     Action    `yaml:"action" json:"action"`
+	MetricName string    `yaml:"metric_name,omitempty" json:"metric_name,omitempty"` // regex; empty = any
+	Tag        *TagMatch `yaml:"tag,omitempty" json:"tag,omitempty"`                 // tag key+value regex
 }
 
 // TagMatch matches a tag key with a value regex. ValueMatch empty = presence.
@@ -51,17 +51,17 @@ func DefaultConfig() Config { return Config{DefaultAction: ActionKeep} }
 
 // compiledRule is a Rule with its regexes pre-compiled.
 type compiledRule struct {
-	action    Action
-	nameRe    *regexp.Regexp
-	tagKey    string
+	action     Action
+	nameRe     *regexp.Regexp
+	tagKey     string
 	tagValueRe *regexp.Regexp
 }
 
 // Filter is a StreamingProcessor.
 type Filter struct {
-	cfg      Config
-	rules    []compiledRule
-	acc      plugin.Accumulator
+	cfg   Config
+	rules []compiledRule
+	acc   plugin.Accumulator
 }
 
 // New compiles the config and returns the processor.
