@@ -127,6 +127,76 @@ Eight new collectors under `internal/collector/`, all opt-in:
 All 8 are wired into `agent.NewWithConfigFile` and the central
 `CollectorConfig` struct.
 
+### Added — M4 Database & Application Collectors
+
+Ten new collectors under `internal/collector/`, all opt-in:
+
+- **`nginx`** — stub_status scraper (stdlib HTTP). Emits 7 `web.nginx.*`
+  metrics (connections_active/accepted/handled, requests,
+  reading/writing/waiting).
+- **`apache`** — server-status scraper (stdlib HTTP). Emits 9
+  `web.apache.*` metrics + per-state `scoreboard_*` gauges.
+- **`haproxy`** — CSV stats scraper (stdlib HTTP). Emits 12
+  `proxy.haproxy.*` metrics per row (frontend/backend/server) with
+  pxname/svname/type labels.
+- **`influxdb`** — `/debug/vars` JSON scraper (stdlib HTTP). Walks
+  subsystem JSON and emits `db.influxdb.<subsystem>.<field>` for each
+  numeric leaf.
+- **`elasticsearch`** — cluster + node stats scraper. Emits
+  `db.elasticsearch.*` (cluster_status, shards, per-node heap/docs/
+  search/indexing counters).
+- **`opensearch`** — mirror of elasticsearch collector for the AWS
+  fork. Emits `db.opensearch.*`.
+- **`couchbase`** — `/pools/default` cluster + node + bucket stats.
+  Emits `db.couchbase.*` (cluster RAM/HDD, per-node mem/cpu,
+  per-bucket ops/disk/item_count).
+- **`vault`** — HashiCorp Vault `/v1/sys/metrics` Prometheus-format
+  scraper. Re-emits all Vault metrics under `vault.*` namespace with
+  X-Vault-Token / Namespace header support.
+- **`sql_generic`** — runs user-defined SQL against any `database/sql`
+  driver. Emits one metric per row using `value_column` for the value
+  and `label_columns` for labels. Supports PostgreSQL, MySQL, SQLite,
+  SQL Server, etc.
+- **`pgbouncer`** — `SHOW STATS` + `SHOW POOLS` via pgx. Emits 12
+  `db.pgbouncer.*` metrics (transactions, queries, bytes, wait time,
+  per-pool client/server connection counts).
+
+All 10 wired into `agent.NewWithConfigFile` and `CollectorConfig`.
+
+### Added — M5 Multi-Output
+
+Six new output plugins under `internal/exporter/`, all registered via
+`plugin.MustAddOutput`:
+
+- **`prometheus_remote_write`** (P0 fix) — proper implementation using
+  `prompb.WriteRequest` protobuf + snappy block compression. Previous
+  stub used text format and was rejected by Mimir/Cortex/Thanos.
+  Supports basic/bearer auth, Mimir tenant header, batch chunking.
+- **OTLP gRPC exporter wired** — `OTLPMetricGRPCBridge` mirrors the
+  HTTP bridge using `otlpmetricgrpc`. Selected via
+  `exporter.otlp.protocol: grpc`. HTTP remains the default.
+- **`file`** — writes metrics to local file in JSON / InfluxDB line
+  protocol / Prometheus text format. Lumberjack-style rotation with
+  gzip compression, MaxBackups, MaxAgeDays.
+- **`kafka`** — produces metrics to a Kafka topic via `IBM/sarama`.
+  Three formats: json, otlp_proto (OTLP protobuf), prometheus_rw.
+  SASL/TLS auth, snappy/gzip/lz4/zstd compression, configurable acks.
+- **`loki`** — pushes log records to Grafana Loki. Stream grouping by
+  label set, Go-template label expansion, multi-tenant (X-Scope-OrgID),
+  batch + interval flush.
+- **`cloudwatch`** — AWS CloudWatch PutMetricData via SDK v2. Name
+  sanitization, 30-dimension cap, unit mapping, IAM-role fallback,
+  optional STS assume-role.
+- **`datadog`** — Datadog Metrics v2 intake via plain HTTP.
+  US/EU/US3/Gov site selection, type mapping, sorted tags.
+
+### Added — M3 Final Piece
+
+- **Selfstat counters wired** into `MetricForwarder` (metrics gathered
+  / written / errors) and `BufferRetrySink` (dropped on overflow).
+  `agent.go` exposes `AgentBufferSize` / `AgentBufferLimit` via a 30s
+  ticker. Counters now reflect real activity instead of staying zero.
+
 ### Added — M3 Logs & Self-Observability (in progress)
 
 - **4 log parser processors** under `internal/processor/`:
