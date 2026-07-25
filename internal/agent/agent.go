@@ -43,6 +43,7 @@ import (
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
 	httprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/http_probe"
+	influxdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/influxdb"
 	kafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/kafka"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
@@ -189,6 +190,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("CockroachDB collector enabled",
 			zap.Int("instances", len(cfg.Collector.CockroachDB.Instances)),
 			zap.Duration("instance_interval", cfg.Collector.CockroachDB.InstanceInterval),
+		)
+	}
+
+	// Add InfluxDB collector if enabled (/debug/vars scrape)
+	if cfg.Collector.InfluxDB.Enabled {
+		influxCol := influxdbcollector.NewInfluxDBCollector(cfg.Collector.InfluxDB, logger)
+		collectors = append(collectors, influxCol)
+		logger.Info("InfluxDB collector enabled",
+			zap.Int("instances", len(cfg.Collector.InfluxDB.Instances)),
+			zap.Duration("interval", cfg.Collector.InfluxDB.Interval),
 		)
 	}
 

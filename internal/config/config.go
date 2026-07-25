@@ -301,6 +301,9 @@ type CollectorConfig struct {
 	// CockroachDB contains CockroachDB database monitoring collector settings
 	CockroachDB CockroachDBCollectorConfig `mapstructure:"cockroachdb"`
 
+	// InfluxDB contains InfluxDB v1/v2 database monitoring collector settings (/debug/vars)
+	InfluxDB InfluxDBCollectorConfig `mapstructure:"influxdb"`
+
 	// MSSQL contains Microsoft SQL Server database monitoring collector settings
 	MSSQL MSSQLCollectorConfig `mapstructure:"mssql"`
 
