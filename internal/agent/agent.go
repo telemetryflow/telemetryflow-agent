@@ -30,6 +30,7 @@ import (
 	"go.uber.org/zap"
 
 	agentapi "github.com/telemetryflow/telemetryflow-agent/internal/api"
+	"github.com/telemetryflow/telemetryflow-agent/internal/buffer"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	auroracollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/aurora"
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
@@ -83,6 +84,8 @@ type Agent struct {
 	agentAPIServer   *agentapi.Server
 	otlpBridge       *exporter.OTLPMetricBridge
 	metricForwarder  *exporter.MetricForwarder
+	bufferRetry      *exporter.BufferRetrySink
+	diskBuffer       *buffer.Buffer
 	qanForwarder     *qan.QANForwarder
 	qanExporter      *qan.QANExporter
 
@@ -601,6 +604,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	// This is the export pipeline that forwards collected metrics to the
 	// TelemetryFlow Platform backend via OTLP HTTP.
 	var otlpBridge *exporter.OTLPMetricBridge
+	var otlpSink exporter.MetricSink
 	if cfg.IsMetricsEnabled() {
 		bridgeCtx := context.Background()
 		otlpHost, otlpPath, otlpTLS := cfg.GetOTLPEndpoint("metrics")
@@ -622,9 +626,45 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 		} else {
 			otlpBridge = bridge
+			otlpSink = bridge
 			logger.Info("OTLP metric bridge enabled",
 				zap.String("endpoint", otlpHost),
 				zap.String("path", otlpPath),
+			)
+		}
+	}
+
+	// Wire disk-backed buffer around the OTLP sink so transient backend
+	// failures do not lose metrics (M1.2 — internal/buffer existed but was
+	// not instantiated; this closes that gap).
+	var bufferRetry *exporter.BufferRetrySink
+	if cfg.Buffer.Enabled && otlpSink != nil {
+		bufPath := cfg.Buffer.Path
+		if bufPath == "" {
+			bufPath = "/var/lib/tfo-agent/buffer"
+		}
+		buf, err := buffer.New(buffer.Config{
+			Enabled:       true,
+			Path:          bufPath,
+			MaxSizeMB:     cfg.Buffer.MaxSizeMB,
+			MaxAge:        cfg.Buffer.MaxAge,
+			FlushInterval: cfg.Buffer.FlushInterval,
+		})
+		if err != nil {
+			logger.Warn("Failed to initialise disk buffer — metrics will be lost on backend outage",
+				zap.String("path", bufPath),
+				zap.Error(err),
+			)
+		} else {
+			bufferRetry = exporter.NewBufferRetrySink(otlpSink, exporter.BufferRetryConfig{
+				Enabled: true,
+				Buffer:  buf,
+				Logger:  logger,
+			})
+			otlpSink = bufferRetry
+			logger.Info("Disk-backed retry buffer wired",
+				zap.String("path", bufPath),
+				zap.Int64("max_size_mb", cfg.Buffer.MaxSizeMB),
 			)
 		}
 	}
@@ -642,8 +682,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			Interval:   fwdInterval,
 			Logger:     logger,
 		}
-		if otlpBridge != nil {
-			fwdCfg.OTLPSink = otlpBridge
+		if otlpSink != nil {
+			fwdCfg.OTLPSink = otlpSink
 		}
 		if promServer != nil {
 			fwdCfg.PromSink = promServer
@@ -823,6 +863,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		agentAPIServer:   apiServer,
 		otlpBridge:       otlpBridge,
 		metricForwarder:  forwarder,
+		bufferRetry:      bufferRetry,
+		diskBuffer:       nil, // tracked separately when needed; buffer closes itself
 		qanForwarder:     qanFwd,
 		qanExporter:      qanExp,
 		configFile:       configFile,
@@ -978,6 +1020,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		if err := a.metricForwarder.Start(ctx); err != nil && err != context.Canceled {
 			errChan <- fmt.Errorf("metric forwarder error: %w", err)
 		}
+	}
+
+	// Start buffer retry loop (drains failed batches back into OTLP sink).
+	if a.bufferRetry != nil {
+		a.bufferRetry.StartRetryLoop(ctx)
 	}
 
 	// Start QAN exporter and forwarder (separate data path from OTLP)
