@@ -38,6 +38,7 @@ import (
 	clickhousecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/clickhouse"
 	cockroachdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cockroachdb"
 	confluentkafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/confluent_kafka"
+	couchbasecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/couchbase"
 	dnscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/dns"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
@@ -57,6 +58,7 @@ import (
 	netflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/netflow"
 	nginxcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nginx"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
+	opensearchcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/opensearch"
 	pgbouncercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pgbouncer"
 	pingcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ping"
 	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
@@ -67,17 +69,20 @@ import (
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 	sflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sflow"
 	snmpcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/snmp"
+	sqlgenericcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sql_generic"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
 	sysloglistenercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/syslog_listener"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
 	tcpprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/tcp_probe"
 	tsdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/timescaledb"
 	valkeycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/valkey"
+	vaultcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/vault"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
 	"github.com/telemetryflow/telemetryflow-agent/internal/persister"
 	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
 	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
+	"github.com/telemetryflow/telemetryflow-agent/internal/selfstat"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 	k8s "k8s.io/client-go/kubernetes"
 )
@@ -267,6 +272,23 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		)
 	}
 
+	// Add SQL generic collector if enabled
+	if cfg.Collector.SQLGeneric.Enabled {
+		sqlGenCol, err := sqlgenericcollector.NewSQLGenericCollector(cfg.Collector.SQLGeneric, logger)
+		if err != nil {
+			logger.Warn("SQL generic collector failed to initialize",
+				zap.Int("instances", len(cfg.Collector.SQLGeneric.Instances)),
+				zap.Error(err),
+			)
+		} else {
+			collectors = append(collectors, sqlGenCol)
+			logger.Info("SQL generic collector enabled",
+				zap.Int("instances", len(cfg.Collector.SQLGeneric.Instances)),
+				zap.Duration("interval", cfg.Collector.SQLGeneric.Interval),
+			)
+		}
+	}
+
 	// Add MongoDB Community collector if enabled
 	if cfg.Collector.MongoDBCommunity.Enabled {
 		mongoCol := mongodbcollector.NewMongoDBCollector(cfg.Collector.MongoDBCommunity, logger)
@@ -347,6 +369,26 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		)
 	}
 
+	// Add OpenSearch collector if enabled (cluster + node stats scrape)
+	if cfg.Collector.OpenSearch.Enabled {
+		osCol := opensearchcollector.NewOpenSearchCollector(cfg.Collector.OpenSearch, logger)
+		collectors = append(collectors, osCol)
+		logger.Info("OpenSearch collector enabled",
+			zap.Int("instances", len(cfg.Collector.OpenSearch.Instances)),
+			zap.Duration("interval", cfg.Collector.OpenSearch.Interval),
+		)
+	}
+
+	// Add Couchbase collector if enabled (cluster + node + bucket stats scrape)
+	if cfg.Collector.Couchbase.Enabled {
+		cbCol := couchbasecollector.NewCouchbaseCollector(cfg.Collector.Couchbase, logger)
+		collectors = append(collectors, cbCol)
+		logger.Info("Couchbase collector enabled",
+			zap.Int("instances", len(cfg.Collector.Couchbase.Instances)),
+			zap.Duration("interval", cfg.Collector.Couchbase.Interval),
+		)
+	}
+
 	// Add Nginx collector if enabled (stub_status scrape)
 	if cfg.Collector.Nginx.Enabled {
 		nginxCol := nginxcollector.NewNginxCollector(cfg.Collector.Nginx, logger)
@@ -374,6 +416,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("PgBouncer collector enabled",
 			zap.Int("instances", len(cfg.Collector.PgBouncer.Instances)),
 			zap.Duration("interval", cfg.Collector.PgBouncer.Interval),
+		)
+	}
+
+	// Add Vault collector if enabled (Prometheus /v1/sys/metrics scrape)
+	if cfg.Collector.Vault.Enabled {
+		vaultCol := vaultcollector.NewVaultCollector(cfg.Collector.Vault, logger)
+		collectors = append(collectors, vaultCol)
+		logger.Info("Vault collector enabled",
+			zap.Int("instances", len(cfg.Collector.Vault.Instances)),
+			zap.Duration("interval", cfg.Collector.Vault.Interval),
 		)
 	}
 
@@ -879,6 +931,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	// failures do not lose metrics (M1.2 — internal/buffer existed but was
 	// not instantiated; this closes that gap).
 	var bufferRetry *exporter.BufferRetrySink
+	var diskBuf *buffer.Buffer
 	if cfg.Buffer.Enabled && otlpSink != nil {
 		bufPath := cfg.Buffer.Path
 		if bufPath == "" {
@@ -897,6 +950,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 				zap.Error(err),
 			)
 		} else {
+			diskBuf = buf
+			selfstat.AgentBufferLimit.Set(cfg.Buffer.MaxSizeMB * 1024 * 1024)
 			bufferRetry = exporter.NewBufferRetrySink(otlpSink, exporter.BufferRetryConfig{
 				Enabled: true,
 				Buffer:  buf,
@@ -1145,7 +1200,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logCollector:     nativeLogCol,
 		metricForwarder:  forwarder,
 		bufferRetry:      bufferRetry,
-		diskBuffer:       nil, // tracked separately when needed; buffer closes itself
+		diskBuffer:       diskBuf,
 		persister:        agentPersister,
 		qanForwarder:     qanFwd,
 		qanExporter:      qanExp,
@@ -1314,6 +1369,27 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Start buffer retry loop (drains failed batches back into OTLP sink).
 	if a.bufferRetry != nil {
 		a.bufferRetry.StartRetryLoop(ctx)
+	}
+
+	// Periodically report the disk buffer occupancy so AgentBufferSize
+	// reflects live state rather than staying pinned at zero. The limit is
+	// set once at construction (see NewWithConfigFile); only the gauge is
+	// refreshed here.
+	if a.diskBuffer != nil {
+		buf := a.diskBuffer
+		go func() {
+			selfstat.AgentBufferSize.Set(buf.Size())
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					selfstat.AgentBufferSize.Set(buf.Size())
+				}
+			}
+		}()
 	}
 
 	// Start persister save loop (M1.7). Plugins implementing
@@ -1675,6 +1751,13 @@ func (a *Agent) rebuildCollectors(cfg *config.Config) []collector.Collector {
 	}
 	if cfg.Collector.SQLite3.Enabled {
 		collectors = append(collectors, sqlite3collector.NewSQLite3Collector(cfg.Collector.SQLite3, a.logger))
+	}
+	if cfg.Collector.SQLGeneric.Enabled {
+		if sqlGenCol, err := sqlgenericcollector.NewSQLGenericCollector(cfg.Collector.SQLGeneric, a.logger); err == nil {
+			collectors = append(collectors, sqlGenCol)
+		} else {
+			a.logger.Warn("SQL generic collector failed to initialize", zap.Error(err))
+		}
 	}
 	if cfg.Collector.MongoDBCommunity.Enabled {
 		collectors = append(collectors, mongodbcollector.NewMongoDBCollector(cfg.Collector.MongoDBCommunity, a.logger))

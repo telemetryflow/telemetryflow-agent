@@ -295,6 +295,9 @@ type CollectorConfig struct {
 	// SQLite3 contains SQLite3 database monitoring collector settings
 	SQLite3 SQLite3CollectorConfig `mapstructure:"sqlite3"`
 
+	// SQLGeneric contains user-defined SQL query collector settings (M4)
+	SQLGeneric SQLGenericCollectorConfig `mapstructure:"sql_generic"`
+
 	// MongoDBCommunity contains MongoDB Community database monitoring collector settings
 	MongoDBCommunity MongoDBCommunityCollectorConfig `mapstructure:"mongodb_community"`
 
@@ -378,6 +381,13 @@ type CollectorConfig struct {
 	// Elasticsearch contains Elasticsearch cluster monitoring collector settings (M4).
 	Elasticsearch ElasticsearchCollectorConfig `mapstructure:"elasticsearch"`
 
+	// Couchbase contains Couchbase cluster monitoring collector settings (M4).
+	Couchbase CouchbaseCollectorConfig `mapstructure:"couchbase"`
+
+	// OpenSearch contains OpenSearch cluster monitoring collector settings (M4).
+	// OpenSearch is the AWS-backed fork of Elasticsearch and exposes the same API.
+	OpenSearch OpenSearchCollectorConfig `mapstructure:"opensearch"`
+
 	// Nginx contains Nginx stub_status scraper settings (M4).
 	Nginx NginxCollectorConfig `mapstructure:"nginx"`
 
@@ -386,6 +396,9 @@ type CollectorConfig struct {
 
 	// PgBouncer contains PgBouncer SHOW STATS/POOLS collector settings (M4).
 	PgBouncer PgBouncerCollectorConfig `mapstructure:"pgbouncer"`
+
+	// Vault contains HashiCorp Vault /v1/sys/metrics scraper settings (M4).
+	Vault VaultCollectorConfig `mapstructure:"vault"`
 }
 
 // ClickHouseCollectorConfig contains settings for monitoring external ClickHouse instances.
@@ -2902,6 +2915,11 @@ func DefaultConfig() *Config {
 				IntegrityTimeout:   300 * time.Second,
 				MaxDatabases:       50,
 				Databases:          []SQLite3DatabaseConfig{},
+			},
+			SQLGeneric: SQLGenericCollectorConfig{
+				Enabled:   false,
+				Interval:  30 * time.Second,
+				Instances: []SQLGenericInstance{},
 			},
 			CockroachDB: CockroachDBCollectorConfig{
 				Enabled:            false,
