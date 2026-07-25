@@ -41,6 +41,7 @@ import (
 	dnscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/dns"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
+	elasticsearchcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/elasticsearch"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
 	httprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/http_probe"
 	influxdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/influxdb"
@@ -320,6 +321,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("Apache collector enabled",
 			zap.Int("instances", len(cfg.Collector.Apache.Instances)),
 			zap.Duration("interval", cfg.Collector.Apache.Interval),
+		)
+	}
+
+	// Add Elasticsearch collector if enabled (cluster + node stats scrape)
+	if cfg.Collector.Elasticsearch.Enabled {
+		esCol := elasticsearchcollector.NewElasticsearchCollector(cfg.Collector.Elasticsearch, logger)
+		collectors = append(collectors, esCol)
+		logger.Info("Elasticsearch collector enabled",
+			zap.Int("instances", len(cfg.Collector.Elasticsearch.Instances)),
+			zap.Duration("interval", cfg.Collector.Elasticsearch.Interval),
 		)
 	}
 

@@ -374,6 +374,9 @@ type CollectorConfig struct {
 
 	// SyslogListener contains syslog receiver settings.
 	SyslogListener SyslogListenerConfig `mapstructure:"syslog_listener"`
+
+	// Elasticsearch contains Elasticsearch cluster monitoring collector settings (M4).
+	Elasticsearch ElasticsearchCollectorConfig `mapstructure:"elasticsearch"`
 }
 
 // ClickHouseCollectorConfig contains settings for monitoring external ClickHouse instances.
