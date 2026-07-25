@@ -1,7 +1,7 @@
 // Package redis implements a TelemetryFlow Agent collector for Redis cache
 // instances. It connects via the RESP protocol over TCP and collects INFO,
-// commandstats, replication, and cluster statistics. No external client
-// library is required.
+// commandstats, keyspace, optional LATENCY LATEST, and optional CLUSTER INFO
+// statistics. No external client library is required.
 //
 // TelemetryFlow Agent - AI-Powered Observability & Incident Response Management (IRM) Platform
 // Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
@@ -213,4 +213,104 @@ func ParseInfo(info string) map[string]string {
 func ToFloat(s string) float64 {
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+// ParseSemver parses a semantic version string like "7.2.5" into its major,
+// minor, and patch integer components. Non-numeric components are treated as
+// 0. An empty or completely malformed string yields 0,0,0. Trailing
+// pre-release suffixes (e.g. "7.2.5-rc1") are ignored for the patch value.
+//
+// Exported so the Valkey collector (which speaks the same RESP wire protocol
+// and reports versions in the same form) and external tests can reuse it.
+func ParseSemver(s string) (major, minor, patch int) {
+	if s == "" {
+		return 0, 0, 0
+	}
+	parts := strings.SplitN(s, ".", 3)
+	if len(parts) >= 1 {
+		major, _ = strconv.Atoi(stripPreRelease(parts[0]))
+	}
+	if len(parts) >= 2 {
+		minor, _ = strconv.Atoi(stripPreRelease(parts[1]))
+	}
+	if len(parts) >= 3 {
+		patch, _ = strconv.Atoi(stripPreRelease(parts[2]))
+	}
+	return major, minor, patch
+}
+
+// stripPreRelease removes any "-" pre-release suffix from a version component
+// (e.g. "5-rc1" → "5"). Non-numeric trailing characters after a digit run are
+// also stripped so "5rc1" becomes "5".
+func stripPreRelease(s string) string {
+	if i := strings.IndexByte(s, '-'); i >= 0 {
+		s = s[:i]
+	}
+	var (
+		out       strings.Builder
+		seenDigit bool
+	)
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			out.WriteRune(r)
+			seenDigit = true
+			continue
+		}
+		if !seenDigit {
+			// Leading non-digit (e.g. "rc1"); stop — Atoi will fail and yield 0.
+			break
+		}
+		// Once we've seen a digit, stop at any non-digit trailing char.
+		break
+	}
+	return out.String()
+}
+
+// LatencyEvent represents a single entry from a LATENCY LATEST reply. Timestamp
+// is the unix time (seconds) of the most recent occurrence.
+type LatencyEvent struct {
+	Event        string
+	Timestamp    int64
+	LatencyMs    float64
+	MaxLatencyMs float64
+}
+
+// ParseLatencyLatest parses the bulk-string form of a LATENCY LATEST reply
+// where each line is one event and fields are separated by whitespace:
+//
+//	event_name timestamp latency_ms max_latency_ms
+//
+// Malformed lines (fewer than two whitespace-separated fields) are skipped.
+// Exported for the Valkey collector and external tests.
+func ParseLatencyLatest(s string) map[string]LatencyEvent {
+	out := make(map[string]LatencyEvent)
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		ev := LatencyEvent{Event: fields[0]}
+		ts, _ := strconv.ParseInt(fields[1], 10, 64)
+		ev.Timestamp = ts
+		if len(fields) >= 3 {
+			ev.LatencyMs, _ = strconv.ParseFloat(fields[2], 64)
+		}
+		if len(fields) >= 4 {
+			ev.MaxLatencyMs, _ = strconv.ParseFloat(fields[3], 64)
+		}
+		out[ev.Event] = ev
+	}
+	return out
+}
+
+// ParseClusterInfo parses a CLUSTER INFO bulk-string reply into a flat
+// key→value map. The CLUSTER INFO response uses the same line-oriented
+// "key:value" format as INFO, so this delegates to ParseInfo. Exported for the
+// Valkey collector and external tests.
+func ParseClusterInfo(s string) map[string]string {
+	return ParseInfo(s)
 }

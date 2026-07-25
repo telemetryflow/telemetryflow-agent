@@ -912,7 +912,7 @@ type RedisInstanceConfig struct {
 	// TLSEnabled enables TLS for the Redis connection (default: false)
 	TLSEnabled    bool `mapstructure:"tls_enabled"`
 	TLSSkipVerify bool `mapstructure:"tls_skip_verify"`
-	// CollectLatency enables LATENCY HISTORY/RESET collection (default: false)
+	// CollectLatency enables LATENCY LATEST collection (default: false)
 	CollectLatency bool `mapstructure:"collect_latency"`
 	// CollectCommandStats enables INFO commandstats (default: true)
 	CollectCommandStats bool              `mapstructure:"collect_command_stats"`
@@ -931,13 +931,16 @@ type ValkeyCollectorConfig struct {
 
 // ValkeyInstanceConfig contains connection settings for a single Valkey instance.
 type ValkeyInstanceConfig struct {
-	Name                string            `mapstructure:"name"`
-	Host                string            `mapstructure:"host"`
-	Port                int               `mapstructure:"port"`
-	Password            string            `mapstructure:"password"`
-	DB                  int               `mapstructure:"db"`
-	TLSEnabled          bool              `mapstructure:"tls_enabled"`
-	TLSSkipVerify       bool              `mapstructure:"tls_skip_verify"`
+	Name          string `mapstructure:"name"`
+	Host          string `mapstructure:"host"`
+	Port          int    `mapstructure:"port"`
+	Password      string `mapstructure:"password"`
+	DB            int    `mapstructure:"db"`
+	TLSEnabled    bool   `mapstructure:"tls_enabled"`
+	TLSSkipVerify bool   `mapstructure:"tls_skip_verify"`
+	// CollectLatency enables LATENCY LATEST collection (default: false)
+	CollectLatency bool `mapstructure:"collect_latency"`
+	// CollectCommandStats enables INFO commandstats (default: true)
 	CollectCommandStats bool              `mapstructure:"collect_command_stats"`
 	Tags                map[string]string `mapstructure:"tags"`
 }

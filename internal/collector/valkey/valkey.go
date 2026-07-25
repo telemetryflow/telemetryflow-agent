@@ -127,8 +127,28 @@ func (c *ValkeyCollector) collectInstance(ctx context.Context, inst config.Valke
 		}
 	}
 
+	var clusterInfo map[string]string
+	if redis.ToFloat(parsed["cluster_enabled"]) == 1 {
+		if raw, err := client.BulkString([]string{"CLUSTER", "INFO"}); err == nil {
+			clusterInfo = redis.ParseClusterInfo(raw)
+		}
+	}
+
+	var latency map[string]redis.LatencyEvent
+	if inst.CollectLatency {
+		if raw, err := client.BulkString([]string{"LATENCY", "LATEST"}); err == nil {
+			latency = redis.ParseLatencyLatest(raw)
+		}
+	}
+
 	labels := c.instanceLabels(inst)
-	return BuildValkeyMetrics(parsed, commandStats, labels), nil
+	return BuildValkeyMetrics(MetricsInput{
+		Info:         parsed,
+		CommandStats: commandStats,
+		ClusterInfo:  clusterInfo,
+		Latency:      latency,
+		Labels:       labels,
+	}), nil
 }
 
 func (c *ValkeyCollector) instanceLabels(inst config.ValkeyInstanceConfig) map[string]string {
@@ -145,9 +165,22 @@ func (c *ValkeyCollector) instanceLabels(inst config.ValkeyInstanceConfig) map[s
 	return labels
 }
 
-// BuildValkeyMetrics maps INFO key/value pairs to collector.Metric under the
-// db.valkey.* namespace. Exported for external test coverage.
-func BuildValkeyMetrics(info, commandStats, labels map[string]string) []collector.Metric {
+// MetricsInput bundles the parsed data sources needed to build a full set of
+// Valkey metrics in one call. Any of the maps may be nil; the corresponding
+// metric groups are simply skipped. It mirrors redis.MetricsInput so the two
+// collectors stay symmetric.
+type MetricsInput struct {
+	Info         map[string]string             // parsed INFO all response
+	CommandStats map[string]string             // parsed INFO commandstats response
+	ClusterInfo  map[string]string             // parsed CLUSTER INFO response (only when cluster_enabled=1)
+	Latency      map[string]redis.LatencyEvent // parsed LATENCY LATEST response (only when CollectLatency=true)
+	Labels       map[string]string             // base labels applied to every emitted metric
+}
+
+// BuildValkeyMetrics maps INFO/CLUSTER/LATENCY data to collector.Metric under
+// the db.valkey.* namespace. Exported for external test coverage.
+func BuildValkeyMetrics(in MetricsInput) []collector.Metric {
+	info, commandStats, clusterInfo, latency, labels := in.Info, in.CommandStats, in.ClusterInfo, in.Latency, in.Labels
 	now := time.Now()
 	mk := func(name string, v float64, typ collector.MetricType, unit string, desc string) collector.Metric {
 		m := collector.Metric{
@@ -173,6 +206,15 @@ func BuildValkeyMetrics(info, commandStats, labels map[string]string) []collecto
 		}
 	}
 
+	// valkey_version is reported in the same semver form as redis_version.
+	if raw, ok := info["valkey_version"]; ok {
+		major, minor, patch := redis.ParseSemver(raw)
+		out = append(out,
+			mk("db.valkey.version_major", float64(major), collector.MetricTypeGauge, "", "Valkey major version parsed from valkey_version"),
+			mk("db.valkey.version_minor", float64(minor), collector.MetricTypeGauge, "", "Valkey minor version parsed from valkey_version"),
+			mk("db.valkey.version_patch", float64(patch), collector.MetricTypeGauge, "", "Valkey patch version parsed from valkey_version"),
+		)
+	}
 	counter("uptime_in_seconds", "uptime_seconds", "s", "Server uptime in seconds")
 	gauge("connected_clients", "connected_clients", "", "Connected client count")
 	counter("rejected_connections", "rejected_connections", "", "Connections rejected due to maxclients")
@@ -193,6 +235,9 @@ func BuildValkeyMetrics(info, commandStats, labels map[string]string) []collecto
 	gauge("connected_slaves", "connected_slaves", "", "Connected replicas")
 	counter("rdb_bgsave_in_progress", "rdb_bgsave_in_progress", "", "RDB bgsave in progress flag")
 	gauge("aof_enabled", "aof_enabled", "", "AOF enabled flag")
+
+	// Cluster flag from INFO; cluster_* metrics below come from CLUSTER INFO.
+	gauge("cluster_enabled", "cluster_enabled", "", "Cluster enabled flag")
 
 	// Keyspace section.
 	for k, v := range info {
@@ -226,6 +271,33 @@ func BuildValkeyMetrics(info, commandStats, labels map[string]string) []collecto
 			m.Labels["valkey_command"] = cmd
 			out = append(out, m)
 		}
+	}
+
+	// Cluster section: only emitted when CLUSTER INFO was collected.
+	if len(clusterInfo) > 0 {
+		if v, ok := clusterInfo["cluster_state"]; ok {
+			val := 0.0
+			if v == "ok" {
+				val = 1
+			}
+			out = append(out, mk("db.valkey.cluster_state", val, collector.MetricTypeGauge, "", "Cluster state (1=ok,0=fail)"))
+		}
+		if raw, ok := clusterInfo["cluster_slots_assigned"]; ok {
+			out = append(out, mk("db.valkey.cluster_slots_assigned", redis.ToFloat(raw), collector.MetricTypeGauge, "", "Slots assigned to the cluster"))
+		}
+		if raw, ok := clusterInfo["cluster_slots_ok"]; ok {
+			out = append(out, mk("db.valkey.cluster_slots_ok", redis.ToFloat(raw), collector.MetricTypeGauge, "", "Slots in online state"))
+		}
+	}
+
+	// Latency section: one latency_ms + latency_max_ms pair per event.
+	for event, ev := range latency {
+		m1 := mk("db.valkey.latency_ms", ev.LatencyMs, collector.MetricTypeGauge, "ms", "Latest latency in ms for event "+event)
+		m1.Labels["valkey_event"] = event
+		out = append(out, m1)
+		m2 := mk("db.valkey.latency_max_ms", ev.MaxLatencyMs, collector.MetricTypeGauge, "ms", "Max latency in ms for event "+event)
+		m2.Labels["valkey_event"] = event
+		out = append(out, m2)
 	}
 
 	return out
