@@ -612,6 +612,16 @@ collectors:
     enabled: false
     port: 9091
 
+  # ===========================================================================
+  # Internal Stats Collector (M3)
+  # ===========================================================================
+  # Emits the agent's selfstat counters (metrics gathered/written/dropped,
+  # buffer size, per-collector gather time, per-exporter write time) into
+  # the normal metric pipeline under the name "internal".
+  internalstats:
+    enabled: false
+    interval: 30s
+
 # =============================================================================
 # Prometheus Metrics Endpoint
 # =============================================================================
@@ -648,6 +658,8 @@ exporter:
     flush_interval: 10s
     # Compression (none, gzip)
     compression: gzip
+    # Transport protocol (M5.2): "http" (default) or "grpc"
+    protocol: http
 
     # ==========================================================================
     # Endpoint Version
@@ -688,6 +700,80 @@ exporter:
     logs:
       enabled: true
       # endpoint: ""  # Full URL override (e.g., http://tfo-collector:4318/v2/logs)
+
+# =============================================================================
+# Outputs (M5) - Multi-destination export beyond OTLP
+# =============================================================================
+# Each output registers via the plugin system and is selected by type.
+# All are opt-in; when none are configured, metrics flow only via the
+# OTLP exporter above.
+outputs:
+  # Prometheus Remote Write (proper protobuf + snappy encoding)
+  # - type: prometheus_remote_write
+  #   enabled: false
+  #   endpoint: https://mimir.internal/api/v1/push
+  #   headers:
+  #     X-Scope-OrgID: tenant-123
+  #   auth:
+  #     type: basic  # basic | bearer | none
+  #     username: ${PROM_USER}
+  #     password: ${PROM_PASS}
+  #   batch_size: 5000
+  #   flush_interval: 5s
+
+  # File output (JSON / Influx LP / Prometheus text)
+  # - type: file
+  #   enabled: false
+  #   path: /var/log/tfo-agent/metrics.jsonl
+  #   format: json  # json | influx_lp | prometheus_text
+  #   rotation:
+  #     max_size_mb: 100
+  #     max_backups: 7
+  #     max_age_days: 30
+  #     compress: true
+
+  # Kafka producer
+  # - type: kafka
+  #   enabled: false
+  #   brokers: [kafka-1:9092, kafka-2:9092]
+  #   topic: tfo-agent-metrics
+  #   format: json  # json | otlp_proto | prometheus_rw
+  #   auth:
+  #     type: none  # none | sasl_plaintext | sasl_scram_sha256 | sasl_scram_sha512 | tls
+  #   compression: none  # none | gzip | snappy | lz4 | zstd
+  #   acks: all  # all | 1 | 0
+
+  # Loki logs output
+  # - type: loki
+  #   enabled: false
+  #   endpoint: https://loki.internal
+  #   path: /loki/api/v1/push
+  #   tenant_id: ${LOKI_TENANT}
+  #   auth:
+  #     type: basic
+  #     username: ${LOKI_USER}
+  #     password: ${LOKI_PASS}
+  #   labels:
+  #     job: tfo-agent
+  #   batch_size: 100
+  #   flush_interval: 5s
+
+  # AWS CloudWatch
+  # - type: cloudwatch
+  #   enabled: false
+  #   region: ap-southeast-1
+  #   namespace: TelemetryFlow
+  #   # access_key_id: ${AWS_ACCESS_KEY_ID}     # empty = IAM role
+  #   # secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+  #   batch_size: 20
+
+  # Datadog
+  # - type: datadog
+  #   enabled: false
+  #   api_key: ${DD_API_KEY}
+  #   site: datadoghq.com  # datadoghq.com | datadoghq.eu | us3.datadoghq.com | ddog-gov.com
+  #   batch_size: 1000
+  #   flush_interval: 5s
 
 # =============================================================================
 # QAN (Query Analytics)
@@ -759,6 +845,80 @@ buffer:
   max_age: 24h
   # Flush interval for buffered data
   flush_interval: 5s
+
+# =============================================================================
+# Persister (M1.7) - Plugin state persistence across restarts
+# =============================================================================
+# When enabled, plugin state (e.g. log tail offsets) is saved to a JSON file
+# and restored on agent restart. Opt-in.
+persister:
+  enabled: false
+  statefile: "/var/lib/tfo-agent/state.json"
+  save_interval: 5m
+
+# =============================================================================
+# Pipeline (M1.3 + M3) - Processor chain for metrics
+# =============================================================================
+# Metrics flow: inputs → pre-aggregator processors → aggregators →
+# post-aggregator processors → outputs. Empty pipeline = passthrough
+# (identical to pre-1.3 behavior).
+pipeline:
+  queue_size: 10000
+  drop_policy: drop_newest  # block | drop_oldest | drop_newest
+  aggregator_period: 30s
+  flush_interval: 5s
+
+  processors:
+    pre_aggregator: []
+      # Examples (uncomment to enable):
+      # - type: filter
+      #   rules:
+      #     - action: drop
+      #       metric_name: "go_.*"  # drop Go runtime metrics
+      # - type: rename
+      #   measurements:
+      #     old.name: new.name
+      # - type: defaults
+      #   tags:
+      #     region: us-east-1
+      # - type: starlark
+      #   script: |
+      #     def apply(metric):
+      #         metric["labels"]["environment"] = "prod"
+      #         return metric
+
+    post_aggregator: []
+      # - type: tail_sampling
+      #   policies:
+      #     - name: keep-errors
+      #       type: always
+      #       filter:
+      #         label:
+      #           key: level
+      #           value_regex: "error|fatal"
+      #     - name: sample-rest
+      #       type: probabilistic
+      #       sampling_percentage: 10
+
+  aggregators: []
+
+# =============================================================================
+# Secret Stores (M1.6) - @{store:key} resolver
+# =============================================================================
+# Resolve secret references in any config string. Supported backends:
+# env (os.Getenv), file (JSON map), vault (HashiCorp KV-v2 over HTTP).
+# Example: telemetryflow.api_key_secret: "@{vault:tfo/api-key-secret}"
+secret_stores:
+  - type: env
+  # - type: file
+  #   name: file
+  #   path: /etc/tfo-agent/secrets.json
+  # - type: vault
+  #   name: vault
+  #   address: https://vault.internal:8200
+  #   token: ${VAULT_TOKEN}
+  #   namespace: ""
+  #   mount_path: secret
 
 # =============================================================================
 # Logging Settings

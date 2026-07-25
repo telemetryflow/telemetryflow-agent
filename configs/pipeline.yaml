@@ -1,0 +1,203 @@
+# =============================================================================
+# TelemetryFlow Agent - Pipeline Sample Configuration (M1.3 + M3)
+# =============================================================================
+# Reference sample showing every processor and aggregator slot configured.
+# Copy any block into the top-level `pipeline:` key of tfo-agent.yaml.
+#
+# Processor reference: docs/pipeline/PROCESSORS.md (forthcoming)
+#
+# Flow:
+#   inputs → pre_aggregator processors → aggregators → post_aggregator
+#   processors → outputs
+#
+# An empty pipeline (defaults) is a pure passthrough and is byte-for-byte
+# identical to pre-1.3 behavior.
+#
+# Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
+# =============================================================================
+
+pipeline:
+  # --------------------------------------------------------------------------
+  # Engine tuning
+  # --------------------------------------------------------------------------
+  # queue_size: maximum metrics buffered between stages before drop_policy
+  #             kicks in. Raise for bursty collectors (k8s events, logs).
+  # drop_policy: what to discard when the queue is full:
+  #   block         - producer stalls (back-pressure, safest, can deadlock
+  #                   a slow collector)
+  #   drop_oldest   - drop the head of the queue (favor new data)
+  #   drop_newest   - drop the incoming metric (favor old data, default)
+  # aggregator_period: how often aggregators emit a single rolled-up metric.
+  # flush_interval:    how often post-aggregator output is flushed downstream.
+  queue_size: 10000
+  drop_policy: drop_newest
+  aggregator_period: 30s
+  flush_interval: 5s
+
+  # --------------------------------------------------------------------------
+  # Processors
+  # --------------------------------------------------------------------------
+  # Each entry is { type: <name>, ...config }. Processors run in declaration
+  # order within their stage. Registered types (see internal/processor/):
+  #   filter, rename, defaults, starlark, tail_sampling, drop, keep,
+  #   converter, enum, log_to_metric, regex_parser, grok_parser,
+  #   json_parser, multiline.
+  processors:
+    # ========================================================================
+    # pre_aggregator - run BEFORE aggregation. Use for shaping, filtering,
+    # and enrichment that should happen per raw metric.
+    # ========================================================================
+    pre_aggregator:
+      # ----------------------------------------------------------------------
+      # filter - drop or keep metrics by name/label/value. Drops are O(1).
+      # ----------------------------------------------------------------------
+      - type: filter
+        rules:
+          - action: drop
+            metric_name: "go_.*"          # drop Go runtime metrics
+          - action: drop
+            metric_name: "process_.*"
+          - action: keep
+            tag:
+              key: environment
+              value: production           # keep only prod metrics
+
+      # ----------------------------------------------------------------------
+      # rename - rename metric measurements and label keys.
+      # ----------------------------------------------------------------------
+      - type: rename
+        measurements:
+          "system.cpu.usage": "cpu.utilization"
+          "system.memory.usage": "mem.utilization"
+        tags:
+          hostname: host
+
+      # ----------------------------------------------------------------------
+      # defaults - inject tags/labels only when missing (does NOT overwrite).
+      # ----------------------------------------------------------------------
+      - type: defaults
+        tags:
+          region: us-east-1
+          cluster: prod-1
+          team: platform
+
+      # ----------------------------------------------------------------------
+      # starlark - inline Starlark script for arbitrary transformations.
+      # Function signature: def apply(metric) -> metric | None
+      # Returning None drops the metric.
+      # ----------------------------------------------------------------------
+      - type: starlark
+        script: |
+          def apply(metric):
+              metric["labels"]["environment"] = "prod"
+              # Drop metrics missing the required `service` label.
+              if "service" not in metric.get("labels", {}):
+                  return None
+              return metric
+
+      # ----------------------------------------------------------------------
+      # drop / keep - lighter-weight cousins of `filter`; one rule per block.
+      # ----------------------------------------------------------------------
+      # - type: drop
+      #   metric_name: "scratch_.*"
+      # - type: keep
+      #   tag:
+      #     key: service
+      #     value: payments
+
+      # ----------------------------------------------------------------------
+      # converter - coerce field types (e.g. string -> int).
+      # ----------------------------------------------------------------------
+      # - type: converter
+      #   fields:
+      #     - key: http_status
+      #       type: int
+
+      # ----------------------------------------------------------------------
+      # enum - map raw values to enumerated labels.
+      # ----------------------------------------------------------------------
+      # - type: enum
+      #   source: status_code
+      #   target: status_class
+      #   mapping:
+      #     200: ok
+      #     500: error
+
+      # ----------------------------------------------------------------------
+      # regex_parser / grok_parser / json_parser - parse a string field into
+      # structured labels (useful for log-derived metrics).
+      # ----------------------------------------------------------------------
+      # - type: json_parser
+      #   source: message
+      #   target: parsed
+
+      # ----------------------------------------------------------------------
+      # log_to_metric - synthesize metrics from log lines.
+      # ----------------------------------------------------------------------
+      # - type: log_to_metric
+      #   rules:
+      #     - match: "error"
+      #       metric:
+      #         name: app.errors
+      #         type: counter
+
+      # ----------------------------------------------------------------------
+      # multiline - coalesce multi-line log records before processing.
+      # ----------------------------------------------------------------------
+      # - type: multiline
+      #   pattern: '^\s'
+      #   negate: false
+      #   match_after: true
+
+    # ========================================================================
+    # post_aggregator - run AFTER aggregation. Use for tail sampling,
+    # redaction, and final shaping before export.
+    # ========================================================================
+    post_aggregator:
+      # ----------------------------------------------------------------------
+      # tail_sampling - sample metrics after they have been aggregated.
+      # Policies are evaluated top-down; first match wins. The `always`
+      # policy lets you carve out exceptions before a probabilistic cap.
+      # ----------------------------------------------------------------------
+      - type: tail_sampling
+        policies:
+          - name: keep-errors
+            type: always
+            filter:
+              label:
+                key: level
+                value_regex: "error|fatal"
+          - name: keep-payments
+            type: always
+            filter:
+              tag:
+                key: service
+                value: payments
+          - name: sample-rest
+            type: probabilistic
+            sampling_percentage: 10
+
+      # ----------------------------------------------------------------------
+      # A second starlark pass is allowed here too — e.g. to redact PII
+      # before export.
+      # ----------------------------------------------------------------------
+      # - type: starlark
+      #   script: |
+      #     def apply(metric):
+      #         metric["labels"].pop("email", None)
+      #         return metric
+
+  # --------------------------------------------------------------------------
+  # Aggregators
+  # --------------------------------------------------------------------------
+  # Roll many metrics into one on aggregator_period boundaries. Empty list
+  # means metrics pass through untouched (no roll-up).
+  # Example (uncomment to enable):
+  # aggregators:
+  #   - type: rollup
+  #     rules:
+  #       - metric_name: "http.request.duration"
+  #         by: [service, route]
+  #         as: "http.request.duration.p95"
+  #         statistics: [p95, p99]
+  aggregators: []

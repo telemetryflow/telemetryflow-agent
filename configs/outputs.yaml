@@ -1,0 +1,113 @@
+# =============================================================================
+# TelemetryFlow Agent - Outputs Sample Configuration (M5)
+# =============================================================================
+# Reference sample showing every M5 output configured. Copy any block into
+# the top-level `outputs:` list of tfo-agent.yaml.
+#
+# Outputs are opt-in. When none are configured, metrics flow only through
+# the OTLP exporter (see `exporter.otlp`).
+#
+# Registered output types (see internal/exporter/*_output.go):
+#   prometheus_remote_write, file, kafka, loki, cloudwatch, datadog
+#
+# Each output MUST set `enabled: true` to activate; commenting out a block
+# is equivalent to omitting it.
+#
+# Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
+# =============================================================================
+
+outputs:
+  # ==========================================================================
+  # Prometheus Remote Write
+  # ==========================================================================
+  # Proper protobuf + snappy encoding (NOT JSON). Targets Mimir, Cortex,
+  # VictoriaMetrics, Thanos receive, and any Prometheus-remote-write-compatible
+  # sink.
+  - type: prometheus_remote_write
+    enabled: false
+    endpoint: https://mimir.internal/api/v1/push
+    headers:
+      X-Scope-OrgID: tenant-123
+    auth:
+      type: basic            # basic | bearer | none
+      username: ${PROM_USER}
+      password: ${PROM_PASS}
+    batch_size: 5000         # max series per request
+    flush_interval: 5s
+
+  # ==========================================================================
+  # File
+  # ==========================================================================
+  # Writes metrics to a local file in one of three encodings. Size-based
+  # rotation + backup retention + optional gzip compression. Great for
+  # debugging, offline analysis, or piping into a sidecar.
+  - type: file
+    enabled: false
+    path: /var/log/tfo-agent/metrics.jsonl
+    format: json             # json | influx_lp | prometheus_text
+    rotation:
+      max_size_mb: 100       # rotate once the file exceeds this size
+      max_backups: 7         # number of rotated files to keep
+      max_age_days: 30       # retention window for rotated files
+      compress: true         # gzip rotated files (.N.gz)
+
+  # ==========================================================================
+  # Kafka
+  # ==========================================================================
+  # Produces messages to a Kafka topic. Encoding choices:
+  #   json          - newline-delimited JSON (default, easy to consume)
+  #   otlp_proto    - OTLP protobuf bytes (for downstream OTel collectors)
+  #   prometheus_rw - Prometheus remote-write protobuf (for Mimir-style sinks)
+  - type: kafka
+    enabled: false
+    brokers: [kafka-1:9092, kafka-2:9092]
+    topic: tfo-agent-metrics
+    format: json
+    auth:
+      type: none             # none | sasl_plaintext | sasl_scram_sha256 | sasl_scram_sha512 | tls
+    compression: none        # none | gzip | snappy | lz4 | zstd
+    acks: all                # all | 1 | 0
+
+  # ==========================================================================
+  # Loki
+  # ==========================================================================
+  # Pushes log-derived metrics (or any metric stream you re-route here) to a
+  # Loki cluster via /loki/api/v1/push.
+  - type: loki
+    enabled: false
+    endpoint: https://loki.internal
+    path: /loki/api/v1/push
+    tenant_id: ${LOKI_TENANT}
+    auth:
+      type: basic
+      username: ${LOKI_USER}
+      password: ${LOKI_PASS}
+    labels:
+      job: tfo-agent
+    batch_size: 100
+    flush_interval: 5s
+
+  # ==========================================================================
+  # AWS CloudWatch
+  # ==========================================================================
+  # Publishes to CloudWatch Custom Metrics. When access_key_id is empty the
+  # AWS SDK default credential chain is used (EC2/ECS/Fargate IAM role, etc.).
+  # Note: CloudWatch PutMetricData accepts max 20 values per datum (batch_size).
+  - type: cloudwatch
+    enabled: false
+    region: ap-southeast-1
+    namespace: TelemetryFlow
+    # access_key_id: ${AWS_ACCESS_KEY_ID}     # empty = IAM role
+    # secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+    batch_size: 20
+
+  # ==========================================================================
+  # Datadog
+  # ==========================================================================
+  # Posts to the Datadog Metrics API. Choose the site matching your account.
+  - type: datadog
+    enabled: false
+    api_key: ${DD_API_KEY}
+    site: datadoghq.com      # datadoghq.com | datadoghq.eu | us3.datadoghq.com | ddog-gov.com
+    batch_size: 1000
+    flush_interval: 5s
