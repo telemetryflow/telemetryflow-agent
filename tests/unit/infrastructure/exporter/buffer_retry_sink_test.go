@@ -1,4 +1,4 @@
-package exporter
+package exporter_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/buffer"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
 )
 
 // failingSink fails the first N calls then succeeds.
@@ -48,7 +49,7 @@ func newTestBuffer(t *testing.T) *buffer.Buffer {
 
 func TestBufferRetrySink_DisabledIsPassthrough(t *testing.T) {
 	inner := &failingSink{failCount: 1}
-	sink := NewBufferRetrySink(inner, BufferRetryConfig{Enabled: false, Logger: zap.NewNop()})
+	sink := exporter.NewBufferRetrySink(inner, exporter.BufferRetryConfig{Enabled: false, Logger: zap.NewNop()})
 	err := sink.Export(context.Background(), []collector.Metric{{Name: "m"}}, nil)
 	if err == nil {
 		t.Error("disabled sink should propagate error from inner")
@@ -57,7 +58,7 @@ func TestBufferRetrySink_DisabledIsPassthrough(t *testing.T) {
 
 func TestBufferRetrySink_EnabledAbsorbsError(t *testing.T) {
 	inner := &failingSink{failCount: 1}
-	sink := NewBufferRetrySink(inner, BufferRetryConfig{
+	sink := exporter.NewBufferRetrySink(inner, exporter.BufferRetryConfig{
 		Enabled: true,
 		Buffer:  newTestBuffer(t),
 		Logger:  zap.NewNop(),
@@ -70,7 +71,7 @@ func TestBufferRetrySink_EnabledAbsorbsError(t *testing.T) {
 
 func TestBufferRetrySink_RetryLoopEventuallyExports(t *testing.T) {
 	inner := &failingSink{failCount: 2}
-	sink := NewBufferRetrySink(inner, BufferRetryConfig{
+	sink := exporter.NewBufferRetrySink(inner, exporter.BufferRetryConfig{
 		Enabled:       true,
 		Buffer:        newTestBuffer(t),
 		RetryInterval: 50 * time.Millisecond,
@@ -101,7 +102,7 @@ func TestBufferRetrySink_RetryLoopEventuallyExports(t *testing.T) {
 func TestBufferRetrySink_InMemoryFallback(t *testing.T) {
 	inner := &failingSink{failCount: 1}
 	// Buffer == nil forces the in-memory fallback path.
-	sink := NewBufferRetrySink(inner, BufferRetryConfig{
+	sink := exporter.NewBufferRetrySink(inner, exporter.BufferRetryConfig{
 		Enabled:       true,
 		Buffer:        nil,
 		RetryInterval: 50 * time.Millisecond,
@@ -129,7 +130,7 @@ func TestBufferRetrySink_InMemoryFallback(t *testing.T) {
 func TestBufferRetrySink_MaxRetriesDrops(t *testing.T) {
 	// Always-failing sink with MaxRetries=1 → entry dropped after 1 retry.
 	inner := &failingSink{failCount: 1_000_000}
-	sink := NewBufferRetrySink(inner, BufferRetryConfig{
+	sink := exporter.NewBufferRetrySink(inner, exporter.BufferRetryConfig{
 		Enabled:       true,
 		Buffer:        newTestBuffer(t),
 		RetryInterval: 30 * time.Millisecond,

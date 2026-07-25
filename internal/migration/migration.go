@@ -101,10 +101,10 @@ func (r *Registry) Register(m Migration) error {
 	r.migrations = append(r.migrations, m)
 
 	sort.SliceStable(r.migrations, func(i, j int) bool {
-		if c := compareVersion(r.migrations[i].FromVersion, r.migrations[j].FromVersion); c != 0 {
+		if c := CompareVersion(r.migrations[i].FromVersion, r.migrations[j].FromVersion); c != 0 {
 			return c < 0
 		}
-		return compareVersion(r.migrations[i].ToVersion, r.migrations[j].ToVersion) < 0
+		return CompareVersion(r.migrations[i].ToVersion, r.migrations[j].ToVersion) < 0
 	})
 	return nil
 }
@@ -137,10 +137,10 @@ func (r *Registry) List() []Migration {
 func (r *Registry) ApplyAll(input []byte, fromVersion, toVersion string) ([]byte, error) {
 	current := input
 	for _, m := range r.List() {
-		if compareVersion(m.FromVersion, fromVersion) < 0 {
+		if CompareVersion(m.FromVersion, fromVersion) < 0 {
 			continue
 		}
-		if compareVersion(m.ToVersion, toVersion) > 0 {
+		if CompareVersion(m.ToVersion, toVersion) > 0 {
 			continue
 		}
 		out, err := m.Apply(current)
@@ -210,12 +210,12 @@ func DetectVersion(input []byte) string {
 	return LegacyVersion
 }
 
-// compareVersion compares two dotted numeric versions (e.g. "1.2.0"). It
+// CompareVersion compares two dotted numeric versions (e.g. "1.2.0"). It
 // returns -1, 0, or +1. Missing trailing segments are treated as zero so
 // "1.2" compares equal to "1.2.0". Segments that are not pure integers (for
 // example pre-release suffixes like "0-dev") fall back to lexicographic
 // comparison.
-func compareVersion(a, b string) int {
+func CompareVersion(a, b string) int {
 	ta := strings.Split(a, ".")
 	tb := strings.Split(b, ".")
 	n := len(ta)

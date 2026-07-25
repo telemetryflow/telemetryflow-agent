@@ -252,6 +252,35 @@ func (p *Persister) snapshotIDs() []string {
 	return ids
 }
 
+// RegisteredIDs returns a copy of the currently registered plugin ids.
+// Intended for tests and diagnostics that need to inspect registration state
+// without holding the persister's internal lock.
+func (p *Persister) RegisteredIDs() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	ids := make([]string, 0, len(p.plugins))
+	for id := range p.plugins {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// CacheSnapshot returns a shallow copy of the last decoded/loaded state per
+// plugin id. It returns nil after Close has nilled the cache, allowing tests
+// and callers to verify the post-close lifecycle state.
+func (p *Persister) CacheSnapshot() map[string]interface{} {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.cache == nil {
+		return nil
+	}
+	out := make(map[string]interface{}, len(p.cache))
+	for id, st := range p.cache {
+		out[id] = st
+	}
+	return out
+}
+
 // Close performs a final Store to flush the latest state to disk and then
 // nils out the in-memory state cache. After Close returns the persister
 // should not be reused.

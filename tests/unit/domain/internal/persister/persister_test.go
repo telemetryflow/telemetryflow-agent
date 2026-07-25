@@ -17,7 +17,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package persister
+package persister_test
 
 import (
 	"context"
@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/telemetryflow/telemetryflow-agent/internal/persister"
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
 )
 
@@ -80,7 +81,7 @@ func TestPersister_LoadFirstRun_NoExistingFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
-			p := New(filepath.Join(dir, tt.path))
+			p := persister.New(filepath.Join(dir, tt.path))
 			fp := &fakeStatefulPlugin{state: map[string]interface{}{"counter": 42}}
 			require.NoError(t, p.Register("cpu", fp))
 
@@ -115,7 +116,7 @@ func TestPersister_RegisterStoreLoad_Roundtrip(t *testing.T) {
 			path := filepath.Join(dir, "state.json")
 
 			// Phase 1: register, set state, store.
-			pOut := New(path)
+			pOut := persister.New(path)
 			fpOut := &fakeStatefulPlugin{state: tt.state}
 			require.NoError(t, pOut.Register("counter-plugin", fpOut))
 
@@ -127,7 +128,7 @@ func TestPersister_RegisterStoreLoad_Roundtrip(t *testing.T) {
 			assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 
 			// Phase 2: brand-new persister + plugin instance, load, verify.
-			pIn := New(path)
+			pIn := persister.New(path)
 			fpIn := &fakeStatefulPlugin{}
 			require.NoError(t, pIn.Register("counter-plugin", fpIn))
 
@@ -166,7 +167,7 @@ func TestPersister_LoadCorruptFile_Recovery(t *testing.T) {
 			path := filepath.Join(dir, "state.json")
 			require.NoError(t, os.WriteFile(path, tt.content, 0600))
 
-			p := New(path)
+			p := persister.New(path)
 			fp := &fakeStatefulPlugin{state: map[string]interface{}{"counter": 0}}
 			require.NoError(t, p.Register("cpu", fp))
 
@@ -202,7 +203,7 @@ func TestPersister_Store_ConcurrentAtomicWrites(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
-	p := New(path)
+	p := persister.New(path)
 	// Register several plugins so the snapshot is non-trivial.
 	for i := 0; i < 5; i++ {
 		fp := &fakeStatefulPlugin{state: map[string]interface{}{
@@ -251,7 +252,7 @@ func TestPersister_StartSaveLoop_PeriodicSaves(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
-	p := New(path)
+	p := persister.New(path)
 	fp := &fakeStatefulPlugin{state: map[string]interface{}{"counter": float64(0)}}
 	require.NoError(t, p.Register("counter", fp))
 
@@ -289,21 +290,21 @@ func TestPersister_StartSaveLoop_PeriodicSaves(t *testing.T) {
 
 func TestPersister_Register_Errors(t *testing.T) {
 	t.Run("empty id", func(t *testing.T) {
-		p := New(filepath.Join(t.TempDir(), "state.json"))
+		p := persister.New(filepath.Join(t.TempDir(), "state.json"))
 		err := p.Register("", &fakeStatefulPlugin{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must not be empty")
 	})
 
 	t.Run("nil plugin", func(t *testing.T) {
-		p := New(filepath.Join(t.TempDir(), "state.json"))
+		p := persister.New(filepath.Join(t.TempDir(), "state.json"))
 		err := p.Register("cpu", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must not be nil")
 	})
 
 	t.Run("duplicate id", func(t *testing.T) {
-		p := New(filepath.Join(t.TempDir(), "state.json"))
+		p := persister.New(filepath.Join(t.TempDir(), "state.json"))
 		require.NoError(t, p.Register("cpu", &fakeStatefulPlugin{}))
 		err := p.Register("cpu", &fakeStatefulPlugin{})
 		require.Error(t, err)
@@ -315,7 +316,7 @@ func TestPersister_Close_FlushesAndNilsCache(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
-	p := New(path)
+	p := persister.New(path)
 	fp := &fakeStatefulPlugin{state: map[string]interface{}{"counter": float64(99)}}
 	require.NoError(t, p.Register("cpu", fp))
 
@@ -329,9 +330,7 @@ func TestPersister_Close_FlushesAndNilsCache(t *testing.T) {
 	assert.Contains(t, restored, "cpu")
 
 	// Cache is nil after close.
-	p.mu.RLock()
-	assert.Nil(t, p.cache)
-	p.mu.RUnlock()
+	assert.Nil(t, p.CacheSnapshot())
 }
 
 func TestPersister_Load_SkipsUnregisteredEntries(t *testing.T) {
@@ -351,7 +350,7 @@ func TestPersister_Load_SkipsUnregisteredEntries(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, raw, 0600))
 
-	p := New(path)
+	p := persister.New(path)
 	registered := &fakeStatefulPlugin{}
 	require.NoError(t, p.Register("registered", registered))
 
@@ -363,9 +362,7 @@ func TestPersister_Load_SkipsUnregisteredEntries(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"counter": float64(5)}, registered.state)
 
 	// The orphan state must not have leaked into the registered plugin.
-	p.mu.RLock()
-	assert.Len(t, p.plugins, 1)
-	p.mu.RUnlock()
+	assert.Len(t, p.RegisteredIDs(), 1)
 }
 
 // pluginID returns a deterministic id for index i.

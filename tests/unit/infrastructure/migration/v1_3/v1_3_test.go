@@ -15,7 +15,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package v1_3
+package v1_3_test
 
 import (
 	"testing"
@@ -24,18 +24,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/migration"
+	v1_3 "github.com/telemetryflow/telemetryflow-agent/internal/migration/v1_3"
 )
 
 func TestRenameInsecureSkipVerify_RenamesTopLevelKey(t *testing.T) {
 	in := []byte("insecure_skip_verify: true\n")
-	out, err := RenameInsecureSkipVerify(in)
+	out, err := v1_3.RenameInsecureSkipVerify(in)
 	require.NoError(t, err)
 	assert.Equal(t, "tls_skip_verify: true\n", string(out))
 }
 
 func TestRenameInsecureSkipVerify_PreservesNestedIndentation(t *testing.T) {
 	in := []byte("telemetryflow:\n  tls:\n    insecure_skip_verify: true\n")
-	out, err := RenameInsecureSkipVerify(in)
+	out, err := v1_3.RenameInsecureSkipVerify(in)
 	require.NoError(t, err)
 	want := "telemetryflow:\n  tls:\n    tls_skip_verify: true\n"
 	assert.Equal(t, want, string(out))
@@ -43,14 +44,14 @@ func TestRenameInsecureSkipVerify_PreservesNestedIndentation(t *testing.T) {
 
 func TestRenameInsecureSkipVerify_NoOpWhenKeyAbsent(t *testing.T) {
 	in := []byte("telemetryflow:\n  endpoint: localhost\n")
-	out, err := RenameInsecureSkipVerify(in)
+	out, err := v1_3.RenameInsecureSkipVerify(in)
 	require.NoError(t, err)
 	assert.Equal(t, string(in), string(out))
 }
 
 func TestRenameInsecureSkipVerify_ReplacesAllOccurrences(t *testing.T) {
 	in := []byte("collectors:\n  cadvisor:\n    insecure_skip_verify: true\n  foo:\n    insecure_skip_verify: false\n")
-	out, err := RenameInsecureSkipVerify(in)
+	out, err := v1_3.RenameInsecureSkipVerify(in)
 	require.NoError(t, err)
 	want := "collectors:\n  cadvisor:\n    tls_skip_verify: true\n  foo:\n    tls_skip_verify: false\n"
 	assert.Equal(t, want, string(out))
@@ -60,7 +61,7 @@ func TestRenameInsecureSkipVerify_IgnoresSubstringMatches(t *testing.T) {
 	// Only keys anchored at the start of a line should be rewritten; values and
 	// other keys that merely contain the substring must be left alone.
 	in := []byte("note: \"foo_insecure_skip_verify: x\"\nfoo_insecure_skip_verify: bad\n")
-	out, err := RenameInsecureSkipVerify(in)
+	out, err := v1_3.RenameInsecureSkipVerify(in)
 	require.NoError(t, err)
 	assert.Equal(t, string(in), string(out))
 }

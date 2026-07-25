@@ -449,6 +449,21 @@ func (p *Pipeline) runOutputFlusher(ctx context.Context, in <-chan plugin.Metric
 	}
 }
 
+// Config returns the pipeline's effective configuration. Intended for
+// tests and diagnostics that need to inspect the resolved defaults.
+func (p *Pipeline) Config() Config {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.cfg
+}
+
+// Enqueue is the exported entry point to the pipeline's drop-policy-aware
+// channel push. It is intended for tests that need to exercise back-pressure
+// behaviour directly; production code paths call enqueue internally.
+func (p *Pipeline) Enqueue(ch chan plugin.Metric, m plugin.Metric) {
+	p.enqueue(ch, m)
+}
+
 // enqueue pushes a metric into ch honouring the DropPolicy. Centralised so
 // every stage has consistent back-pressure semantics. Takes a bidirectional
 // channel so DropPolicyOldest can perform a non-blocking receive.

@@ -15,7 +15,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package selfstat
+package selfstat_test
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
+	"github.com/telemetryflow/telemetryflow-agent/internal/selfstat"
 )
 
 // resetRegistry is a test helper that restores a clean registry state.
@@ -33,42 +34,42 @@ import (
 // reflecting them post-reset.
 func resetRegistry(t *testing.T) {
 	t.Helper()
-	Reset()
+	selfstat.Reset()
 }
 
 func TestRegisterStat_CounterSemantics(t *testing.T) {
 	resetRegistry(t)
 	cases := []struct {
 		name      string
-		ops       func(s Stat)
+		ops       func(s selfstat.Stat)
 		wantGet   int64
 		wantReset bool
 	}{
 		{
 			name:    "incr accumulates",
-			ops:     func(s Stat) { s.Incr(1); s.Incr(2); s.Incr(3) },
+			ops:     func(s selfstat.Stat) { s.Incr(1); s.Incr(2); s.Incr(3) },
 			wantGet: 6,
 		},
 		{
 			name:    "set replaces",
-			ops:     func(s Stat) { s.Incr(10); s.Set(42); s.Incr(1) },
+			ops:     func(s selfstat.Stat) { s.Incr(10); s.Set(42); s.Incr(1) },
 			wantGet: 43,
 		},
 		{
 			name:    "incr negative subtracts",
-			ops:     func(s Stat) { s.Set(10); s.Incr(-4) },
+			ops:     func(s selfstat.Stat) { s.Set(10); s.Incr(-4) },
 			wantGet: 6,
 		},
 		{
 			name:    "zero on fresh stat",
-			ops:     func(s Stat) {},
+			ops:     func(s selfstat.Stat) {},
 			wantGet: 0,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			resetRegistry(t)
-			s := RegisterStat("test.counter", map[string]string{"case": tc.name})
+			s := selfstat.RegisterStat("test.counter", map[string]string{"case": tc.name})
 			tc.ops(s)
 			if got := s.Get(); got != tc.wantGet {
 				t.Fatalf("Get = %d, want %d", got, tc.wantGet)
@@ -79,8 +80,8 @@ func TestRegisterStat_CounterSemantics(t *testing.T) {
 
 func TestRegisterStat_DedupesByIdentity(t *testing.T) {
 	resetRegistry(t)
-	s1 := RegisterStat("dup", map[string]string{"k": "v"})
-	s2 := RegisterStat("dup", map[string]string{"k": "v"})
+	s1 := selfstat.RegisterStat("dup", map[string]string{"k": "v"})
+	s2 := selfstat.RegisterStat("dup", map[string]string{"k": "v"})
 	if s1 != s2 {
 		t.Fatalf("expected identical handle for same (name, labels)")
 	}
@@ -92,8 +93,8 @@ func TestRegisterStat_DedupesByIdentity(t *testing.T) {
 
 func TestRegisterStat_DistinguishesByLabels(t *testing.T) {
 	resetRegistry(t)
-	a := RegisterStat("n", map[string]string{"x": "1"})
-	b := RegisterStat("n", map[string]string{"x": "2"})
+	a := selfstat.RegisterStat("n", map[string]string{"x": "1"})
+	b := selfstat.RegisterStat("n", map[string]string{"x": "2"})
 	if a == b {
 		t.Fatalf("expected distinct handles for distinct labels")
 	}
@@ -106,7 +107,7 @@ func TestRegisterStat_DistinguishesByLabels(t *testing.T) {
 func TestRegisterStat_NameAndLabels(t *testing.T) {
 	resetRegistry(t)
 	in := map[string]string{"a": "1", "b": "2"}
-	s := RegisterStat("named", in)
+	s := selfstat.RegisterStat("named", in)
 	if s.Name() != "named" {
 		t.Fatalf("Name = %q, want %q", s.Name(), "named")
 	}
@@ -128,21 +129,21 @@ func TestRegisterStat_NameAndLabels(t *testing.T) {
 
 func TestGet_Lookup(t *testing.T) {
 	resetRegistry(t)
-	if _, ok := Get("missing", nil); ok {
+	if _, ok := selfstat.Get("missing", nil); ok {
 		t.Fatalf("expected miss for unregistered stat")
 	}
-	RegisterStat("present", map[string]string{"k": "v"})
-	if _, ok := Get("present", map[string]string{"k": "v"}); !ok {
+	selfstat.RegisterStat("present", map[string]string{"k": "v"})
+	if _, ok := selfstat.Get("present", map[string]string{"k": "v"}); !ok {
 		t.Fatalf("expected hit for registered stat")
 	}
-	if _, ok := Get("present", map[string]string{"k": "other"}); ok {
+	if _, ok := selfstat.Get("present", map[string]string{"k": "other"}); ok {
 		t.Fatalf("expected miss for mismatched labels")
 	}
 }
 
 func TestRegisterTimingStat_AveragesSamples(t *testing.T) {
 	resetRegistry(t)
-	tt := RegisterTimingStat("timing", nil)
+	tt := selfstat.RegisterTimingStat("timing", nil)
 	tt.Add(10 * time.Nanosecond)
 	tt.Add(20 * time.Nanosecond)
 	tt.Add(30 * time.Nanosecond)
@@ -154,7 +155,7 @@ func TestRegisterTimingStat_AveragesSamples(t *testing.T) {
 
 func TestRegisterTimingStat_ClearsAfterRead(t *testing.T) {
 	resetRegistry(t)
-	tt := RegisterTimingStat("timing.clear", nil)
+	tt := selfstat.RegisterTimingStat("timing.clear", nil)
 	tt.Add(100 * time.Nanosecond)
 	if got := tt.Get(); got != 100 {
 		t.Fatalf("first Get = %d, want 100", got)
@@ -172,7 +173,7 @@ func TestRegisterTimingStat_ClearsAfterRead(t *testing.T) {
 func TestRegisterTimingStat_NameAndLabels(t *testing.T) {
 	resetRegistry(t)
 	in := map[string]string{"phase": "write"}
-	tt := RegisterTimingStat("timing.named", in)
+	tt := selfstat.RegisterTimingStat("timing.named", in)
 	if tt.Name() != "timing.named" {
 		t.Fatalf("Name = %q", tt.Name())
 	}
@@ -183,11 +184,11 @@ func TestRegisterTimingStat_NameAndLabels(t *testing.T) {
 
 func TestAllMetrics_NamesAndCounterType(t *testing.T) {
 	resetRegistry(t)
-	RegisterStat("alpha", map[string]string{"x": "1"})
-	RegisterStat("alpha", map[string]string{"x": "2"})
-	RegisterTimingStat("beta.timing", nil)
+	selfstat.RegisterStat("alpha", map[string]string{"x": "1"})
+	selfstat.RegisterStat("alpha", map[string]string{"x": "2"})
+	selfstat.RegisterTimingStat("beta.timing", nil)
 
-	metrics := AllMetrics()
+	metrics := selfstat.AllMetrics()
 	if len(metrics) != 3 {
 		t.Fatalf("len(metrics) = %d, want 3", len(metrics))
 	}
@@ -215,9 +216,9 @@ func TestAllMetrics_NamesAndCounterType(t *testing.T) {
 
 func TestAllMetrics_TimingReadsAreDestructive(t *testing.T) {
 	resetRegistry(t)
-	tt := RegisterTimingStat("destructive", nil)
+	tt := selfstat.RegisterTimingStat("destructive", nil)
 	tt.Add(1 * time.Microsecond)
-	metrics := AllMetrics()
+	metrics := selfstat.AllMetrics()
 	var found float64
 	for _, m := range metrics {
 		if m.Name == "destructive" {
@@ -228,7 +229,7 @@ func TestAllMetrics_TimingReadsAreDestructive(t *testing.T) {
 		t.Fatalf("expected non-zero timing value in AllMetrics output")
 	}
 	// Second snapshot: timing should have been cleared.
-	for _, m := range AllMetrics() {
+	for _, m := range selfstat.AllMetrics() {
 		if m.Name == "destructive" && m.Value != 0 {
 			t.Fatalf("timing stat was not cleared after AllMetrics")
 		}
@@ -237,13 +238,13 @@ func TestAllMetrics_TimingReadsAreDestructive(t *testing.T) {
 
 func TestForCollector_NonNilAndCorrectLabels(t *testing.T) {
 	resetRegistry(t)
-	cs := ForCollector("cpu")
+	cs := selfstat.ForCollector("cpu")
 	if cs == nil {
 		t.Fatalf("ForCollector returned nil")
 	}
 	checks := []struct {
 		name string
-		s    Stat
+		s    selfstat.Stat
 	}{
 		{"MetricsGathered", cs.MetricsGathered},
 		{"GatherErrors", cs.GatherErrors},
@@ -268,20 +269,20 @@ func TestForCollector_NonNilAndCorrectLabels(t *testing.T) {
 	}
 
 	// State should be settable as a gauge.
-	cs.State.Set(CollectorStateRunning)
-	if got := cs.State.Get(); got != CollectorStateRunning {
-		t.Errorf("State.Get = %d, want %d", got, CollectorStateRunning)
+	cs.State.Set(selfstat.CollectorStateRunning)
+	if got := cs.State.Get(); got != selfstat.CollectorStateRunning {
+		t.Errorf("State.Get = %d, want %d", got, selfstat.CollectorStateRunning)
 	}
 }
 
 func TestForCollector_StableIdentity(t *testing.T) {
 	resetRegistry(t)
-	a := ForCollector("disk")
-	b := ForCollector("disk")
+	a := selfstat.ForCollector("disk")
+	b := selfstat.ForCollector("disk")
 	if a.MetricsGathered != b.MetricsGathered {
 		t.Fatalf("expected same handle across ForCollector calls")
 	}
-	c := ForCollector("net")
+	c := selfstat.ForCollector("net")
 	if a.MetricsGathered == c.MetricsGathered {
 		t.Fatalf("expected distinct handles for distinct collectors")
 	}
@@ -289,13 +290,13 @@ func TestForCollector_StableIdentity(t *testing.T) {
 
 func TestForExporter_NonNilAndCorrectLabels(t *testing.T) {
 	resetRegistry(t)
-	es := ForExporter("otlp")
+	es := selfstat.ForExporter("otlp")
 	if es == nil {
 		t.Fatalf("ForExporter returned nil")
 	}
 	checks := []struct {
 		name string
-		s    Stat
+		s    selfstat.Stat
 	}{
 		{"MetricsWritten", es.MetricsWritten},
 		{"MetricsRejected", es.MetricsRejected},
@@ -322,8 +323,8 @@ func TestForExporter_NonNilAndCorrectLabels(t *testing.T) {
 
 func TestForExporter_StableIdentity(t *testing.T) {
 	resetRegistry(t)
-	a := ForExporter("prom")
-	b := ForExporter("prom")
+	a := selfstat.ForExporter("prom")
+	b := selfstat.ForExporter("prom")
 	if a.MetricsWritten != b.MetricsWritten {
 		t.Fatalf("expected same handle across ForExporter calls")
 	}
@@ -331,23 +332,23 @@ func TestForExporter_StableIdentity(t *testing.T) {
 
 func TestReset_ClearsState(t *testing.T) {
 	resetRegistry(t)
-	s := RegisterStat("ephemeral", nil)
+	s := selfstat.RegisterStat("ephemeral", nil)
 	s.Incr(5)
-	if got := len(AllMetrics()); got != 1 {
+	if got := len(selfstat.AllMetrics()); got != 1 {
 		t.Fatalf("pre-reset AllMetrics len = %d, want 1", got)
 	}
-	Reset()
-	if got := len(AllMetrics()); got != 0 {
+	selfstat.Reset()
+	if got := len(selfstat.AllMetrics()); got != 0 {
 		t.Fatalf("post-reset AllMetrics len = %d, want 0", got)
 	}
-	if _, ok := Get("ephemeral", nil); ok {
+	if _, ok := selfstat.Get("ephemeral", nil); ok {
 		t.Fatalf("Get returned true after Reset")
 	}
 }
 
 func TestConcurrency_ParallelIncrMatchesSum(t *testing.T) {
 	resetRegistry(t)
-	s := RegisterStat("concurrent", map[string]string{"case": "parallel"})
+	s := selfstat.RegisterStat("concurrent", map[string]string{"case": "parallel"})
 	const goroutines = 100
 	const perGoroutine = 1000
 	var wg sync.WaitGroup
@@ -377,7 +378,7 @@ func TestConcurrency_ParallelRegisterAndIncr(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			labels := map[string]string{"phase": fmt.Sprintf("g-%d", i%4)}
-			s := RegisterStat("shared.register", labels)
+			s := selfstat.RegisterStat("shared.register", labels)
 			s.Incr(1)
 			atomic.AddInt64(&success, 1)
 		}(i)
@@ -391,9 +392,9 @@ func TestConcurrency_ParallelRegisterAndIncr(t *testing.T) {
 // Property: AllMetrics output value equals current Get() for any counter.
 func TestProperty_AllMetricsMatchesGet(t *testing.T) {
 	resetRegistry(t)
-	s := RegisterStat("prop", map[string]string{"k": "v"})
+	s := selfstat.RegisterStat("prop", map[string]string{"k": "v"})
 	s.Set(12345)
-	for _, m := range AllMetrics() {
+	for _, m := range selfstat.AllMetrics() {
 		if m.Name == "prop" && m.Labels["k"] == "v" {
 			if m.Value != 12345 {
 				t.Fatalf("AllMetrics Value = %v, want 12345", m.Value)
@@ -408,26 +409,26 @@ func TestAgentGlobals_RegisteredOnInit(t *testing.T) {
 	// These are populated by init(); they may already have been touched by
 	// earlier tests' Reset(), but the package variables must remain
 	// non-nil regardless of registry state.
-	for name, s := range map[string]Stat{
-		"AgentMetricsWritten":  AgentMetricsWritten,
-		"AgentMetricsRejected": AgentMetricsRejected,
-		"AgentMetricsDropped":  AgentMetricsDropped,
-		"AgentMetricsGathered": AgentMetricsGathered,
-		"AgentGatherErrors":    AgentGatherErrors,
-		"AgentGatherTimeouts":  AgentGatherTimeouts,
-		"AgentWriteErrors":     AgentWriteErrors,
-		"AgentBufferSize":      AgentBufferSize,
-		"AgentBufferLimit":     AgentBufferLimit,
-		"AgentVersionInfo":     AgentVersionInfo,
+	for name, s := range map[string]selfstat.Stat{
+		"AgentMetricsWritten":  selfstat.AgentMetricsWritten,
+		"AgentMetricsRejected": selfstat.AgentMetricsRejected,
+		"AgentMetricsDropped":  selfstat.AgentMetricsDropped,
+		"AgentMetricsGathered": selfstat.AgentMetricsGathered,
+		"AgentGatherErrors":    selfstat.AgentGatherErrors,
+		"AgentGatherTimeouts":  selfstat.AgentGatherTimeouts,
+		"AgentWriteErrors":     selfstat.AgentWriteErrors,
+		"AgentBufferSize":      selfstat.AgentBufferSize,
+		"AgentBufferLimit":     selfstat.AgentBufferLimit,
+		"AgentVersionInfo":     selfstat.AgentVersionInfo,
 	} {
 		if s == nil {
 			t.Errorf("%s is nil after init()", name)
 		}
 	}
-	if got := AgentVersionInfo.Get(); got != 1 {
+	if got := selfstat.AgentVersionInfo.Get(); got != 1 {
 		t.Errorf("AgentVersionInfo.Get = %d, want 1 (info gauge)", got)
 	}
-	if l := AgentVersionInfo.Labels(); l["version"] == "" {
+	if l := selfstat.AgentVersionInfo.Labels(); l["version"] == "" {
 		t.Errorf("AgentVersionInfo missing version label")
 	}
 }

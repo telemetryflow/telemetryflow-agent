@@ -1,4 +1,4 @@
-package pipeline
+package pipeline_test
 
 import (
 	"context"
@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
 	"go.uber.org/zap"
+
+	"github.com/telemetryflow/telemetryflow-agent/internal/pipeline"
+	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
 )
 
 // --- Test fixtures -----------------------------------------------------------
@@ -80,7 +82,7 @@ func (p *passthroughProcessor) Stop() error { return nil }
 // --- Tests -------------------------------------------------------------------
 
 func TestPipeline_EmptyStages_RunStop(t *testing.T) {
-	p := New(Config{QueueSize: 10, FlushInterval: 50 * time.Millisecond}, zap.NewNop())
+	p := pipeline.New(pipeline.Config{QueueSize: 10, FlushInterval: 50 * time.Millisecond}, zap.NewNop())
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -97,7 +99,7 @@ func TestPipeline_EmptyStages_RunStop(t *testing.T) {
 }
 
 func TestPipeline_NoProcessors_EndToEnd(t *testing.T) {
-	p := New(Config{QueueSize: 100, FlushInterval: 50 * time.Millisecond}, zap.NewNop())
+	p := pipeline.New(pipeline.Config{QueueSize: 100, FlushInterval: 50 * time.Millisecond}, zap.NewNop())
 	col := &noopCollector{name: "test"}
 	out := &captureOutput{name: "capture"}
 	p.AddCollector(col)
@@ -122,12 +124,12 @@ func TestPipeline_NoProcessors_EndToEnd(t *testing.T) {
 }
 
 func TestPipeline_ProcessorChain(t *testing.T) {
-	cfg := Config{
+	cfg := pipeline.Config{
 		QueueSize:     100,
-		DropPolicy:    DropPolicyNewest,
+		DropPolicy:    pipeline.DropPolicyNewest,
 		FlushInterval: 50 * time.Millisecond,
 	}
-	p := New(cfg, zap.NewNop())
+	p := pipeline.New(cfg, zap.NewNop())
 	p.AddPreAggregatorProcessor(&dropAllProcessor{})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,8 +141,8 @@ func TestPipeline_ProcessorChain(t *testing.T) {
 }
 
 func TestPipeline_PreAggPassthrough_DeliversMetric(t *testing.T) {
-	cfg := Config{QueueSize: 100, FlushInterval: 30 * time.Millisecond}
-	p := New(cfg, zap.NewNop())
+	cfg := pipeline.Config{QueueSize: 100, FlushInterval: 30 * time.Millisecond}
+	p := pipeline.New(cfg, zap.NewNop())
 	p.AddPreAggregatorProcessor(&passthroughProcessor{})
 	out := &captureOutput{name: "capture"}
 	p.AddOutput(out)
@@ -184,13 +186,13 @@ func (s *oneShotService) Collect(_ context.Context) ([]plugin.Metric, error) { r
 func (s *oneShotService) IsRunning() bool                                    { return true }
 
 func TestPipeline_StopIsIdempotent(t *testing.T) {
-	p := New(Config{QueueSize: 10}, zap.NewNop())
+	p := pipeline.New(pipeline.Config{QueueSize: 10}, zap.NewNop())
 	p.Stop() // not yet started — must not panic
 	p.Stop()
 }
 
 func TestPipeline_RunTwice_ReturnsError(t *testing.T) {
-	p := New(Config{QueueSize: 10, FlushInterval: 30 * time.Millisecond}, zap.NewNop())
+	p := pipeline.New(pipeline.Config{QueueSize: 10, FlushInterval: 30 * time.Millisecond}, zap.NewNop())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan struct{})
@@ -204,17 +206,17 @@ func TestPipeline_RunTwice_ReturnsError(t *testing.T) {
 }
 
 func TestPipeline_DropPolicyNewest_NoBlock(t *testing.T) {
-	cfg := Config{QueueSize: 2, DropPolicy: DropPolicyNewest, FlushInterval: 10 * time.Second}
-	p := New(cfg, zap.NewNop())
+	cfg := pipeline.Config{QueueSize: 2, DropPolicy: pipeline.DropPolicyNewest, FlushInterval: 10 * time.Second}
+	p := pipeline.New(cfg, zap.NewNop())
 	ch := make(chan plugin.Metric, 2)
 	// Fill the queue.
 	for i := 0; i < 2; i++ {
-		p.enqueue(ch, plugin.Metric{Name: "first"})
+		p.Enqueue(ch, plugin.Metric{Name: "first"})
 	}
 	// This call must not block under DropPolicyNewest.
 	done := make(chan struct{})
 	go func() {
-		p.enqueue(ch, plugin.Metric{Name: "drop_me"})
+		p.Enqueue(ch, plugin.Metric{Name: "drop_me"})
 		close(done)
 	}()
 	select {
@@ -225,13 +227,13 @@ func TestPipeline_DropPolicyNewest_NoBlock(t *testing.T) {
 }
 
 func TestPipeline_DropPolicyOldest_Evicts(t *testing.T) {
-	cfg := Config{QueueSize: 2, DropPolicy: DropPolicyOldest, FlushInterval: 10 * time.Second}
-	p := New(cfg, zap.NewNop())
+	cfg := pipeline.Config{QueueSize: 2, DropPolicy: pipeline.DropPolicyOldest, FlushInterval: 10 * time.Second}
+	p := pipeline.New(cfg, zap.NewNop())
 	ch := make(chan plugin.Metric, 2)
 	ch <- plugin.Metric{Name: "old"}
 	ch <- plugin.Metric{Name: "newer"}
 	// Queue full; enqueue under DropPolicyOldest must evict "old".
-	p.enqueue(ch, plugin.Metric{Name: "newest"})
+	p.Enqueue(ch, plugin.Metric{Name: "newest"})
 	if len(ch) != 2 {
 		t.Fatalf("queue length: want 2, got %d", len(ch))
 	}
@@ -242,11 +244,12 @@ func TestPipeline_DropPolicyOldest_Evicts(t *testing.T) {
 }
 
 func TestPipeline_DefaultConfig_AppliesWhenZero(t *testing.T) {
-	p := New(Config{}, zap.NewNop())
-	if p.cfg.QueueSize != DefaultQueueSize {
-		t.Errorf("QueueSize default: want %d, got %d", DefaultQueueSize, p.cfg.QueueSize)
+	p := pipeline.New(pipeline.Config{}, zap.NewNop())
+	cfg := p.Config()
+	if cfg.QueueSize != pipeline.DefaultQueueSize {
+		t.Errorf("QueueSize default: want %d, got %d", pipeline.DefaultQueueSize, cfg.QueueSize)
 	}
-	if p.cfg.FlushInterval != 5*time.Second {
-		t.Errorf("FlushInterval default: want 5s, got %s", p.cfg.FlushInterval)
+	if cfg.FlushInterval != 5*time.Second {
+		t.Errorf("FlushInterval default: want 5s, got %s", cfg.FlushInterval)
 	}
 }
