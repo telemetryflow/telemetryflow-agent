@@ -37,9 +37,11 @@ import (
 	clickhousecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/clickhouse"
 	cockroachdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cockroachdb"
 	confluentkafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/confluent_kafka"
+	dnscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/dns"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
+	httprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/http_probe"
 	kafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/kafka"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
@@ -48,15 +50,20 @@ import (
 	mssqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mssql"
 	mysqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mysql"
 	natscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nats"
+	netflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/netflow"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
+	pingcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ping"
 	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
 	pubsubcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pubsub"
 	rabbitmqcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rabbitmq"
 	rdspgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rds_postgresql"
 	redicollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/redis"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
+	snmpcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/snmp"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
+	sysloglistenercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/syslog_listener"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
+	tcpprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/tcp_probe"
 	tsdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/timescaledb"
 	valkeycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/valkey"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
@@ -328,6 +335,82 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("NATS collector enabled",
 			zap.Int("instances", len(cfg.Collector.NATS.Instances)),
 			zap.Duration("stats_interval", cfg.Collector.NATS.StatsInterval),
+		)
+	}
+
+	// === M2 Network Monitoring Collectors ===
+
+	// Add DNS probe collector if enabled
+	if cfg.Collector.DNS.Enabled {
+		dnsCol := dnscollector.NewDNSCollector(cfg.Collector.DNS, logger)
+		collectors = append(collectors, dnsCol)
+		logger.Info("DNS collector enabled",
+			zap.Int("servers", len(cfg.Collector.DNS.Servers)),
+			zap.Int("queries", len(cfg.Collector.DNS.Queries)),
+			zap.Duration("interval", cfg.Collector.DNS.Interval),
+		)
+	}
+
+	// Add HTTP probe collector if enabled
+	if cfg.Collector.HTTPProbe.Enabled {
+		httpProbeCol := httprobecollector.NewHTTPProbeCollector(cfg.Collector.HTTPProbe, logger)
+		collectors = append(collectors, httpProbeCol)
+		logger.Info("HTTP probe collector enabled",
+			zap.Int("targets", len(cfg.Collector.HTTPProbe.Targets)),
+			zap.Duration("interval", cfg.Collector.HTTPProbe.Interval),
+		)
+	}
+
+	// Add NetFlow listener collector if enabled
+	if cfg.Collector.Netflow.Enabled {
+		netflowCol := netflowcollector.NewNetflowCollector(cfg.Collector.Netflow, logger)
+		collectors = append(collectors, netflowCol)
+		logger.Info("Netflow collector enabled",
+			zap.String("address", cfg.Collector.Netflow.Address),
+			zap.Int("port", cfg.Collector.Netflow.Port),
+			zap.Strings("protocols", cfg.Collector.Netflow.Protocols),
+		)
+	}
+
+	// Add Ping probe collector if enabled
+	if cfg.Collector.Ping.Enabled {
+		pingCol := pingcollector.NewPingCollector(cfg.Collector.Ping, logger)
+		collectors = append(collectors, pingCol)
+		logger.Info("Ping collector enabled",
+			zap.Int("targets", len(cfg.Collector.Ping.Targets)),
+			zap.Duration("interval", cfg.Collector.Ping.Interval),
+		)
+	}
+
+	// Add SNMP poll collector if enabled
+	if cfg.Collector.SNMP.Enabled {
+		snmpCol := snmpcollector.NewSNMPCollector(cfg.Collector.SNMP, logger)
+		collectors = append(collectors, snmpCol)
+		logger.Info("SNMP collector enabled",
+			zap.Int("agents", len(cfg.Collector.SNMP.Agents)),
+			zap.Int("fields", len(cfg.Collector.SNMP.Fields)),
+			zap.Int("tables", len(cfg.Collector.SNMP.Tables)),
+			zap.Duration("interval", cfg.Collector.SNMP.Interval),
+		)
+	}
+
+	// Add Syslog listener collector if enabled
+	if cfg.Collector.SyslogListener.Enabled {
+		syslogCol := sysloglistenercollector.NewSyslogListenerCollector(cfg.Collector.SyslogListener, logger)
+		collectors = append(collectors, syslogCol)
+		logger.Info("Syslog listener collector enabled",
+			zap.Int("listeners", len(cfg.Collector.SyslogListener.Listeners)),
+			zap.String("default_format", cfg.Collector.SyslogListener.DefaultFormat),
+		)
+	}
+
+	// Add TCP probe collector if enabled
+	if cfg.Collector.TCPProbe.Enabled {
+		tcpProbeCol := tcpprobecollector.NewTCPProbeCollector(cfg.Collector.TCPProbe, logger)
+		collectors = append(collectors, tcpProbeCol)
+		logger.Info("TCP probe collector enabled",
+			zap.Int("targets", len(cfg.Collector.TCPProbe.Targets)),
+			zap.Duration("interval", cfg.Collector.TCPProbe.Interval),
 		)
 	}
 

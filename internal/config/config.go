@@ -342,6 +342,29 @@ type CollectorConfig struct {
 
 	// RemoteWriteReceiver contains Prometheus remote_write push receiver settings
 	RemoteWriteReceiver RemoteWriteReceiverConfig `mapstructure:"remote_write_receiver"`
+
+	// === M2 Network Monitoring Collectors ===
+
+	// Ping contains ICMP ping probe settings.
+	Ping PingCollectorConfig `mapstructure:"ping"`
+
+	// DNS contains DNS query probe settings.
+	DNS DNSCollectorConfig `mapstructure:"dns"`
+
+	// TCPProbe contains TCP/UDP port probe settings.
+	TCPProbe TCPProbeCollectorConfig `mapstructure:"tcp_probe"`
+
+	// HTTPProbe contains HTTP synthetic check settings.
+	HTTPProbe HTTPProbeCollectorConfig `mapstructure:"http_probe"`
+
+	// SNMP contains SNMP polling settings.
+	SNMP SNMPCollectorConfig `mapstructure:"snmp"`
+
+	// Netflow contains NetFlow v5/v9/IPFIX listener settings.
+	Netflow NetflowCollectorConfig `mapstructure:"netflow"`
+
+	// SyslogListener contains syslog receiver settings.
+	SyslogListener SyslogListenerConfig `mapstructure:"syslog_listener"`
 }
 
 // ClickHouseCollectorConfig contains settings for monitoring external ClickHouse instances.
