@@ -1,14 +1,15 @@
-package enum
+package enum_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
+	"github.com/telemetryflow/telemetryflow-agent/internal/processor/enum"
 )
 
 func TestEnum_MapsValue(t *testing.T) {
-	e := New(Config{Mappings: []Mapping{{
+	e := enum.New(enum.Config{Mappings: []enum.Mapping{{
 		Tag:    "state",
 		Values: map[string]string{"0": "stopped", "1": "running"},
 	}}})
@@ -21,7 +22,7 @@ func TestEnum_MapsValue(t *testing.T) {
 }
 
 func TestEnum_DefaultApplied(t *testing.T) {
-	e := New(Config{Mappings: []Mapping{{
+	e := enum.New(enum.Config{Mappings: []enum.Mapping{{
 		Tag:     "state",
 		Values:  map[string]string{"0": "stopped"},
 		Default: "unknown",
@@ -35,7 +36,7 @@ func TestEnum_DefaultApplied(t *testing.T) {
 }
 
 func TestEnum_NoMappingForValue_LeavesUnchanged(t *testing.T) {
-	e := New(Config{Mappings: []Mapping{{
+	e := enum.New(enum.Config{Mappings: []enum.Mapping{{
 		Tag:    "state",
 		Values: map[string]string{"0": "stopped"},
 	}}})
@@ -48,7 +49,7 @@ func TestEnum_NoMappingForValue_LeavesUnchanged(t *testing.T) {
 }
 
 func TestEnum_TagAbsent_NoOp(t *testing.T) {
-	e := New(Config{Mappings: []Mapping{{Tag: "state", Values: map[string]string{"0": "stopped"}}}})
+	e := enum.New(enum.Config{Mappings: []enum.Mapping{{Tag: "state", Values: map[string]string{"0": "stopped"}}}})
 	acc := &captureAcc{}
 	e.Start(acc)
 	_ = e.Add(plugin.Metric{Name: "m", Labels: map[string]string{"other": "x"}}, nil)
@@ -59,8 +60,8 @@ func TestEnum_TagAbsent_NoOp(t *testing.T) {
 
 type captureAcc struct{ added []plugin.Metric }
 
-func (a *captureAcc) Add(m plugin.Metric)                                       { a.added = append(a.added, m) }
-func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time) {}
+func (a *captureAcc) Add(m plugin.Metric)                                              { a.added = append(a.added, m) }
+func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time)  {}
 func (a *captureAcc) AddGauge(_ string, _ float64, _ map[string]string, _ time.Time)   {}
 func (a *captureAcc) AddCounter(_ string, _ float64, _ map[string]string, _ time.Time) {}
-func (a *captureAcc) AddError(_ error)                                           {}
+func (a *captureAcc) AddError(_ error)                                                 {}

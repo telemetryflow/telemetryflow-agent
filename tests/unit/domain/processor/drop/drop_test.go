@@ -1,14 +1,15 @@
-package drop
+package drop_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
+	"github.com/telemetryflow/telemetryflow-agent/internal/processor/drop"
 )
 
 func TestDrop_NoPatterns_ForwardsAll(t *testing.T) {
-	d, err := New(Config{})
+	d, err := drop.New(drop.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +23,7 @@ func TestDrop_NoPatterns_ForwardsAll(t *testing.T) {
 }
 
 func TestDrop_MatchDrops(t *testing.T) {
-	d, err := New(Config{Patterns: []string{"^debug\\."}})
+	d, err := drop.New(drop.Config{Patterns: []string{"^debug\\."}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,13 +37,13 @@ func TestDrop_MatchDrops(t *testing.T) {
 }
 
 func TestDrop_InvalidRegex_ReturnsError(t *testing.T) {
-	if _, err := New(Config{Patterns: []string{"["}}); err == nil {
+	if _, err := drop.New(drop.Config{Patterns: []string{"["}}); err == nil {
 		t.Error("expected regex compile error")
 	}
 }
 
 func TestDrop_Name(t *testing.T) {
-	d, _ := New(Config{})
+	d, _ := drop.New(drop.Config{})
 	if d.Name() != "drop" {
 		t.Error("name mismatch")
 	}
@@ -52,8 +53,8 @@ type captureAcc struct {
 	added []plugin.Metric
 }
 
-func (a *captureAcc) Add(m plugin.Metric)                                       { a.added = append(a.added, m) }
-func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time) {}
+func (a *captureAcc) Add(m plugin.Metric)                                              { a.added = append(a.added, m) }
+func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time)  {}
 func (a *captureAcc) AddGauge(_ string, _ float64, _ map[string]string, _ time.Time)   {}
 func (a *captureAcc) AddCounter(_ string, _ float64, _ map[string]string, _ time.Time) {}
-func (a *captureAcc) AddError(_ error)                                           {}
+func (a *captureAcc) AddError(_ error)                                                 {}

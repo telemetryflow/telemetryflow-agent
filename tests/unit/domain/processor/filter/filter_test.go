@@ -1,14 +1,15 @@
-package filter
+package filter_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
+	"github.com/telemetryflow/telemetryflow-agent/internal/processor/filter"
 )
 
 func TestFilter_DefaultKeep_Forwards(t *testing.T) {
-	f := New(Config{DefaultAction: ActionKeep})
+	f := filter.New(filter.Config{DefaultAction: filter.ActionKeep})
 	acc := &captureAcc{}
 	f.Start(acc)
 
@@ -21,7 +22,7 @@ func TestFilter_DefaultKeep_Forwards(t *testing.T) {
 }
 
 func TestFilter_DefaultDrop_DropsAll(t *testing.T) {
-	f := New(Config{DefaultAction: ActionDrop})
+	f := filter.New(filter.Config{DefaultAction: filter.ActionDrop})
 	acc := &captureAcc{}
 	f.Start(acc)
 
@@ -33,10 +34,10 @@ func TestFilter_DefaultDrop_DropsAll(t *testing.T) {
 }
 
 func TestFilter_RuleKeepByNameRegex(t *testing.T) {
-	f := New(Config{
-		Rules: []Rule{
-			{Action: ActionKeep, MetricName: "^keep\\..*"},
-			{Action: ActionDrop, MetricName: ".*"},
+	f := filter.New(filter.Config{
+		Rules: []filter.Rule{
+			{Action: filter.ActionKeep, MetricName: "^keep\\..*"},
+			{Action: filter.ActionDrop, MetricName: ".*"},
 		},
 	})
 	acc := &captureAcc{}
@@ -55,10 +56,10 @@ func TestFilter_RuleKeepByNameRegex(t *testing.T) {
 }
 
 func TestFilter_RuleByTagPresence(t *testing.T) {
-	f := New(Config{
-		Rules: []Rule{
-			{Action: ActionKeep, Tag: &TagMatch{Key: "service"}},
-			{Action: ActionDrop, MetricName: ".*"},
+	f := filter.New(filter.Config{
+		Rules: []filter.Rule{
+			{Action: filter.ActionKeep, Tag: &filter.TagMatch{Key: "service"}},
+			{Action: filter.ActionDrop, MetricName: ".*"},
 		},
 	})
 	acc := &captureAcc{}
@@ -76,10 +77,10 @@ func TestFilter_RuleByTagPresence(t *testing.T) {
 }
 
 func TestFilter_RuleByTagValueRegex(t *testing.T) {
-	f := New(Config{
-		Rules: []Rule{
-			{Action: ActionKeep, Tag: &TagMatch{Key: "env", ValueMatch: "^prod.*"}},
-			{Action: ActionDrop, MetricName: ".*"},
+	f := filter.New(filter.Config{
+		Rules: []filter.Rule{
+			{Action: filter.ActionKeep, Tag: &filter.TagMatch{Key: "env", ValueMatch: "^prod.*"}},
+			{Action: filter.ActionDrop, MetricName: ".*"},
 		},
 	})
 	acc := &captureAcc{}
@@ -95,10 +96,10 @@ func TestFilter_RuleByTagValueRegex(t *testing.T) {
 }
 
 func TestFilter_FirstMatchingRuleWins(t *testing.T) {
-	f := New(Config{
-		Rules: []Rule{
-			{Action: ActionDrop, MetricName: "^drop"},
-			{Action: ActionKeep, MetricName: "^drop"}, // unreachable
+	f := filter.New(filter.Config{
+		Rules: []filter.Rule{
+			{Action: filter.ActionDrop, MetricName: "^drop"},
+			{Action: filter.ActionKeep, MetricName: "^drop"}, // unreachable
 		},
 	})
 	acc := &captureAcc{}
@@ -111,7 +112,7 @@ func TestFilter_FirstMatchingRuleWins(t *testing.T) {
 }
 
 func TestFilter_Name(t *testing.T) {
-	if New(DefaultConfig()).Name() != "filter" {
+	if filter.New(filter.DefaultConfig()).Name() != "filter" {
 		t.Error("name mismatch")
 	}
 }
@@ -122,8 +123,8 @@ type captureAcc struct {
 	errs  []error
 }
 
-func (a *captureAcc) Add(m plugin.Metric)                                       { a.added = append(a.added, m) }
-func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time) {}
+func (a *captureAcc) Add(m plugin.Metric)                                              { a.added = append(a.added, m) }
+func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time)  {}
 func (a *captureAcc) AddGauge(_ string, _ float64, _ map[string]string, _ time.Time)   {}
 func (a *captureAcc) AddCounter(_ string, _ float64, _ map[string]string, _ time.Time) {}
-func (a *captureAcc) AddError(err error)                                        { a.errs = append(a.errs, err) }
+func (a *captureAcc) AddError(err error)                                               { a.errs = append(a.errs, err) }

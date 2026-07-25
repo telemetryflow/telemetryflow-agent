@@ -1,14 +1,15 @@
-package keep
+package keep_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
+	"github.com/telemetryflow/telemetryflow-agent/internal/processor/keep"
 )
 
 func TestKeep_ForwardsOnlyMatching(t *testing.T) {
-	k, err := New(Config{Patterns: []string{"^system\\..*"}})
+	k, err := keep.New(keep.Config{Patterns: []string{"^system\\..*"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +24,7 @@ func TestKeep_ForwardsOnlyMatching(t *testing.T) {
 }
 
 func TestKeep_NoPatterns_KeepsNothing(t *testing.T) {
-	k, _ := New(Config{})
+	k, _ := keep.New(keep.Config{})
 	acc := &captureAcc{}
 	k.Start(acc)
 	_ = k.Add(plugin.Metric{Name: "anything"}, nil)
@@ -33,15 +34,15 @@ func TestKeep_NoPatterns_KeepsNothing(t *testing.T) {
 }
 
 func TestKeep_InvalidRegex(t *testing.T) {
-	if _, err := New(Config{Patterns: []string{"("}}); err == nil {
+	if _, err := keep.New(keep.Config{Patterns: []string{"("}}); err == nil {
 		t.Error("expected regex error")
 	}
 }
 
 type captureAcc struct{ added []plugin.Metric }
 
-func (a *captureAcc) Add(m plugin.Metric)                                       { a.added = append(a.added, m) }
-func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time) {}
+func (a *captureAcc) Add(m plugin.Metric)                                              { a.added = append(a.added, m) }
+func (a *captureAcc) AddFields(_ string, _ float64, _ map[string]string, _ time.Time)  {}
 func (a *captureAcc) AddGauge(_ string, _ float64, _ map[string]string, _ time.Time)   {}
 func (a *captureAcc) AddCounter(_ string, _ float64, _ map[string]string, _ time.Time) {}
-func (a *captureAcc) AddError(_ error)                                           {}
+func (a *captureAcc) AddError(_ error)                                                 {}

@@ -1,14 +1,15 @@
-package starlark
+package starlark_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
+	"github.com/telemetryflow/telemetryflow-agent/internal/processor/starlark"
 )
 
 func TestStarlark_NoScript_Passthrough(t *testing.T) {
-	s := New(Config{})
+	s := starlark.New(starlark.Config{})
 	acc := &captureAcc{}
 	if err := s.Start(acc); err != nil {
 		t.Fatal(err)
@@ -20,7 +21,7 @@ func TestStarlark_NoScript_Passthrough(t *testing.T) {
 }
 
 func TestStarlark_AddTag(t *testing.T) {
-	s := New(Config{Script: `
+	s := starlark.New(starlark.Config{Script: `
 def apply(metric):
     metric["labels"]["environment"] = "prod"
     return metric
@@ -36,7 +37,7 @@ def apply(metric):
 }
 
 func TestStarlark_DropMetric(t *testing.T) {
-	s := New(Config{Script: `
+	s := starlark.New(starlark.Config{Script: `
 def apply(metric):
     if metric["name"].startswith("debug."):
         return None
@@ -54,7 +55,7 @@ def apply(metric):
 }
 
 func TestStarlark_ComputeField(t *testing.T) {
-	s := New(Config{Script: `
+	s := starlark.New(starlark.Config{Script: `
 def apply(metric):
     metric["value"] = metric["value"] * 100
     return metric
@@ -70,7 +71,7 @@ def apply(metric):
 }
 
 func TestStarlark_FanOutList(t *testing.T) {
-	s := New(Config{Script: `
+	s := starlark.New(starlark.Config{Script: `
 def apply(metric):
     out = []
     metric1 = dict(metric)
@@ -92,14 +93,14 @@ def apply(metric):
 }
 
 func TestStarlark_MissingApply_ReturnsError(t *testing.T) {
-	s := New(Config{Script: `x = 1`})
+	s := starlark.New(starlark.Config{Script: `x = 1`})
 	if err := s.Start(&captureAcc{}); err == nil {
 		t.Error("expected error when apply() is missing")
 	}
 }
 
 func TestStarlark_SyntaxError_ReturnsError(t *testing.T) {
-	s := New(Config{Script: `def apply(`})
+	s := starlark.New(starlark.Config{Script: `def apply(`})
 	if err := s.Start(&captureAcc{}); err == nil {
 		t.Error("expected syntax error")
 	}
