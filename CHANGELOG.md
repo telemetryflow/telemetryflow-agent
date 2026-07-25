@@ -144,9 +144,29 @@ All 8 are wired into `agent.NewWithConfigFile` and the central
   `drop`) with name regex + label filters. Deterministic FNV-1a hash
   of (name + sorted labels) ensures the same series always yields the
   same decision.
+- **`log_to_metric` processor** — extracts metrics from log lines.
+  Counter (always increments on regex match) or gauge (value from
+  capture group). Tag-from-group extraction. Original log forwarded
+  unchanged so the log path stays intact.
 - **`internalstats` collector** — emits the M1 selfstat registry into
   the normal metric pipeline under the Telegraf-compatible name
   `internal`. Snapshot of `selfstat.AllMetrics()` per Collect cycle.
+- **OTLPLogBridge** (`internal/exporter/otlp_log_bridge.go`) — the
+  logs equivalent of `OTLPMetricBridge`. Forwards `LogCollector`
+  output via OTLP HTTP `/v1/logs` with gzip + batching + severity
+  mapping (TRACE=1, DEBUG=5, INFO=9, WARN=13, ERROR=17, FATAL=21).
+  Wired into `agent.NewWithConfigFile`: native log collector's
+  `SetLogCallback` is now connected to the bridge's `Emit`.
+- **Tail offset persistence** — `LogCollector` now implements
+  `plugin.StatefulPlugin`. File tailer offsets (path + inode + offset)
+  survive agent restarts via the persister framework. Inode mismatch
+  (file rotation) safely falls back to EOF with a warning.
+- **Grafana dashboard** (`deploy/grafana/tfo-agent-self-observability.json`)
+  — 15-panel dashboard covering Overview (gather/write/drop rates +
+  version), Throughput (gather/write/error rate graphs), Buffer
+  (size/limit/usage), and Collector Health (state table + per-
+  collector gather time + errors). 30s refresh, three templating
+  variables ($datasource, $collector, $exporter).
 
 ### Fixed — Redis & Valkey Collector Audit
 
