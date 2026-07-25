@@ -43,6 +43,7 @@ import (
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
 	elasticsearchcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/elasticsearch"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
+	haproxycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/haproxy"
 	httprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/http_probe"
 	influxdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/influxdb"
 	kafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/kafka"
@@ -54,7 +55,9 @@ import (
 	mysqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mysql"
 	natscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nats"
 	netflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/netflow"
+	nginxcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nginx"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
+	pgbouncercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pgbouncer"
 	pingcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ping"
 	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
 	pubsubcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pubsub"
@@ -341,6 +344,36 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("Elasticsearch collector enabled",
 			zap.Int("instances", len(cfg.Collector.Elasticsearch.Instances)),
 			zap.Duration("interval", cfg.Collector.Elasticsearch.Interval),
+		)
+	}
+
+	// Add Nginx collector if enabled (stub_status scrape)
+	if cfg.Collector.Nginx.Enabled {
+		nginxCol := nginxcollector.NewNginxCollector(cfg.Collector.Nginx, logger)
+		collectors = append(collectors, nginxCol)
+		logger.Info("Nginx collector enabled",
+			zap.Int("instances", len(cfg.Collector.Nginx.Instances)),
+			zap.Duration("interval", cfg.Collector.Nginx.Interval),
+		)
+	}
+
+	// Add HAProxy collector if enabled (CSV stats scrape)
+	if cfg.Collector.HAProxy.Enabled {
+		hapCol := haproxycollector.NewHAProxyCollector(cfg.Collector.HAProxy, logger)
+		collectors = append(collectors, hapCol)
+		logger.Info("HAProxy collector enabled",
+			zap.Int("instances", len(cfg.Collector.HAProxy.Instances)),
+			zap.Duration("interval", cfg.Collector.HAProxy.Interval),
+		)
+	}
+
+	// Add PgBouncer collector if enabled (SHOW STATS / SHOW POOLS)
+	if cfg.Collector.PgBouncer.Enabled {
+		pgbCol := pgbouncercollector.NewPgBouncerCollector(cfg.Collector.PgBouncer, logger)
+		collectors = append(collectors, pgbCol)
+		logger.Info("PgBouncer collector enabled",
+			zap.Int("instances", len(cfg.Collector.PgBouncer.Instances)),
+			zap.Duration("interval", cfg.Collector.PgBouncer.Interval),
 		)
 	}
 

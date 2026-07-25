@@ -377,6 +377,15 @@ type CollectorConfig struct {
 
 	// Elasticsearch contains Elasticsearch cluster monitoring collector settings (M4).
 	Elasticsearch ElasticsearchCollectorConfig `mapstructure:"elasticsearch"`
+
+	// Nginx contains Nginx stub_status scraper settings (M4).
+	Nginx NginxCollectorConfig `mapstructure:"nginx"`
+
+	// HAProxy contains HAProxy CSV stats scraper settings (M4).
+	HAProxy HAProxyCollectorConfig `mapstructure:"haproxy"`
+
+	// PgBouncer contains PgBouncer SHOW STATS/POOLS collector settings (M4).
+	PgBouncer PgBouncerCollectorConfig `mapstructure:"pgbouncer"`
 }
 
 // ClickHouseCollectorConfig contains settings for monitoring external ClickHouse instances.
