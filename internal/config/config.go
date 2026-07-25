@@ -363,6 +363,9 @@ type CollectorConfig struct {
 	// Netflow contains NetFlow v5/v9/IPFIX listener settings.
 	Netflow NetflowCollectorConfig `mapstructure:"netflow"`
 
+	// Sflow contains sFlow v5 listener settings.
+	Sflow SflowCollectorConfig `mapstructure:"sflow"`
+
 	// SyslogListener contains syslog receiver settings.
 	SyslogListener SyslogListenerConfig `mapstructure:"syslog_listener"`
 }

@@ -59,6 +59,7 @@ import (
 	rdspgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rds_postgresql"
 	redicollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/redis"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
+	sflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sflow"
 	snmpcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/snmp"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
 	sysloglistenercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/syslog_listener"
@@ -369,6 +370,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			zap.String("address", cfg.Collector.Netflow.Address),
 			zap.Int("port", cfg.Collector.Netflow.Port),
 			zap.Strings("protocols", cfg.Collector.Netflow.Protocols),
+		)
+	}
+
+	// Add sFlow listener collector if enabled
+	if cfg.Collector.Sflow.Enabled {
+		sflowCol := sflowcollector.NewSflowCollector(cfg.Collector.Sflow, logger)
+		collectors = append(collectors, sflowCol)
+		logger.Info("sFlow collector enabled",
+			zap.String("address", cfg.Collector.Sflow.Address),
+			zap.Int("port", cfg.Collector.Sflow.Port),
 		)
 	}
 
