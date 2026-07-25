@@ -557,8 +557,321 @@ graph LR
     COLL --> GO
 ```
 
+## Plugin System & Pipeline (1.3.0+)
+
+Starting with the `1.3.0` dev cycle, the agent ships a Telegraf-style plugin
+system and a channel-based pipeline engine. The new foundation is **opt-in**:
+an empty `pipeline:` section reproduces the v1.2.x behaviour exactly, legacy
+collectors keep working through `plugin.CollectorAdapter`, and the buffer,
+persister, secret resolver, and migration framework are no-ops until their
+config keys are set. The master roadmap lives in
+`telemetryflow-platform-monolith/docs/tfo-agent-roadmap/`; per-release change
+history is in [`CHANGELOG.md`](../CHANGELOG.md). Canonical interface
+definitions live in [`internal/plugin/types.go`](../internal/plugin/types.go).
+
+### A. Plugin Contracts
+
+The `internal/plugin/` package defines typed plugin interfaces that mirror
+Telegraf's taxonomy. Each interface is small and composable; capability
+mixins are injected by type-assertion so a plugin only implements what it
+needs. Plugins self-register via `init()` + `plugin.MustAddXxx()` and a
+top-level `all` package blank-imports every concrete plugin so the binary
+links them in (identical pattern to Telegraf's `plugins/all`).
+
+**8 typed interfaces** (see `internal/plugin/types.go`):
+
+| Interface           | Purpose                                                        |
+| ------------------- | ------------------------------------------------------------- |
+| `Collector`         | Poll-style input (mirrors `collector.Collector`)              |
+| `ServiceCollector`  | Streaming/listener input (SNMP trap, NetFlow, syslog)         |
+| `StreamingProcessor`| Async-capable processor with `Start`/`Add`/`Stop` lifecycle   |
+| `SyncProcessor`     | Legacy synchronous `Apply([]Metric) []Metric` processor       |
+| `Aggregator`        | Windowed rollups via `Add` / `Push` / `Reset` / `DropOriginal`|
+| `Output`            | Synchronous sink (`Connect` / `Write` / `Close`)              |
+| `Parser`            | `[]byte → []Metric` decoder (injectable into Collectors)      |
+| `Serializer`        | `Metric → []byte` encoder (injectable into Outputs)           |
+
+**6 capability mixins** (optional interfaces, checked by type assertion):
+
+| Mixin              | Hook                                  | Purpose                                            |
+| ------------------ | ------------------------------------- | -------------------------------------------------- |
+| `Initializer`      | `Init() error`                        | Post-config, pre-Start setup                       |
+| `PluginWithID`     | `ID() string`                         | Deterministic persister key (multi-instance)       |
+| `StatefulPlugin`   | `GetState()` / `SetState()`           | Persister-backed state save/restore                |
+| `ProbePlugin`      | `Probe() error`                       | Startup health probe (`startup_error_behavior: probe`) |
+| `ParserPlugin`     | `SetParser(Parser)`                   | Parser injection (e.g. http scrape)                |
+| `SerializerPlugin` | `SetSerializer(Serializer)`           | Serializer injection                               |
+
+`plugin.CollectorAdapter` wraps the existing `internal/collector.Collector`
+interface so all 26 legacy collectors participate in the new registry without
+rewrite. `plugin.SyncProcessorAdapter` upgrades a `SyncProcessor` to the
+`StreamingProcessor` contract (batches up to 1000 metrics per flush).
+
+```mermaid
+classDiagram
+    class PluginDescriber {
+        <<interface>>
+        +Info() Info
+    }
+    class Initializer {
+        <<interface>>
+        +Init() error
+    }
+    class StatefulPlugin {
+        <<interface>>
+        +GetState() interface{}
+        +SetState(state interface{})
+    }
+    class ProbePlugin {
+        <<interface>>
+        +Probe() error
+    }
+    class PluginWithID {
+        <<interface>>
+        +ID() string
+    }
+    class Collector {
+        <<interface>>
+        +Name() string
+        +Start(ctx) error
+        +Stop() error
+        +Collect(ctx) ([]Metric, error)
+        +IsRunning() bool
+    }
+    class ServiceCollector {
+        <<interface>>
+        +Start(ctx, acc) error
+        +Stop() error
+        +Collect(ctx) ([]Metric, error)
+        +IsRunning() bool
+    }
+    class StreamingProcessor {
+        <<interface>>
+        +Name() string
+        +Start(acc) error
+        +Add(metric, acc) error
+        +Stop() error
+    }
+    class SyncProcessor {
+        <<interface>>
+        +Name() string
+        +Apply([]Metric) []Metric
+    }
+    class Aggregator {
+        <<interface>>
+        +Name() string
+        +Add(Metric)
+        +Push(acc)
+        +Reset()
+        +DropOriginal() bool
+    }
+    class Output {
+        <<interface>>
+        +Name() string
+        +Connect() error
+        +Close() error
+        +Write([]Metric) error
+    }
+    class Parser {
+        +Parse([]byte) ([]Metric, error)
+    }
+    class Serializer {
+        +Serialize(Metric) ([]byte, error)
+    }
+    class CollectorAdapter {
+        +Name() string
+        +Start(ctx) error
+        +Stop() error
+        +Collect(ctx) ([]Metric, error)
+        +IsRunning() bool
+        +Impl() LegacyCollector
+    }
+    class Accumulator {
+        <<interface>>
+        +Add(Metric)
+        +AddGauge(name, value, labels, t)
+        +AddCounter(name, value, labels, t)
+        +AddError(err)
+    }
+    Collector ..|> PluginDescriber : describes
+    ServiceCollector ..|> PluginDescriber : describes
+    StreamingProcessor ..|> PluginDescriber : describes
+    Output ..|> PluginDescriber : describes
+    Aggregator ..|> PluginDescriber : describes
+    CollectorAdapter ..|> Collector : wraps legacy
+    Collector ..>| Initializer : optional mixin
+    Collector ..>| StatefulPlugin : optional mixin
+    Collector ..>| ProbePlugin : optional mixin
+    Collector ..>| PluginWithID : optional mixin
+    ServiceCollector ..>| Accumulator : emits via
+    StreamingProcessor ..>| Accumulator : emits via
+    Aggregator ..>| Accumulator : emits via
+    Collector ..>| Parser : injectable via ParserPlugin
+    Output ..>| Serializer : injectable via SerializerPlugin
+```
+
+### B. Pipeline Topology
+
+`internal/pipeline/` wires plugins into a channel-based DAG. Every stage is
+a buffered Go channel of `plugin.Metric`; the queue size and drop policy are
+configurable per pipeline instance. Aggregators window on a fixed
+`AggregatorPeriod`; the output stage batches up to 1000 metrics and flushes
+every `FlushInterval`.
+
+```mermaid
+flowchart LR
+    subgraph Inputs
+        POLL[Collector<br/>poll-style]
+        SVC[ServiceCollector<br/>listener]
+    end
+    PRE[Pre-agg Processors<br/>StreamingProcessor chain]
+    AGG[Aggregators<br/>Add/Push/Reset window]
+    POST[Post-agg Processors<br/>StreamingProcessor chain]
+    OUT[Output fan-out<br/>batched Write]
+    SINK[TFO-Collector<br/>OTLP]
+
+    POLL -->|chan Metric| PRE
+    SVC -->|Accumulator| PRE
+    PRE --> AGG
+    AGG --> POST
+    POST --> OUT
+    OUT --> SINK
+```
+
+**Queue sizing & drop policies** (`pipeline.Config.DropPolicy`):
+
+| Policy         | Behaviour when the channel is full                                       |
+| -------------- | ------------------------------------------------------------------------ |
+| `block`        | Producer blocks until room is available. Strong back-pressure, can stall. |
+| `drop_oldest`  | Evict the oldest queued metric to make room. Bounded latency.            |
+| `drop_newest`  | Drop the incoming metric. **Default.** Preserves history over freshness. |
+
+Default queue size is 10000 per stage; default aggregator window is 30s;
+default flush interval is 5s.
+
+**Backpressure semantics.** Each stage owns its own goroutine and channel.
+Slow downstream stages fill their channel and engage the configured drop
+policy at the producer side. `DropPolicyBlock` propagates backpressure all
+the way to the collector `Gather` loop; the other two isolate the producer
+and silently shed load. The `ChannelAccumulator` emits an
+`ErrAccumulatorFull` on every drop so the selfstat layer can count them.
+
+**Backwards compatibility.** When no `pipeline:` section is present (or
+every stage list is empty), `agent.NewWithConfigFile` skips building a
+`Pipeline` and falls back to the existing `MetricForwarder → OTLP bridge`
+path used since v1.2.x. Legacy collectors registered through
+`CollectorAdapter` work in both modes.
+
+### C. Buffer & Retry Layer
+
+`internal/exporter/buffer_retry_sink.go` wraps any `MetricSink` with
+disk-backed retry. It implements `MetricSink`, so `agent.go` can swap the
+bare OTLP bridge for `NewBufferRetrySink(otlpBridge, cfg)` without touching
+`MetricForwarder`. Enabled via `buffer.enabled: true`.
+
+- On a successful `Export`, the call passes through to the inner sink.
+- On failure, the batch is marshalled as a `retryEntry` and pushed into
+  `internal/buffer.Buffer` (the disk-backed store). If the disk buffer is
+  unavailable, an in-memory fallback queue capped at 100 entries is used.
+- A background goroutine (`StartRetryLoop`) wakes every `RetryInterval`
+  (default 5s), drains the disk buffer and the in-memory queue, and retries
+  each entry against the inner sink. Entries that exceed `MaxRetries`
+  (default 0 = unlimited) are dropped with a warning.
+- Writes are atomic from the caller's perspective: `Export` never returns
+  the underlying error once the entry is buffered, so the forwarder never
+  double-counts.
+- When `buffer.enabled: true`, queued entries survive an agent restart
+  because they live in the on-disk buffer until successfully exported.
+
+### D. Secret Management
+
+Configuration values can reference a secret store with the `@{store:key}`
+syntax. The resolver is wired into the config loader as the third stage of
+the preprocess pipeline:
+
+```
+migration.ApplyLatest  →  os.ExpandEnv  →  secret.Resolver
+```
+
+1. `migration.ApplyLatest` upgrades older YAML schemas (e.g. the
+   `insecure_skip_verify → tls_skip_verify` rename handled by
+   `internal/migration/v1_3/`).
+2. `os.ExpandEnv` resolves `${VAR}` references — this lets operators inject
+   secret-store configuration (a Vault token, a file path) from the process
+   environment.
+3. `secret.Resolver` looks up each `@{store:key}` against the named
+   `SecretStore` backend and substitutes the resolved value.
+
+Three backends ship out of the box under `internal/secret/`:
+`env` (os.Getenv), `file` (JSON map), and `vault` (HashiCorp Vault KV-v2
+over `net/http`, no SDK dependency). Backends self-register via
+`plugin.MustAddSecretStore`. Failures in any stage are logged but
+non-fatal — the resulting YAML surfaces a more actionable parse error from
+Viper.
+
+### E. Persister
+
+`internal/persister/` provides disk-backed state persistence for plugins
+that implement `plugin.StatefulPlugin`. The agent lifecycle wiring is:
+
+1. **Load** the JSON state file before collectors start. Each entry is
+   dispatched by id to the matching registered plugin via `SetState`. A
+   missing file is a first run (not an error); a corrupt file is
+   quarantined to `<path>.corrupt-<timestamp>` and Load returns nil so the
+   agent can start fresh.
+2. **Store** snapshots every registered plugin's `GetState()` atomically:
+   write to `<path>.tmp` then rename over the final path, mode `0600`.
+   Concurrent Stores are serialised.
+3. **StartSaveLoop** runs in its own goroutine and calls `Store` every
+   interval until the context is cancelled. Wired into agent shutdown so
+   the final Store flushes on graceful exit.
+
+Opt-in via `persister.enabled: true`. Plugin ids are taken from
+`PluginWithID.ID()` when available so multiple instances of the same plugin
+(e.g. several MySQL collectors) persist independent state.
+
+### F. Selfstat Layer
+
+`internal/selfstat/` is the agent's internal self-observability registry,
+mirroring Telegraf's `internal` plugin. Subsystems acquire a counter via
+`selfstat.RegisterStat(name, labels)` or a timing via
+`selfstat.RegisterTimingStat(name, labels)`; the handles are atomic
+(`int64`) / mutex-guarded and safe for concurrent mutation.
+
+- Pre-registered agent-level globals: metrics written/rejected/dropped,
+  gather errors, buffer size/limit, version info.
+- `selfstat.ForCollector()` and `selfstat.ForExporter()` emit per-plugin
+  stats keyed by plugin name.
+- `selfstat.AllMetrics()` snapshots the registry into a slice of
+  `plugin.Metric` for pipeline emission. `TimingStat.Get()` is destructive:
+  it returns the running average since the previous call and clears the
+  accumulator, so each tick reports only samples observed since the last
+  tick.
+
+The `internalstats` collector (`internal/collector/internalstats/`) is the
+bridge: on every `Collect` cycle it calls `selfstat.AllMetrics()` and
+forwards the snapshot into the normal metric pipeline under the
+Telegraf-compatible collector name `internal`. This makes the agent's own
+behaviour observable by the same dashboards that consume host metrics.
+
+### M2 Collector Documentation
+
+The M2 network-monitoring collectors are documented under
+[`docs/collectors/`](./collectors/):
+
+- ICMP probing — see [docs/collectors/](./collectors/) (ping entry)
+- DNS, TCP, HTTP probes — same directory
+- SNMP, NetFlow, syslog, sFlow — same directory
+
+Master roadmap: `telemetryflow-platform-monolith/docs/tfo-agent-roadmap/`.
+
 ## Related Documentation
 
 - [TFO-Collector Configuration](../../telemetryflow-collector/docs/CONFIGURATION.md)
 - [TFO-GO-SDK Usage](../../telemetryflow-go-sdk/docs/USAGE.md)
 - [Deployment Guide](./DEPLOYMENT.md)
+- [Collector Reference](./collectors/README.md)
+- [CLI Commands](./COMMANDS.md)
+- [Change History](../CHANGELOG.md)
+- [Plugin Interface Definitions](../internal/plugin/types.go)
+- [Master Roadmap](../../telemetryflow-platform-monolith/docs/tfo-agent-roadmap/)

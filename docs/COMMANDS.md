@@ -1,13 +1,19 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.2.2
-- **Last Updated:** June 2026
+- **Version:** 1.3.0-dev
+- **Last Updated:** July 2026
 
 ---
 
 ## Overview
 
 TelemetryFlow Agent provides a Cobra-based CLI with multiple commands for different operations. This document describes all available commands and their options.
+
+> **1.3.0-dev note.** `config validate` and `config show` now run the
+> migration framework on the raw config bytes and apply `${VAR}` env
+> expansion plus `@{store:key}` secret resolution before parsing. The
+> `plugins` and `test` commands listed in the roadmap below are planned for
+> `1.4.0`.
 
 ---
 
@@ -228,52 +234,124 @@ TelemetryFlow Agent v1.2.2
 
 ### tfo-agent config
 
-Shows the parsed configuration. Useful for validating configuration files.
+Configuration management parent command. Subcommands validate or render the
+parsed configuration.
 
 ```bash
-./build/tfo-agent config --config configs/tfo-agent.yaml
+./build/tfo-agent config --config configs/tfo-agent.yaml <subcommand>
+```
+
+Both subcommands load the file through the same three-stage preprocess
+pipeline used at agent startup:
+
+1. `migration.ApplyLatest` — schema upgrades for older configs (e.g. the
+   `insecure_skip_verify → tls_skip_verify` rename handled by
+   `internal/migration/v1_3/`).
+2. `os.ExpandEnv` — `${VAR}` substitution.
+3. `secret.Resolver` — `@{store:key}` substitution (when a secret resolver
+   is wired).
+
+This means `config validate` is a true dry-run of agent startup: a config
+that validates cleanly here will parse cleanly under `tfo-agent start`.
+
+---
+
+### tfo-agent config validate
+
+Validates the configuration file. Runs the migration framework on the raw
+config bytes, applies env expansion and secret resolution, then unmarshals
+and runs `Config.Validate()`. Returns exit code 0 only when every stage
+succeeds.
+
+```bash
+./build/tfo-agent config validate --config configs/tfo-agent.yaml
 ```
 
 **Options:**
 
 ```bash
---config string  Path to configuration file (required)
---format string  Output format: yaml, json (default: yaml)
--h, --help       Help for config command
+--config string    Path to configuration file (required)
+--log-level string Override log level from config
+-h, --help         Help for validate command
 ```
 
 **Examples:**
 
 ```bash
-# Show config as YAML
-./build/tfo-agent config --config configs/tfo-agent.yaml
+# Validate default config location
+./build/tfo-agent config validate
 
-# Show config as JSON
-./build/tfo-agent config --config configs/tfo-agent.yaml --format json
+# Validate a specific file
+./build/tfo-agent config validate --config /etc/tfo-agent/tfo-agent.yaml
 
-# Validate config (returns exit code 0 if valid)
-./build/tfo-agent config --config configs/tfo-agent.yaml && echo "Config is valid"
+# Use as a CI gate
+./build/tfo-agent config validate --config configs/tfo-agent.yaml && echo "Config is valid"
+```
+
+**Output (success):**
+
+```
+Configuration is valid
+  Endpoint:           localhost:4317
+  Hostname:           server-01
+  Heartbeat Interval: 60s
+```
+
+**Output (failure):** non-zero exit code, error message from the failing
+preprocess stage or from `Config.Validate()`. Migration and
+secret-resolution failures are logged at WARN level but do not abort the
+load — the underlying parse error from Viper is surfaced instead because
+it is more actionable.
+
+---
+
+### tfo-agent config show
+
+Prints the parsed configuration. Applies the same migration →
+`${VAR}` → `@{store:key}` preprocess pipeline as `config validate` and
+`tfo-agent start`, then renders the resolved `Config` struct.
+
+> **Secret redaction.** Values that arrived via `@{store:key}` are
+> redacted in the rendered output so credentials are not leaked into
+> terminal scrollback or CI logs. Use `--format json` for machine-readable
+> output.
+
+```bash
+./build/tfo-agent config show --config configs/tfo-agent.yaml
+```
+
+**Options:**
+
+```bash
+--config string    Path to configuration file (required)
+--format string    Output format: yaml, json (default: yaml)
+--log-level string Override log level from config
+-h, --help         Help for show command
+```
+
+**Examples:**
+
+```bash
+# Render config as YAML
+./build/tfo-agent config show --config configs/tfo-agent.yaml
+
+# Render config as JSON (pipe into jq for diffs)
+./build/tfo-agent config show --config configs/tfo-agent.yaml --format json | jq .
+
+# Verify secret resolution happened without leaking the secret value
+./build/tfo-agent config show --config configs/tfo-agent.yaml --log-level debug
 ```
 
 **Output:**
 
 ```
-Configuration File: configs/tfo-agent.yaml
+TelemetryFlow Agent Configuration
+==================================
 
 Agent:
-  ID: agent-001
+  ID:       agent-001
   Hostname: server-01
-  Description: TelemetryFlow Agent
-  Tags: environment=production, datacenter=dc1
-
-Collectors:
-  Metrics: enabled=true, interval=60s
-  Logs: enabled=true, paths=[/var/log/*.log]
-  Traces: enabled=true
-
-Receivers:
-  OTLP gRPC: enabled=true, endpoint=0.0.0.0:4317
-  OTLP HTTP: enabled=true, endpoint=0.0.0.0:4318
+  ...
 
 Exporter:
   OTLP: enabled=true, endpoint=http://tfo-collector:4317, compression=gzip
@@ -356,6 +434,81 @@ Shows help for any command.
 
 ---
 
+## Roadmap Commands (1.4.0)
+
+The following commands are planned for the `1.4.0` release and are tracked
+in the master roadmap at
+`telemetryflow-platform-monolith/docs/tfo-agent-roadmap/`. They are built on
+top of the `1.3.0` plugin registry (`internal/plugin/registry.go`) and are
+documented here so operators can plan automation around the expected CLI
+surface. Flag names are provisional.
+
+### tfo-agent plugins list
+
+Lists every collector, processor, aggregator, output, parser, serializer,
+and secret store registered against the in-process plugin registry. Backed
+by `plugin.AllNames()` plus the per-type `*Names()` helpers.
+
+```bash
+./build/tfo-agent plugins list [--type collector|processor|aggregator|output|parser|serializer|secretstore]
+```
+
+**Planned output:**
+
+```
+TYPE        NAME                 DESCRIPTION                                   DEPRECATED
+collector   system              Lightweight host metrics + SystemInfo
+collector   ping                ICMP probe (rtt, loss, ttl)
+collector   snmp                SNMP v1/v2c/v3 polling
+processor   filter              Rule-based keep/drop by name regex + labels
+processor   starlark            Embedded Starlark escape hatch
+output      otlp_http          OTLP/HTTP metric sink
+output      prometheus_writer   Remote-write compatible sink
+...
+```
+
+### tfo-agent plugins usage \<name\>
+
+Prints the sample configuration block for a registered plugin, sourced
+from the `Info.SampleConfig` string returned by the plugin's
+`PluginDescriber` implementation.
+
+```bash
+./build/tfo-agent plugins usage ping
+```
+
+**Planned output:**
+
+```yaml
+# ping — ICMP probe (rtt, loss, ttl)
+[[collectors.ping]]
+  targets = ["8.8.8.8", "1.1.1.1"]
+  interval = "30s"
+  count = 3
+  timeout = "1s"
+  privileged = false
+```
+
+### tfo-agent test \<collector\>
+
+Runs a single gather cycle for the named collector and prints the emitted
+metrics to stdout. Equivalent to Telegraf `--test --input-filter`. Useful
+for validating collector configuration without waiting for the full agent
+flush interval.
+
+```bash
+./build/tfo-agent test ping --config configs/tfo-agent.yaml
+```
+
+**Planned output:**
+
+```
+> ping,host=server-01,target=8.8.8.8 rtt_avg_ms=12.4,rtt_min_ms=11.9,rtt_max_ms=13.1,loss_percent=0,state=up 1780000000000000000
+> ping,host=server-01,target=1.1.1.1 rtt_avg_ms=14.8,rtt_min_ms=14.2,rtt_max_ms=15.3,loss_percent=0,state=up 1780000000000000000
+```
+
+---
+
 ## Exit Codes
 
 | Code | Description          |
@@ -418,8 +571,15 @@ containers:
 ### Validate Configuration
 
 ```bash
-./build/tfo-agent config --config configs/tfo-agent.yaml
+./build/tfo-agent config validate --config configs/tfo-agent.yaml
 echo $?  # 0 if valid
+```
+
+### Render Resolved Configuration
+
+```bash
+# Applies migration → ${VAR} → @{store:key} and redacts secrets in output
+./build/tfo-agent config show --config configs/tfo-agent.yaml
 ```
 
 ### Check Version
