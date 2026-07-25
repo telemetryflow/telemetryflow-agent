@@ -1,0 +1,55 @@
+# TelemetryFlow Agent - SNMP Polling Collector Configuration
+#
+# Example configuration for polling SNMP agents (v1/v2c/v3).
+# Collects scalar fields and full tables, one metric row per agent.
+#
+# Documentation: docs/collectors/SNMP.md (if exists)
+
+snmp:
+  enabled: false
+
+  # Global polling interval (default: 60s)
+  interval: 60s
+
+  # Agents to poll. Every field and table is polled on every agent.
+  agents:
+    # SNMPv2c community-string agent
+    - name: "core-switch-01"
+      host: "10.0.0.2"
+      community: "${SNMP_COMMUNITY_RO}"   # v1/v2c community string
+      version: "2c"                       # "1", "2c" (default), or "3"
+      port: 161                           # default 161
+      timeout: 10s                        # default 10s
+      retries: 3                          # default 3
+
+    # SNMPv3 authPriv agent
+    - name: "edge-router-01"
+      host: "10.0.0.1"
+      version: "3"
+      port: 161
+      timeout: 10s
+      retries: 3
+      auth:
+        username: "${SNMPV3_USER}"
+        auth_protocol: "SHA"              # MD5, SHA, SHA256, SHA512
+        auth_password: "${SNMPV3_AUTH_PASS}"
+        priv_protocol: "AES"              # DES, AES, AES256, AES192C, AES256C
+        priv_password: "${SNMPV3_PRIV_PASS}"
+        security_level: "authPriv"       # noAuthNoPriv, authNoPriv, authPriv (default)
+
+  # Scalar OIDs to poll once per agent per cycle.
+  fields:
+    - name: "sysUpTime"
+      oid: "1.3.6.1.2.1.1.3.0"
+      unit: "centiseconds"                # optional unit hint
+    - name: "ifNumber"
+      oid: "1.3.6.1.2.1.2.1.0"
+
+  # Repeating OIDs whose values form a table (one row per index).
+  tables:
+    - name: "ifTable"
+      oid: "1.3.6.1.2.1.2.2"
+      index_as_tag: true                 # use the OID index as a tag value
+    - name: "ifXTable"
+      oid: "1.3.6.1.2.1.31.1.1"
+      index_as_tag: true

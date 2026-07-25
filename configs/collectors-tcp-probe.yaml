@@ -1,0 +1,46 @@
+# TelemetryFlow Agent - TCP/UDP Port Probe Collector Configuration
+#
+# Example configuration for active port-reachability probes with optional
+# banner grabbing. Collects connect status, connect latency, and (when
+# `expect` is set) banner-match success.
+#
+# Documentation: docs/collectors/TCP-PROBE.md (if exists)
+
+tcp_probe:
+  enabled: false
+
+  # Global interval between probe cycles (default: 30s)
+  interval: 30s
+
+  targets:
+    # Plain TCP reachability check
+    - name: "ssh-bastion"
+      host: "bastion.internal"
+      port: 22
+      protocol: "tcp"      # "tcp" (default) or "udp"
+      timeout: 5s          # per-target timeout (default: 5s)
+
+    # HTTPS reachability check (TCP-level, no TLS handshake)
+    - name: "ingress-https"
+      host: "ingress.internal"
+      port: 443
+      protocol: "tcp"
+      timeout: 5s
+
+    # Banner grab: connect, send bytes, inspect response for a substring.
+    - name: "smtp-relay"
+      host: "smtp.internal"
+      port: 25
+      protocol: "tcp"
+      timeout: 5s
+      send: "EHLO probe.local\r\n"   # optional bytes to send after connect
+      expect: "220"                  # optional substring to find in response
+
+    # UDP service probe (requires Send/Expect to validate reachability)
+    # - name: "ntp-server"
+    #   host: "ntp.internal"
+    #   port: 123
+    #   protocol: "udp"
+    #   timeout: 5s
+    #   send: ""
+    #   expect: ""
