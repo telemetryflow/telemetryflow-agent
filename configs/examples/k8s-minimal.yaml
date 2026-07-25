@@ -1,0 +1,223 @@
+# =============================================================================
+# TelemetryFlow Agent - Minimal Kubernetes Configuration
+# =============================================================================
+#
+# Production-ready minimal config for deploying tfo-agent in a Kubernetes
+# cluster (DaemonSet or Deployment). Collects only TFO-native collectors:
+# host system metrics + deep Kubernetes cluster observability.
+#
+# No third-party integration collectors (no MySQL, Redis, Kafka, etc.).
+# No integrations section. No pipeline processors. Just the essentials.
+#
+# Usage:
+#   1. Copy to your ConfigMap
+#   2. Set env vars: TELEMETRYFLOW_API_KEY_ID, TELEMETRYFLOW_API_KEY_SECRET
+#   3. Optional: TELEMETRYFLOW_K8S_CLUSTER_NAME, TELEMETRYFLOW_K8S_CLUSTER_PROVIDER
+#
+# Docker:
+#   docker run -d \
+#     -e TELEMETRYFLOW_API_KEY_ID=tfk_xxx \
+#     -e TELEMETRYFLOW_API_KEY_SECRET=tfs_xxx \
+#     -v $(pwd)/configs/examples/k8s-minimal.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
+#     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
+#     telemetryflow/telemetryflow-agent:1.3.0-dev \
+#     --config /etc/tfo-agent/tfo-agent.yaml
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# TFO Platform Connection
+# -----------------------------------------------------------------------------
+telemetryflow:
+  # API credentials (from TFO Platform → Settings → API Keys)
+  api_key_id: ${TELEMETRYFLOW_API_KEY_ID}
+  api_key_secret: ${TELEMETRYFLOW_API_KEY_SECRET}
+
+  # OTLP ingestion endpoint (host:port or https:// URL)
+  endpoint: ${TELEMETRYFLOW_ENDPOINT:-https://api.telemetryflow.id}
+
+  # Backend REST API (for heartbeat + cluster sync). Same as endpoint by default.
+  backend_endpoint: ${TELEMETRYFLOW_BACKEND_ENDPOINT:-https://api.telemetryflow.id}
+
+  # Connection settings
+  timeout: 30s
+  retry:
+    enabled: true
+    max_attempts: 5
+    initial_interval: 1s
+    max_interval: 30s
+
+# -----------------------------------------------------------------------------
+# Agent Identity
+# -----------------------------------------------------------------------------
+agent:
+  # Auto-generated via UUIDv5 host fingerprint when empty.
+  id: ${TELEMETRYFLOW_ID:-}
+
+  # In K8s, set via NODE_NAME env (DaemonSet) or pod name.
+  hostname: ${NODE_NAME:-}
+
+  # Optional tags applied to all metrics from this agent.
+  tags:
+    deployment: kubernetes
+  labels:
+    environment: ${CLUSTER_ENV:-production}
+
+# -----------------------------------------------------------------------------
+# Heartbeat (agent liveness signal to TFO Platform)
+# -----------------------------------------------------------------------------
+heartbeat:
+  interval: 60s
+  timeout: 10s
+  include_system_info: true
+
+# -----------------------------------------------------------------------------
+# Collectors — TFO Native Only
+# -----------------------------------------------------------------------------
+collectors:
+  # ===========================================================================
+  # System Collector — host-level CPU, memory, disk, network
+  # ===========================================================================
+  # Lightweight; runs on every node. ~50 metrics per node.
+  system:
+    enabled: true
+    interval: 30s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+
+  # ===========================================================================
+  # Node Exporter — prometheus/node_exporter-equivalent detailed host metrics
+  # ===========================================================================
+  # Richer than `system`: per-CPU-mode time, per-mount filesystem, TCP states,
+  # conntrack, PSI, thermal zone, textfile collector. ~200 metrics per node.
+  node_exporter:
+    enabled: true
+    interval: 30s
+    cpu: true
+    memory: true
+    diskio: true
+    filesystem: true
+    network: true
+    loadavg: true
+    # Linux-only extras:
+    thermal: false        # requires lm-sensors / thermal_zone
+    textfile: false       # set textfile_path to read custom *.prom files
+    conntrack: true
+    psi: true             # Pressure Stall Information (kernel 4.20+)
+    vmstat: true
+    sockstat: true
+    entropy: true
+    filedesc: true
+    stat: true
+
+  # ===========================================================================
+  # Kubernetes Collector — deep cluster observability (33 sub-collectors)
+  # ===========================================================================
+  # Replaces kube-state-metrics + cAdvisor + eventrouter in one binary.
+  # Auto-detects in-cluster config when KUBECONFIG env is not set.
+  kubernetes:
+    enabled: true
+    interval: 30s
+
+    # Cluster identification (auto-detected from cloud IMDS if empty)
+    cluster_name: ${TELEMETRYFLOW_K8S_CLUSTER_NAME:-}
+    cluster_provider: ${TELEMETRYFLOW_K8S_CLUSTER_PROVIDER:-}
+
+    # Namespace scoping (empty = all namespaces)
+    namespaces: []
+    exclude_namespaces:
+      - kube-system
+
+    # --- Core resource inventory ---
+    nodes: true              # Node capacity, allocatable, conditions, taints
+    pods: true               # Pod count, phase, container status, restarts
+    deployments: true        # Replica counts, strategy, conditions
+    namespaces_collect: true # Namespace count + labels
+    services: true           # Service type, ports, selector
+    workloads: true          # StatefulSet, DaemonSet, ReplicaSet, Job, CronJob
+
+    # --- Resource governance ---
+    hpa: true                # HorizontalPodAutoscaler targets + metrics
+    pdb: true                # PodDisruptionBudget min-available
+    resource_counts: true    # Secrets, ConfigMaps, Ingresses count
+    storage: true            # PV + PVC status + capacity
+    resource_quotas: false   # enable if you use ResourceQuota
+    limit_ranges: false      # enable if you use LimitRange
+
+    # --- Events & logs ---
+    events: true             # Kubernetes Events (warning + normal)
+    pod_logs: false          # enable to tail pod logs (high volume!)
+    pod_logs_tail_lines: 100
+    pod_logs_namespaces: []
+    node_logs: false         # enable to tail node (kubelet) logs
+
+    # --- Networking ---
+    network: true            # Per-namespace network via Kubelet Summary API
+    network_policies: true   # NetworkPolicy inventory
+
+    # --- Metrics API (resource utilization) ---
+    metrics_api: true        # Pod/Node CPU+memory usage via metrics.k8s.io
+
+    # --- Workload generations ---
+    workload_generations: true  # Deployment/DST/DS revision history
+
+    # --- Sync cluster state to TFO Platform backend ---
+    sync_to_backend: true
+    sync_interval: 60s
+    sync_timeout: 30s
+
+# -----------------------------------------------------------------------------
+# Exporter — OTLP HTTP to TFO Platform
+# -----------------------------------------------------------------------------
+exporter:
+  otlp:
+    enabled: true
+    protocol: http         # http (default) or grpc (M5.2)
+    batch_size: 100
+    flush_interval: 10s
+    compression: gzip
+    endpoint_version: v2   # v1 (OTLP community) or v2 (TFO enhanced)
+
+# -----------------------------------------------------------------------------
+# Buffer — disk-backed retry (survives backend outages)
+# -----------------------------------------------------------------------------
+buffer:
+  enabled: true
+  path: /var/lib/tfo-agent/buffer
+  max_size_mb: 50          # 50MB is enough for ~1h of metrics at 30s interval
+  max_age: 24h
+  flush_interval: 5s
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  level: info              # debug | info | warn | error
+  format: json             # json (production) or text (debugging)
+
+# -----------------------------------------------------------------------------
+# Everything below is DISABLED — not needed for minimal K8s monitoring.
+# Enable only when you need the specific feature.
+# -----------------------------------------------------------------------------
+
+# Prometheus /metrics endpoint (for local scraping by Prom/Grafana)
+prometheus_server:
+  enabled: false
+  port: 8888
+  path: /metrics
+
+# Persister (plugin state across restarts — needed for log tail offset)
+persister:
+  enabled: false
+
+# Pipeline processors (filter/rename/transform metrics in-flight)
+# pipeline:
+#   processors:
+#     pre_aggregator: []
+
+# Secret stores (@{store:key} resolver)
+# secret_stores: []
+
+# Multi-output (beyond OTLP)
+# outputs: []
