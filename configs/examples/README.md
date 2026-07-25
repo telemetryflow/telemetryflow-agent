@@ -6,10 +6,10 @@ Copy, set your API keys, and go.
 
 ## Files
 
-| File | Use Case | Collectors | ~Metrics |
-|---|---|---|---|
+| File                                     | Use Case                          | Collectors                                                    | ~Metrics        |
+| ---------------------------------------- | --------------------------------- | ------------------------------------------------------------- | --------------- |
 | [`k8s-minimal.yaml`](./k8s-minimal.yaml) | Kubernetes DaemonSet / Deployment | `system` + `node_exporter` + `kubernetes` (33 sub-collectors) | ~250-500 / node |
-| [`vm-minimal.yaml`](./vm-minimal.yaml) | Standalone Linux VM / bare metal | `system` + `node_exporter` | ~250 / host |
+| [`vm-minimal.yaml`](./vm-minimal.yaml)   | Standalone Linux VM / bare metal  | `system` + `node_exporter`                                    | ~250 / host     |
 
 ## Quick Start
 
@@ -25,6 +25,7 @@ kubectl apply -f deploy/kubernetes/
 ```
 
 Or via Helm:
+
 ```bash
 helm install tfo-agent deploy/helm/telemetryflow-agent \
   --set telemetryflow.apiKeyId=$TELEMETRYFLOW_API_KEY_ID \
@@ -65,16 +66,16 @@ docker run -d \
 
 Both configs resolve these env vars:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `TELEMETRYFLOW_API_KEY_ID` | ✅ | — | API key ID (`tfk_xxx`) |
-| `TELEMETRYFLOW_API_KEY_SECRET` | ✅ | — | API key secret (`tfs_xxx`) |
-| `TELEMETRYFLOW_ENDPOINT` | ❌ | `https://api.telemetryflow.id` | OTLP endpoint |
-| `TELEMETRYFLOW_ID` | ❌ | auto (UUIDv5 host) | Agent ID |
-| `TELEMETRYFLOW_HOSTNAME` | ❌ | `os.Hostname()` | Display hostname |
-| `NODE_NAME` | ❌ | — | K8s node name (set by downward API) |
-| `TELEMETRYFLOW_K8S_CLUSTER_NAME` | ❌ | auto-detect | K8s cluster name |
-| `TELEMETRYFLOW_K8S_CLUSTER_PROVIDER` | ❌ | auto-detect | `eks` / `gke` / `aks` / `self-managed` |
+| Variable                             | Required | Default                        | Description                            |
+| ------------------------------------ | -------- | ------------------------------ | -------------------------------------- |
+| `TELEMETRYFLOW_API_KEY_ID`           | ✅       | —                              | API key ID (`tfk_xxx`)                 |
+| `TELEMETRYFLOW_API_KEY_SECRET`       | ✅       | —                              | API key secret (`tfs_xxx`)             |
+| `TELEMETRYFLOW_ENDPOINT`             | ❌       | `https://api.telemetryflow.id` | OTLP endpoint                          |
+| `TELEMETRYFLOW_ID`                   | ❌       | auto (UUIDv5 host)             | Agent ID                               |
+| `TELEMETRYFLOW_HOSTNAME`             | ❌       | `os.Hostname()`                | Display hostname                       |
+| `NODE_NAME`                          | ❌       | —                              | K8s node name (set by downward API)    |
+| `TELEMETRYFLOW_K8S_CLUSTER_NAME`     | ❌       | auto-detect                    | K8s cluster name                       |
+| `TELEMETRYFLOW_K8S_CLUSTER_PROVIDER` | ❌       | auto-detect                    | `eks` / `gke` / `aks` / `self-managed` |
 
 ## What's NOT Included (by design)
 
