@@ -22,6 +22,8 @@ package log
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"runtime"
@@ -33,9 +35,15 @@ import (
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
+	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
 )
 
 // LogCollector collects logs from file paths and journald, exporting them via OTLP.
+//
+// LogCollector implements the plugin.StatefulPlugin mixin (GetState/SetState)
+// so file tail offsets can be persisted across agent restarts by the
+// persister framework. It continues to satisfy the legacy collector.Collector
+// interface as well.
 type LogCollector struct {
 	cfg        config.LogCollectorConfig
 	logger     *zap.Logger
@@ -49,10 +57,22 @@ type LogCollector struct {
 	linesTotal atomic.Int64
 	bytesTotal atomic.Int64
 
+	// restoredState is populated by SetState() at agent startup (before Start
+	// creates tailers). Start() consults it to seed each FileTailer with its
+	// saved offset/inode so collection resumes instead of skipping to EOF.
+	restoredState *CollectorState
+
 	// logCallback is called for each collected log line.
 	// Set by the agent to wire into the OTLP LoggerProvider.
 	logCallback func(timestamp time.Time, severity, body, source string, attrs map[string]string)
 }
+
+// Compile-time assertions that LogCollector satisfies both the legacy
+// collector.Collector interface and the plugin.StatefulPlugin mixin.
+var (
+	_ collector.Collector   = (*LogCollector)(nil)
+	_ plugin.StatefulPlugin = (*LogCollector)(nil)
+)
 
 // NewLogCollector creates a log collector with the given configuration.
 func NewLogCollector(cfg config.LogCollectorConfig, agentID string, logger *zap.Logger) *LogCollector {
@@ -104,9 +124,19 @@ func (c *LogCollector) Start(ctx context.Context) error {
 		maxLine = 64 * 1024
 	}
 
-	// Create file tailers
+	// Create file tailers. Seed each one with its persisted offset (if any)
+	// BEFORE calling Start() so the tailer can resume from the saved offset
+	// instead of skipping to EOF. The restoredState map is keyed by the same
+	// expanded path that ExpandGlobs returns, so the lookup is stable across
+	// restarts for non-glob configs.
+	c.mu.Lock()
 	for _, p := range paths {
 		tailer := NewFileTailer(p, maxLine, c.logger)
+		if c.restoredState != nil {
+			if ts, ok := c.restoredState.Tailers[p]; ok {
+				tailer.SetOffset(ts.Offset, ts.Inode)
+			}
+		}
 		c.tailers = append(c.tailers, tailer)
 		go func(t *FileTailer) {
 			if err := t.Start(ctx); err != nil && err != context.Canceled {
@@ -114,6 +144,7 @@ func (c *LogCollector) Start(ctx context.Context) error {
 			}
 		}(tailer)
 	}
+	c.mu.Unlock()
 
 	// Start journald collector if enabled and on Linux
 	if c.cfg.Journald.Enabled && runtime.GOOS == "linux" {
@@ -184,6 +215,132 @@ func (c *LogCollector) Collect(_ context.Context) ([]collector.Metric, error) {
 		collector.NewMetric("tfo.log_collector.bytes_total", float64(bytes), collector.MetricTypeCounter).
 			WithDescription("Total log bytes collected"),
 	}, nil
+}
+
+// GetState returns the current per-tailer (path, inode, offset) snapshot for
+// persistence by the persister framework. It implements plugin.StatefulPlugin.
+// The returned value is always a non-nil *CollectorState, even when no tailers
+// are configured, so the persister has a stable shape to serialize.
+func (c *LogCollector) GetState() interface{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	state := NewCollectorState()
+	for _, t := range c.tailers {
+		ts := t.State()
+		state.Tailers[ts.Path] = ts
+	}
+	return state
+}
+
+// SetState restores tailer offsets from persisted state. It is called by the
+// persister at agent startup BEFORE Start() creates the FileTailers, so the
+// restored state is consulted when each tailer is constructed. It implements
+// plugin.StatefulPlugin.
+//
+// The persister decodes the on-disk JSON into generic interface{} values, so
+// SetState accepts both *CollectorState (direct programmatic calls) and
+// map[string]interface{} (the shape produced by encoding/json). Unknown or
+// malformed payloads are ignored rather than panicking — the worst case is
+// that tailers start from EOF as they would on a first run.
+func (c *LogCollector) SetState(s interface{}) {
+	if s == nil {
+		return
+	}
+	switch v := s.(type) {
+	case *CollectorState:
+		c.mu.Lock()
+		c.restoredState = v
+		c.mu.Unlock()
+	case CollectorState:
+		c.mu.Lock()
+		c.restoredState = &v
+		c.mu.Unlock()
+	case map[string]interface{}:
+		state, err := collectorStateFromMap(v)
+		if err != nil {
+			c.logger.Warn("log collector: ignoring malformed persisted state",
+				zap.Error(err))
+			return
+		}
+		c.mu.Lock()
+		c.restoredState = state
+		c.mu.Unlock()
+	default:
+		// Unknown shape — ignore silently. This matches the persister's
+		// design that SetState must never panic on unexpected input.
+	}
+}
+
+// collectorStateFromMap decodes the generic map[string]interface{} shape
+// produced by encoding/json back into a typed CollectorState. It is lenient:
+// missing fields default to zero values, and type mismatches cause the
+// offending entry to be skipped rather than failing the whole decode.
+func collectorStateFromMap(m map[string]interface{}) (*CollectorState, error) {
+	state := NewCollectorState()
+	rawTailers, ok := m["tailers"]
+	if !ok {
+		return state, nil
+	}
+	tailersMap, ok := rawTailers.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("persister state: 'tailers' is not an object")
+	}
+	for path, raw := range tailersMap {
+		entry, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ts := TailerState{Path: path}
+		if v, err := toUint64(entry["inode"]); err == nil {
+			ts.Inode = v
+		}
+		if v, err := toInt64(entry["offset"]); err == nil {
+			ts.Offset = v
+		}
+		if fp, ok := entry["fingerprint"].(string); ok {
+			ts.Fingerprint = fp
+		}
+		state.Tailers[path] = ts
+	}
+	return state, nil
+}
+
+// toUint64 coerces a JSON-decoded numeric value to uint64.
+func toUint64(v interface{}) (uint64, error) {
+	switch n := v.(type) {
+	case float64:
+		return uint64(n), nil
+	case int:
+		return uint64(n), nil
+	case int64:
+		return uint64(n), nil
+	case uint64:
+		return n, nil
+	case json.Number:
+		i, err := n.Int64()
+		if err != nil {
+			return 0, err
+		}
+		return uint64(i), nil
+	}
+	return 0, fmt.Errorf("not a number")
+}
+
+// toInt64 coerces a JSON-decoded numeric value to int64.
+func toInt64(v interface{}) (int64, error) {
+	switch n := v.(type) {
+	case float64:
+		return int64(n), nil
+	case int:
+		return int64(n), nil
+	case int64:
+		return n, nil
+	case uint64:
+		return int64(n), nil
+	case json.Number:
+		return n.Int64()
+	}
+	return 0, fmt.Errorf("not a number")
 }
 
 // drainFileTailer reads all pending lines from a file tailer.

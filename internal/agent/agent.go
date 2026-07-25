@@ -92,6 +92,8 @@ type Agent struct {
 	prometheusServer *exporter.PrometheusServer
 	agentAPIServer   *agentapi.Server
 	otlpBridge       *exporter.OTLPMetricBridge
+	logBridge        *exporter.OTLPLogBridge
+	logCollector     *logcollector.LogCollector
 	metricForwarder  *exporter.MetricForwarder
 	bufferRetry      *exporter.BufferRetrySink
 	diskBuffer       *buffer.Buffer
@@ -567,6 +569,10 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 
 	// Add log collector: Fluent Bit (preferred) or native (fallback).
 	// Mutual exclusion — Fluent Bit replaces native when both are enabled.
+	// nativeLogCol tracks any native LogCollector created below so it can be
+	// registered with the persister once the persister is initialised later
+	// in this function (the persister is created after the collectors).
+	var nativeLogCol *logcollector.LogCollector
 	if cfg.Collector.FluentBit.Enabled {
 		// Route Fluent Bit's OTLP output to the same logs endpoint the OTLP exporter
 		// uses. Without this, logs would go to telemetryflow.endpoint + /v1/logs,
@@ -589,8 +595,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 			// Fall back to native log collector
 			if cfg.Collector.Logs.Enabled {
-				logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
-				collectors = append(collectors, logCol)
+				nativeLogCol = logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
+				collectors = append(collectors, nativeLogCol)
 				logger.Info("Native log collector enabled (Fluent Bit fallback)")
 			}
 		} else {
@@ -603,8 +609,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 		}
 	} else if cfg.Collector.Logs.Enabled {
-		logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
-		collectors = append(collectors, logCol)
+		nativeLogCol = logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
+		collectors = append(collectors, nativeLogCol)
 		logger.Info("Native log collector enabled",
 			zap.Int("paths", len(cfg.Collector.Logs.Paths)),
 			zap.Bool("journald", cfg.Collector.Logs.Journald.Enabled),
@@ -726,6 +732,41 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			logger.Info("OTLP metric bridge enabled",
 				zap.String("endpoint", otlpHost),
 				zap.String("path", otlpPath),
+			)
+		}
+	}
+
+	// Wire OTLP log bridge into the native LogCollector's SetLogCallback.
+	// Without this, the native log collector tails files / journald but the
+	// logCallback is never set, so collected logs go nowhere. The bridge
+	// batches and POSTs to the OTLP /v1/logs endpoint, mirroring the metric
+	// bridge. Fluent Bit has its own OTLP output and does not need this.
+	var logBridge *exporter.OTLPLogBridge
+	if nativeLogCol != nil && cfg.IsLogsEnabled() {
+		logHost, logPath, logTLS := cfg.GetOTLPEndpoint("logs")
+		lb, err := exporter.NewOTLPLogBridge(exporter.OTLPLogBridgeConfig{
+			Endpoint:      logHost,
+			Path:          logPath,
+			TLSEnabled:    logTLS,
+			TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
+			Headers: map[string]string{
+				"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
+				"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
+				"X-TelemetryFlow-Agent-ID":   agentID,
+			},
+			Logger:  logger,
+			Timeout: 10 * time.Second,
+		})
+		if err != nil {
+			logger.Warn("Failed to create OTLP log bridge, native logs will not be exported",
+				zap.Error(err),
+			)
+		} else {
+			logBridge = lb
+			nativeLogCol.SetLogCallback(lb.Emit)
+			logger.Info("OTLP log bridge wired to native log collector",
+				zap.String("endpoint", logHost),
+				zap.String("path", logPath),
 			)
 		}
 	}
@@ -956,6 +997,20 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			statefile = "/var/lib/tfo-agent/state.json"
 		}
 		agentPersister = persister.New(statefile).WithLogger(logger)
+
+		// Register stateful collectors BEFORE Load() so the persister can
+		// dispatch the restored state to them via SetState. Registration must
+		// also happen before the collectors' Start() (which runs later in
+		// Agent.Run) so the restored state is available when each collector
+		// spins up its workers. The native LogCollector persists per-file
+		// tail offsets so collection resumes across agent restarts (M3).
+		if nativeLogCol != nil {
+			if err := agentPersister.Register("log_collector", nativeLogCol); err != nil {
+				logger.Warn("failed to register log collector with persister",
+					zap.Error(err))
+			}
+		}
+
 		// Load previously persisted state BEFORE collectors start so they can
 		// pick up their saved state during Init/Start. Errors here are non-fatal
 		// — a missing or corrupt statefile just means plugins start fresh.
@@ -982,6 +1037,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		prometheusServer: promServer,
 		agentAPIServer:   apiServer,
 		otlpBridge:       otlpBridge,
+		logBridge:        logBridge,
+		logCollector:     nativeLogCol,
 		metricForwarder:  forwarder,
 		bufferRetry:      bufferRetry,
 		diskBuffer:       nil, // tracked separately when needed; buffer closes itself
@@ -1140,6 +1197,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.metricForwarder != nil {
 		if err := a.metricForwarder.Start(ctx); err != nil && err != context.Canceled {
 			errChan <- fmt.Errorf("metric forwarder error: %w", err)
+		}
+	}
+
+	// Start OTLP log bridge flusher (native log collector export path).
+	if a.logBridge != nil {
+		if err := a.logBridge.Start(ctx); err != nil {
+			errChan <- fmt.Errorf("otlp log bridge start: %w", err)
 		}
 	}
 
@@ -1333,6 +1397,19 @@ func (a *Agent) shutdown() error {
 			if err := a.otlpBridge.Shutdown(shutdownCtx); err != nil {
 				errMu.Lock()
 				errs = append(errs, fmt.Errorf("otlp bridge shutdown: %w", err))
+				errMu.Unlock()
+			}
+		}()
+	}
+
+	// Stop OTLP log bridge — flushes pending records before returning.
+	if a.logBridge != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := a.logBridge.Stop(); err != nil {
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("otlp log bridge stop: %w", err))
 				errMu.Unlock()
 			}
 		}()
