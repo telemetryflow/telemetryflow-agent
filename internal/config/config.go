@@ -1649,6 +1649,13 @@ type OTLPExporterConfig struct {
 	// Enabled enables the OTLP exporter
 	Enabled bool `mapstructure:"enabled"`
 
+	// Protocol selects the OTLP transport for the metric bridge: "http" (default)
+	// or "grpc". Empty is treated as "http" so existing configurations are
+	// preserved. The legacy OTLPExporter reads its protocol from
+	// TelemetryFlowConfig.Protocol; this field only governs the
+	// OTLPMetricBridge vs OTLPMetricGRPCBridge selection in agent.go.
+	Protocol string `mapstructure:"protocol"`
+
 	// BatchSize is the maximum batch size
 	BatchSize int `mapstructure:"batch_size"`
 

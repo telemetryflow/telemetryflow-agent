@@ -79,6 +79,13 @@ import (
 	k8s "k8s.io/client-go/kubernetes"
 )
 
+// otlpMetricBridge is the contract satisfied by both the HTTP and gRPC OTLP
+// metric bridges so the agent run/shutdown paths are transport-agnostic.
+type otlpMetricBridge interface {
+	exporter.MetricSink
+	Shutdown(ctx context.Context) error
+}
+
 // Agent is the main telemetry agent
 type Agent struct {
 	id     string
@@ -94,15 +101,18 @@ type Agent struct {
 	collectorManager *collector.Manager
 	prometheusServer *exporter.PrometheusServer
 	agentAPIServer   *agentapi.Server
-	otlpBridge       *exporter.OTLPMetricBridge
-	logBridge        *exporter.OTLPLogBridge
-	logCollector     *logcollector.LogCollector
-	metricForwarder  *exporter.MetricForwarder
-	bufferRetry      *exporter.BufferRetrySink
-	diskBuffer       *buffer.Buffer
-	persister        *persister.Persister
-	qanForwarder     *qan.QANForwarder
-	qanExporter      *qan.QANExporter
+	// otlpBridge holds whichever metric bridge was constructed (HTTP or gRPC).
+	// Both implementations satisfy MetricSink + Shutdown so the run/shutdown
+	// paths do not need to care about the transport.
+	otlpBridge      otlpMetricBridge
+	logBridge       *exporter.OTLPLogBridge
+	logCollector    *logcollector.LogCollector
+	metricForwarder *exporter.MetricForwarder
+	bufferRetry     *exporter.BufferRetrySink
+	diskBuffer      *buffer.Buffer
+	persister       *persister.Persister
+	qanForwarder    *qan.QANForwarder
+	qanExporter     *qan.QANExporter
 
 	// State
 	mu         sync.RWMutex
@@ -737,35 +747,63 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 
 	// Create OTLP metric bridge if metrics export is enabled.
 	// This is the export pipeline that forwards collected metrics to the
-	// TelemetryFlow Platform backend via OTLP HTTP.
-	var otlpBridge *exporter.OTLPMetricBridge
+	// TelemetryFlow Platform backend via OTLP. The transport is selected by
+	// cfg.Exporter.OTLP.Protocol: "grpc" instantiates the gRPC bridge, any
+	// other value (including the empty default) keeps the HTTP bridge so
+	// existing configurations are unchanged.
+	var otlpBridge otlpMetricBridge
 	var otlpSink exporter.MetricSink
 	if cfg.IsMetricsEnabled() {
 		bridgeCtx := context.Background()
 		otlpHost, otlpPath, otlpTLS := cfg.GetOTLPEndpoint("metrics")
-		bridge, err := exporter.NewOTLPMetricBridge(bridgeCtx, exporter.OTLPMetricBridgeConfig{
-			Endpoint:      otlpHost,
-			Path:          otlpPath,
-			TLSEnabled:    otlpTLS,
-			TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
-			Headers: map[string]string{
-				"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
-				"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
-				"X-TelemetryFlow-Agent-ID":   agentID,
-			},
-			Logger: logger,
-		})
-		if err != nil {
-			logger.Warn("Failed to create OTLP metric bridge, metrics will not be exported",
-				zap.Error(err),
-			)
-		} else {
-			otlpBridge = bridge
-			otlpSink = bridge
-			logger.Info("OTLP metric bridge enabled",
-				zap.String("endpoint", otlpHost),
-				zap.String("path", otlpPath),
-			)
+		authHeaders := map[string]string{
+			"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
+			"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
+			"X-TelemetryFlow-Agent-ID":   agentID,
+		}
+		switch strings.ToLower(cfg.Exporter.OTLP.Protocol) {
+		case "grpc":
+			grpcBridge, err := exporter.NewOTLPMetricGRPCBridge(bridgeCtx, exporter.OTLPMetricGRPCBridgeConfig{
+				Endpoint:      otlpHost,
+				TLSEnabled:    otlpTLS,
+				TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
+				Headers:       authHeaders,
+				Logger:        logger,
+				Timeout:       cfg.GetEffectiveTimeout(),
+				Compression:   cfg.Exporter.OTLP.Compression,
+			})
+			if err != nil {
+				logger.Warn("Failed to create OTLP gRPC metric bridge, metrics will not be exported",
+					zap.Error(err),
+				)
+			} else {
+				otlpBridge = grpcBridge
+				otlpSink = grpcBridge
+				logger.Info("OTLP gRPC metric bridge enabled",
+					zap.String("endpoint", otlpHost),
+				)
+			}
+		default: // "http" and empty both fall through to HTTP for backward compat
+			httpBridge, err := exporter.NewOTLPMetricBridge(bridgeCtx, exporter.OTLPMetricBridgeConfig{
+				Endpoint:      otlpHost,
+				Path:          otlpPath,
+				TLSEnabled:    otlpTLS,
+				TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
+				Headers:       authHeaders,
+				Logger:        logger,
+			})
+			if err != nil {
+				logger.Warn("Failed to create OTLP metric bridge, metrics will not be exported",
+					zap.Error(err),
+				)
+			} else {
+				otlpBridge = httpBridge
+				otlpSink = httpBridge
+				logger.Info("OTLP metric bridge enabled",
+					zap.String("endpoint", otlpHost),
+					zap.String("path", otlpPath),
+				)
+			}
 		}
 	}
 
