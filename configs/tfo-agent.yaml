@@ -7,6 +7,11 @@
 # This configuration file controls the TelemetryFlow Agent behavior.
 # Copy to: /etc/tfo-agent/tfo-agent.yaml or ~/.tfo-agent/
 #
+# Looking for a minimal starting point? See:
+#   configs/examples/k8s-minimal.yaml  — Kubernetes (system + node_exporter + k8s)
+#   configs/examples/vm-minimal.yaml   — Standalone VM (system + node_exporter)
+#   configs/examples/README.md         — Quick start guide
+#
 # =============================================================================
 # Environment Variables
 # =============================================================================
