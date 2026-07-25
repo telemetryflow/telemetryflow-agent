@@ -12,6 +12,7 @@ import (
 	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/grok_parser"
 	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/json_parser"
 	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/keep"
+	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/log_to_metric"
 	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/multiline"
 	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/regex_parser"
 	_ "github.com/telemetryflow/telemetryflow-agent/internal/processor/rename"
