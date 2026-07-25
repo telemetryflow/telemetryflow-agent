@@ -1,0 +1,206 @@
+# =============================================================================
+# TelemetryFlow Agent - Minimal VM (Virtual Machine) Configuration
+# =============================================================================
+#
+# Production-ready minimal config for deploying tfo-agent on a standalone
+# Linux VM or bare-metal host. Collects only TFO-native host metrics:
+# system overview + detailed node_exporter-equivalent metrics.
+#
+# No Kubernetes collector. No database/app collectors. No integrations.
+# Just the host observability essentials that every VM needs.
+#
+# Usage:
+#   1. Copy to /etc/tfo-agent/tfo-agent.yaml
+#   2. Set env vars: TELEMETRYFLOW_API_KEY_ID, TELEMETRYFLOW_API_KEY_SECRET
+#   3. Start: systemctl start tfo-agent
+#
+# Or run in Docker:
+#   docker run -d \
+#     --name tfo-agent \
+#     --restart unless-stopped \
+#     -e TELEMETRYFLOW_API_KEY_ID=tfk_xxx \
+#     -e TELEMETRYFLOW_API_KEY_SECRET=tfs_xxx \
+#     --pid=host \
+#     --cgroupns=host \
+#     -v /etc/tfo-agent/tfo-agent.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
+#     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
+#     -v /proc:/host/proc:ro \
+#     -v /sys:/host/sys:ro \
+#     -v /etc:/host/etc:ro \
+#     -v /var:/host/var:ro \
+#     -v /run:/host/run:ro \
+#     telemetryflow/telemetryflow-agent:1.3.0-dev \
+#     --config /etc/tfo-agent/tfo-agent.yaml
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# TFO Platform Connection
+# -----------------------------------------------------------------------------
+telemetryflow:
+  # API credentials (from TFO Platform → Settings → API Keys)
+  api_key_id: ${TELEMETRYFLOW_API_KEY_ID}
+  api_key_secret: ${TELEMETRYFLOW_API_KEY_SECRET}
+
+  # OTLP ingestion endpoint
+  endpoint: ${TELEMETRYFLOW_ENDPOINT:-https://api.telemetryflow.id}
+
+  # Backend REST API (for heartbeat)
+  backend_endpoint: ${TELEMETRYFLOW_BACKEND_ENDPOINT:-https://api.telemetryflow.id}
+
+  timeout: 30s
+  retry:
+    enabled: true
+    max_attempts: 5
+    initial_interval: 1s
+    max_interval: 30s
+
+# -----------------------------------------------------------------------------
+# Agent Identity
+# -----------------------------------------------------------------------------
+agent:
+  # Auto-generated via UUIDv5 host fingerprint when empty.
+  id: ${TELEMETRYFLOW_ID:-}
+
+  # Auto-detected via os.Hostname() when empty.
+  hostname: ${TELEMETRYFLOW_HOSTNAME:-}
+
+  # Optional tags — applied to all metrics from this agent.
+  tags:
+    deployment: vm
+  labels:
+    environment: ${HOST_ENV:-production}
+    region: ${HOST_REGION:-}
+
+# -----------------------------------------------------------------------------
+# Heartbeat
+# -----------------------------------------------------------------------------
+heartbeat:
+  interval: 60s
+  timeout: 10s
+  include_system_info: true
+
+# -----------------------------------------------------------------------------
+# Collectors — TFO Native Host Observability Only
+# -----------------------------------------------------------------------------
+collectors:
+  # ===========================================================================
+  # System Collector — basic host metrics (CPU, memory, disk, network)
+  # ===========================================================================
+  # ~50 metrics per host. Low overhead. Always enable.
+  system:
+    enabled: true
+    interval: 30s
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+
+  # ===========================================================================
+  # Node Exporter — detailed host metrics
+  # ===========================================================================
+  # Equivalent to running prometheus/node_exporter. ~200 metrics per host.
+  # Covers: per-CPU-mode time, per-mount filesystem, disk I/O per device,
+  # network per-interface + TCP states + ARP, load average, conntrack,
+  # pressure stall information (PSI), entropy, file descriptors, VM stats.
+  #
+  # This is the primary collector for VM monitoring. Disable individual
+  # sub-collectors if you don't need them (e.g. thermal on servers).
+  node_exporter:
+    enabled: true
+    interval: 30s
+    cpu: true
+    memory: true
+    diskio: true
+    filesystem: true
+    network: true
+    loadavg: true
+
+    # Linux extras — enable based on what your kernel supports:
+    thermal: false          # requires thermal_zone or lm-sensors
+    textfile: false         # custom metrics from *.prom files
+    textfile_path: /var/lib/tfo-agent/textfile
+    conntrack: true         # netfilter conntrack table
+    psi: true               # Pressure Stall Information (kernel 4.20+)
+    vmstat: true            # /proc/vmstat
+    sockstat: true          # /proc/net/sockstat
+    entropy: true           # /proc/sys/kernel/random/entropy_avail
+    filedesc: true          # file descriptor usage
+    stat: true              # /proc/stat context switches + interrupts
+
+    # Exclude noisy devices/mounts:
+    filesystem_mount_exclude:
+      - /var/lib/docker/overlay2    # container FS internals
+      - /run/containerd             # container runtime
+      - /sys/fs/cgroup              # cgroup pseudo-FS
+    filesystem_type_exclude:
+      - tmpfs
+      - devtmpfs
+      - squashfs
+      - overlay
+    network_device_exclude:
+      - lo
+      - veth*
+      - docker*
+      - br-*
+    disk_device_exclude:
+      - loop*
+      - ram*
+
+# -----------------------------------------------------------------------------
+# Exporter — OTLP HTTP to TFO Platform
+# -----------------------------------------------------------------------------
+exporter:
+  otlp:
+    enabled: true
+    protocol: http         # http (default) or grpc
+    batch_size: 100
+    flush_interval: 10s
+    compression: gzip
+    endpoint_version: v2
+
+# -----------------------------------------------------------------------------
+# Buffer — disk-backed retry
+# -----------------------------------------------------------------------------
+# Critical for VMs with flaky internet — keeps metrics during network outages.
+buffer:
+  enabled: true
+  path: /var/lib/tfo-agent/buffer
+  max_size_mb: 50          # ~1h retention at 30s interval with ~250 metrics
+  max_age: 24h
+  flush_interval: 5s
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  level: info
+  format: json             # json for journald/ELK; text for console debugging
+
+# -----------------------------------------------------------------------------
+# Everything below is DISABLED — not needed for minimal VM monitoring.
+# -----------------------------------------------------------------------------
+
+# Prometheus /metrics endpoint (for local scraping)
+prometheus_server:
+  enabled: false
+  port: 8888
+  path: /metrics
+
+# Persister (needed only for log tail offset persistence)
+persister:
+  enabled: false
+
+# Agent HTTP API (for real-time K8s queries — not needed on standalone VM)
+agent_api:
+  enabled: false
+
+# Pipeline processors
+# pipeline:
+#   processors:
+#     pre_aggregator: []
+
+# Secret stores
+# secret_stores: []
+
+# Multi-output
+# outputs: []

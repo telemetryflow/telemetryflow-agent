@@ -130,8 +130,28 @@ func (c *RedisCollector) collectInstance(ctx context.Context, inst config.RedisI
 		}
 	}
 
+	var clusterInfo map[string]string
+	if ToFloat(parsed["cluster_enabled"]) == 1 {
+		if raw, err := client.BulkString([]string{"CLUSTER", "INFO"}); err == nil {
+			clusterInfo = ParseClusterInfo(raw)
+		}
+	}
+
+	var latency map[string]LatencyEvent
+	if inst.CollectLatency {
+		if raw, err := client.BulkString([]string{"LATENCY", "LATEST"}); err == nil {
+			latency = ParseLatencyLatest(raw)
+		}
+	}
+
 	labels := c.instanceLabels(inst)
-	return BuildRedisMetrics(parsed, commandStats, labels), nil
+	return BuildRedisMetrics(MetricsInput{
+		Info:         parsed,
+		CommandStats: commandStats,
+		ClusterInfo:  clusterInfo,
+		Latency:      latency,
+		Labels:       labels,
+	}), nil
 }
 
 func (c *RedisCollector) instanceLabels(inst config.RedisInstanceConfig) map[string]string {
@@ -148,10 +168,22 @@ func (c *RedisCollector) instanceLabels(inst config.RedisInstanceConfig) map[str
 	return labels
 }
 
-// BuildRedisMetrics maps INFO key/value pairs to collector.Metric under the
-// db.redis.* namespace. Exported so external tests under tests/ can cover the
-// mapping logic without a live Redis instance.
-func BuildRedisMetrics(info, commandStats, labels map[string]string) []collector.Metric {
+// MetricsInput bundles the parsed data sources needed to build a full set of
+// Redis metrics in one call. Any of the maps may be nil; the corresponding
+// metric groups are simply skipped.
+type MetricsInput struct {
+	Info         map[string]string       // parsed INFO all response
+	CommandStats map[string]string       // parsed INFO commandstats response
+	ClusterInfo  map[string]string       // parsed CLUSTER INFO response (only when cluster_enabled=1)
+	Latency      map[string]LatencyEvent // parsed LATENCY LATEST response (only when CollectLatency=true)
+	Labels       map[string]string       // base labels applied to every emitted metric
+}
+
+// BuildRedisMetrics maps INFO/CLUSTER/LATENCY data to collector.Metric under
+// the db.redis.* namespace. Exported so external tests under tests/ can cover
+// the mapping logic without a live Redis instance.
+func BuildRedisMetrics(in MetricsInput) []collector.Metric {
+	info, commandStats, clusterInfo, latency, labels := in.Info, in.CommandStats, in.ClusterInfo, in.Latency, in.Labels
 	now := time.Now()
 	mk := func(name string, v float64, typ collector.MetricType, unit string, desc string) collector.Metric {
 		m := collector.Metric{
@@ -179,7 +211,17 @@ func BuildRedisMetrics(info, commandStats, labels map[string]string) []collector
 		}
 	}
 
-	gauge("redis_version", "version_info", "", "Redis version (numeric major only when numeric)") // emitted as label below
+	// redis_version is a semver string (e.g. "7.2.5"); ToFloat on it returns 0.
+	// Split it into numeric major/minor/patch gauges so consumers can alert on
+	// version ranges.
+	if raw, ok := info["redis_version"]; ok {
+		major, minor, patch := ParseSemver(raw)
+		out = append(out,
+			mk("db.redis.version_major", float64(major), collector.MetricTypeGauge, "", "Redis major version parsed from redis_version"),
+			mk("db.redis.version_minor", float64(minor), collector.MetricTypeGauge, "", "Redis minor version parsed from redis_version"),
+			mk("db.redis.version_patch", float64(patch), collector.MetricTypeGauge, "", "Redis patch version parsed from redis_version"),
+		)
+	}
 	counter("uptime_in_seconds", "uptime_seconds", "s", "Server uptime in seconds")
 	gauge("connected_clients", "connected_clients", "", "Connected client count")
 	counter("total_connections_received", "total_connections_received", "", "Total connections accepted")
@@ -217,6 +259,10 @@ func BuildRedisMetrics(info, commandStats, labels map[string]string) []collector
 	counter("rdb_bgsave_in_progress", "rdb_bgsave_in_progress", "", "RDB bgsave in progress flag")
 	gauge("aof_enabled", "aof_enabled", "", "AOF enabled flag")
 	counter("aof_rewrite_in_progress", "aof_rewrite_in_progress", "", "AOF rewrite in progress flag")
+
+	// Cluster flag from INFO; the rest of the cluster_* metrics below come from
+	// CLUSTER INFO which is only fetched when this is 1.
+	gauge("cluster_enabled", "cluster_enabled", "", "Cluster enabled flag")
 
 	// Keyspace section: db0:keys=N,expires=M,avg_ttl=T
 	for k, v := range info {
@@ -261,6 +307,35 @@ func BuildRedisMetrics(info, commandStats, labels map[string]string) []collector
 			m.Labels = cmdLabels
 			out = append(out, m)
 		}
+	}
+
+	// Cluster section: only emitted when CLUSTER INFO was collected. The
+	// cluster_enabled flag above still emits from INFO regardless.
+	if len(clusterInfo) > 0 {
+		if v, ok := clusterInfo["cluster_state"]; ok {
+			val := 0.0
+			if v == "ok" {
+				val = 1
+			}
+			out = append(out, mk("db.redis.cluster_state", val, collector.MetricTypeGauge, "", "Cluster state (1=ok,0=fail)"))
+		}
+		if raw, ok := clusterInfo["cluster_slots_assigned"]; ok {
+			out = append(out, mk("db.redis.cluster_slots_assigned", ToFloat(raw), collector.MetricTypeGauge, "", "Slots assigned to the cluster"))
+		}
+		if raw, ok := clusterInfo["cluster_slots_ok"]; ok {
+			out = append(out, mk("db.redis.cluster_slots_ok", ToFloat(raw), collector.MetricTypeGauge, "", "Slots in online state"))
+		}
+	}
+
+	// Latency section: one latency_ms + latency_max_ms pair per event, tagged
+	// with redis_event.
+	for event, ev := range latency {
+		m1 := mk("db.redis.latency_ms", ev.LatencyMs, collector.MetricTypeGauge, "ms", "Latest latency in ms for event "+event)
+		m1.Labels["redis_event"] = event
+		out = append(out, m1)
+		m2 := mk("db.redis.latency_max_ms", ev.MaxLatencyMs, collector.MetricTypeGauge, "ms", "Max latency in ms for event "+event)
+		m2.Labels["redis_event"] = event
+		out = append(out, m2)
 	}
 
 	return out

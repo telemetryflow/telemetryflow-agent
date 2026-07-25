@@ -1,0 +1,40 @@
+# TelemetryFlow Agent - Syslog Listener Collector Configuration
+#
+# Example configuration for the syslog receiver. Listens on one or more
+# UDP/TCP/Unix sockets, parses incoming syslog frames, and flushes
+# counters on a fixed cadence.
+#
+# Documentation: docs/collectors/SYSLOG.md (if exists)
+
+syslog_listener:
+  enabled: false
+
+  # Per-listener bind configuration. At least one listener is required.
+  listeners:
+    # RFC 3164 (BSD) over UDP — the common case for network gear.
+    - protocol: "udp"            # "udp" (default), "tcp", "unix"
+      address: "0.0.0.0"         # default "0.0.0.0"
+      port: 514                  # 514 for UDP, 601 for TCP (RFC 3195)
+      format: "rfc3164"          # override DefaultFormat for this listener
+
+    # RFC 5424 over TCP — structured logs from systemd/journald.
+    - protocol: "tcp"
+      address: "0.0.0.0"
+      port: 601
+      format: "rfc5424"
+
+    # Cisco IOS syslog (sequence-numbered) over UDP.
+    # - protocol: "udp"
+    #   address: "0.0.0.0"
+    #   port: 1514
+    #   format: "cisco"
+
+  # Default parser when a listener omits `format`.
+  # One of: "rfc3164" (default), "rfc5424", "cisco"
+  default_format: "rfc3164"
+
+  # Timezone used when parsing RFC 3164 timestamps that lack one (default: "UTC")
+  timezone: "UTC"
+
+  # How often parsed counters are emitted via Collect() (default: 30s)
+  flush_interval: 30s

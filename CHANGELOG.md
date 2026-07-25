@@ -25,6 +25,298 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0-dev] - 2026-07-25
+
+The `1.3.0` release is the first cut of the multi-milestone roadmap that
+closes the Telegraf capability gap documented in
+`telemetryflow-platform-monolith/docs/tfo-agent-roadmap/`. This dev tag
+tracks M1 (Foundation), M2 (Network Monitoring), and the in-progress M3
+(Logs & Self-Observability) milestones. All features are opt-in via the
+new `collectors.*` config keys — existing 1.2.x configurations continue
+to work unchanged.
+
+### Added — M1 Foundation
+
+- **Plugin system (`internal/plugin/`)** — typed plugin contracts
+  (`Collector`, `ServiceCollector`, `StreamingProcessor`, `SyncProcessor`,
+  `Aggregator`, `Output`, `Parser`, `Serializer`, `SecretStore`) with
+  capability mixins (`Initializer`, `PluginWithID`, `StatefulPlugin`,
+  `ProbePlugin`, `ParserPlugin`, `SerializerPlugin`), self-registration
+  via `init()`, channel-based `Accumulator`, and a `CollectorAdapter`
+  that wraps the existing `collector.Collector` interface so legacy
+  collectors work via the new registry without rewrite.
+- **Disk-backed retry buffer wired** — the previously-unused
+  `internal/buffer/` (371 lines, complete but never instantiated) is
+  now wired between `MetricForwarder` and the OTLP sink via
+  `internal/exporter/buffer_retry_sink.go`. Backend outages no longer
+  drop metrics. Opt-in via `buffer.enabled: true`.
+- **Processor pipeline engine (`internal/pipeline/`)** — channel-based
+  DAG topology: `inputs → pre-aggregator processors → aggregators →
+  post-aggregator processors → outputs`, with configurable
+  backpressure policies (`block` / `drop_oldest` / `drop_newest`).
+- **7 foundation processors** under `internal/processor/`:
+  `filter` (rule-based keep/drop by name regex + tag presence/value),
+  `drop`, `keep`, `rename`, `converter` (float rounding),
+  `enum` (value mapping with default), `defaults` (default tag values).
+- **Starlark processor** (`internal/processor/starlark/`) — Turing-
+  complete escape hatch via embedded Starlark (`go.starlark.net`).
+  Scripts define `apply(metric)` returning dict / None / list for
+  passthrough / drop / fan-out. Failures fall through to the original
+  metric so user scripts cannot lose data.
+- **Secret management (`internal/secret/`)** — `@{store:key}` resolver
+  with 3 backends: `env` (os.Getenv), `file` (JSON map),
+  `vault` (HashiCorp Vault KV-v2 over net/http, no SDK dependency).
+  Resolver order: `${VAR}` (os.ExpandEnv) → `@{store:key}`.
+- **Persister (`internal/persister/`)** — atomic JSON state persistence
+  for `StatefulPlugin` across restarts. Opt-in via
+  `persister.enabled: true`. Wired into agent lifecycle (`Load()` before
+  collectors start, `Store()` at shutdown, periodic `StartSaveLoop`).
+  First consumer: M3 log tail offset (forthcoming).
+- **Self-observability layer (`internal/selfstat/`)** — pre-registered
+  agent-level globals (metrics written/rejected/dropped, gather errors,
+  buffer size/limit, version info) plus `ForCollector()` and
+  `ForExporter()` helpers that emit per-plugin stats. Atomic-based
+  counters and mutex-guarded timing averages; race-clean.
+- **Config migration framework (`internal/migration/`)** — registry
+  for versioned schema upgrades between releases. First migration:
+  `1.2.0 → 1.3.0 tls_skip_verify_rename` (extracts the inline migration
+  previously living in `config/loader.go`). Wired into the loader as a
+  three-stage preprocess pipeline: `ApplyLatest → os.ExpandEnv →
+  secret.Resolver`.
+- **Error taxonomy** — `FatalError` (non-recoverable startup failure),
+  `StartupError{Retry, Partial}` (recoverable), `PartialWriteError`
+  (per-metric accept/reject from `Output.Write`).
+- **`StartupBehavior` constants** for `startup_error_behavior`
+  (`error` / `retry` / `ignore` / `probe`).
+
+### Added — M2 Network Monitoring
+
+Eight new collectors under `internal/collector/`, all opt-in:
+
+- **`ping`** — ICMP probe via `golang.org/x/net/icmp`. Supports both
+  privileged (raw socket, root) and unprivileged (UDP, Linux sysctl
+  `net.ipv4.ping_group_range`) modes with automatic fallback. Emits
+  rtt_min/avg/max/stddev_ms, packets_sent/received, loss_percent, ttl,
+  state per target.
+- **`dns`** — DNS query probe via `github.com/miekg/dns`. Supports
+  A/AAAA/TXT/MX/NS/CNAME/PTR. Emits query_time_ms, result_code,
+  records_returned, state per (server × query).
+- **`tcp_probe`** — TCP/UDP port probe (stdlib only). Emits
+  connect_time_ms, response_time_ms, state, string_found per target.
+- **`http_probe`** — HTTP synthetic check (stdlib only). Emits
+  response_time_ms, status_code, content_length, state, tls_days_remaining,
+  tls_valid, redirect_count, string_found per target.
+- **`snmp`** — SNMP v1/v2c/v3 polling via `github.com/gosnmp/gosnmp`.
+  Scalar GET + table WALK with ASN.1 → gauge/counter conversion. Emits
+  `network.snmp.<field_name>` per agent × field plus `state` per agent.
+- **`netflow`** — NetFlow v5 listener (stdlib parser). v9/IPFIX do
+  header-only inspection today; aggregate counters only (no per-flow
+  metrics yet) to avoid metric explosion. Emits packets_received_total,
+  flows_received_total, bytes_received_total, parse_errors_total,
+  packets_by_version per cycle.
+- **`syslog_listener`** — syslog receiver via
+  `github.com/leodido/go-syslog/v4`. Supports RFC 3164 / RFC 5424 / Cisco
+  formats over UDP / TCP / Unix. Emits aggregate counters
+  (messages_received_total, parse_errors_total, bytes_received_total,
+  messages_by_severity, messages_by_facility) per cycle.
+- **`sflow`** — sFlow v5 listener (stdlib parser). Header + sample
+  envelope decoding; detailed sample-body decoding deferred. Emits
+  packets_received_total, samples_received_total, bytes_received_total,
+  parse_errors_total, samples_by_format per cycle.
+
+All 8 are wired into `agent.NewWithConfigFile` and the central
+`CollectorConfig` struct.
+
+### Added — M4 Database & Application Collectors
+
+Ten new collectors under `internal/collector/`, all opt-in:
+
+- **`nginx`** — stub_status scraper (stdlib HTTP). Emits 7 `web.nginx.*`
+  metrics (connections_active/accepted/handled, requests,
+  reading/writing/waiting).
+- **`apache`** — server-status scraper (stdlib HTTP). Emits 9
+  `web.apache.*` metrics + per-state `scoreboard_*` gauges.
+- **`haproxy`** — CSV stats scraper (stdlib HTTP). Emits 12
+  `proxy.haproxy.*` metrics per row (frontend/backend/server) with
+  pxname/svname/type labels.
+- **`influxdb`** — `/debug/vars` JSON scraper (stdlib HTTP). Walks
+  subsystem JSON and emits `db.influxdb.<subsystem>.<field>` for each
+  numeric leaf.
+- **`elasticsearch`** — cluster + node stats scraper. Emits
+  `db.elasticsearch.*` (cluster_status, shards, per-node heap/docs/
+  search/indexing counters).
+- **`opensearch`** — mirror of elasticsearch collector for the AWS
+  fork. Emits `db.opensearch.*`.
+- **`couchbase`** — `/pools/default` cluster + node + bucket stats.
+  Emits `db.couchbase.*` (cluster RAM/HDD, per-node mem/cpu,
+  per-bucket ops/disk/item_count).
+- **`vault`** — HashiCorp Vault `/v1/sys/metrics` Prometheus-format
+  scraper. Re-emits all Vault metrics under `vault.*` namespace with
+  X-Vault-Token / Namespace header support.
+- **`sql_generic`** — runs user-defined SQL against any `database/sql`
+  driver. Emits one metric per row using `value_column` for the value
+  and `label_columns` for labels. Supports PostgreSQL, MySQL, SQLite,
+  SQL Server, etc.
+- **`pgbouncer`** — `SHOW STATS` + `SHOW POOLS` via pgx. Emits 12
+  `db.pgbouncer.*` metrics (transactions, queries, bytes, wait time,
+  per-pool client/server connection counts).
+
+All 10 wired into `agent.NewWithConfigFile` and `CollectorConfig`.
+
+### Added — M5 Multi-Output
+
+Six new output plugins under `internal/exporter/`, all registered via
+`plugin.MustAddOutput`:
+
+- **`prometheus_remote_write`** (P0 fix) — proper implementation using
+  `prompb.WriteRequest` protobuf + snappy block compression. Previous
+  stub used text format and was rejected by Mimir/Cortex/Thanos.
+  Supports basic/bearer auth, Mimir tenant header, batch chunking.
+- **OTLP gRPC exporter wired** — `OTLPMetricGRPCBridge` mirrors the
+  HTTP bridge using `otlpmetricgrpc`. Selected via
+  `exporter.otlp.protocol: grpc`. HTTP remains the default.
+- **`file`** — writes metrics to local file in JSON / InfluxDB line
+  protocol / Prometheus text format. Lumberjack-style rotation with
+  gzip compression, MaxBackups, MaxAgeDays.
+- **`kafka`** — produces metrics to a Kafka topic via `IBM/sarama`.
+  Three formats: json, otlp_proto (OTLP protobuf), prometheus_rw.
+  SASL/TLS auth, snappy/gzip/lz4/zstd compression, configurable acks.
+- **`loki`** — pushes log records to Grafana Loki. Stream grouping by
+  label set, Go-template label expansion, multi-tenant (X-Scope-OrgID),
+  batch + interval flush.
+- **`cloudwatch`** — AWS CloudWatch PutMetricData via SDK v2. Name
+  sanitization, 30-dimension cap, unit mapping, IAM-role fallback,
+  optional STS assume-role.
+- **`datadog`** — Datadog Metrics v2 intake via plain HTTP.
+  US/EU/US3/Gov site selection, type mapping, sorted tags.
+
+### Added — M3 Final Piece
+
+- **Selfstat counters wired** into `MetricForwarder` (metrics gathered
+  / written / errors) and `BufferRetrySink` (dropped on overflow).
+  `agent.go` exposes `AgentBufferSize` / `AgentBufferLimit` via a 30s
+  ticker. Counters now reflect real activity instead of staying zero.
+
+### Added — M3 Logs & Self-Observability (in progress)
+
+- **4 log parser processors** under `internal/processor/`:
+  - `multiline` — aggregate continuation lines (stack traces) via
+    regex + `StreamKey` grouping + timeout flush.
+  - `grok_parser` — `%{PATTERN:name}` syntax with self-contained RE2
+    translator (18 common patterns: TIMESTAMP_ISO8601, LOGLEVEL,
+    GREEDYDATA, IP, etc.); no external grok library needed.
+  - `json_parser` — dotted-path `TagKeys` extraction + numeric
+    `ValueKey` coercion. Invalid JSON passes through unchanged.
+  - `regex_parser` — Go RE2 with named captures → labels; configurable
+    drop-vs-forward on no-match.
+- **`tail_sampling` processor** — probabilistic + policy-based sampling
+  for high-volume metrics. Policies (`always` / `probabilistic` /
+  `drop`) with name regex + label filters. Deterministic FNV-1a hash
+  of (name + sorted labels) ensures the same series always yields the
+  same decision.
+- **`log_to_metric` processor** — extracts metrics from log lines.
+  Counter (always increments on regex match) or gauge (value from
+  capture group). Tag-from-group extraction. Original log forwarded
+  unchanged so the log path stays intact.
+- **`internalstats` collector** — emits the M1 selfstat registry into
+  the normal metric pipeline under the Telegraf-compatible name
+  `internal`. Snapshot of `selfstat.AllMetrics()` per Collect cycle.
+- **OTLPLogBridge** (`internal/exporter/otlp_log_bridge.go`) — the
+  logs equivalent of `OTLPMetricBridge`. Forwards `LogCollector`
+  output via OTLP HTTP `/v1/logs` with gzip + batching + severity
+  mapping (TRACE=1, DEBUG=5, INFO=9, WARN=13, ERROR=17, FATAL=21).
+  Wired into `agent.NewWithConfigFile`: native log collector's
+  `SetLogCallback` is now connected to the bridge's `Emit`.
+- **Tail offset persistence** — `LogCollector` now implements
+  `plugin.StatefulPlugin`. File tailer offsets (path + inode + offset)
+  survive agent restarts via the persister framework. Inode mismatch
+  (file rotation) safely falls back to EOF with a warning.
+- **Grafana dashboard** (`deploy/grafana/tfo-agent-self-observability.json`)
+  — 15-panel dashboard covering Overview (gather/write/drop rates +
+  version), Throughput (gather/write/error rate graphs), Buffer
+  (size/limit/usage), and Collector Health (state table + per-
+  collector gather time + errors). 30s refresh, three templating
+  variables ($datasource, $collector, $exporter).
+
+### Fixed — Redis & Valkey Collector Audit
+
+- **`db.redis.version_info` always emitted 0** — `ToFloat("7.2.5")`
+  returned 0. Replaced with three separate gauges
+  (`db.redis.version_major` / `_minor` / `_patch`) parsed from the
+  semver string. Same fix mirrored to `db.valkey.*`.
+- **`CollectLatency` config field was dead** — declared in
+  `RedisInstanceConfig` but never read. Now implements
+  `LATENCY LATEST` polling gated by the flag. Emits
+  `db.redis.latency_ms{event=...}` + `db.redis.latency_max_ms`.
+  Added to `ValkeyInstanceConfig` for parity (`db.valkey.latency_*`).
+- **Cluster metrics missing** — docstring claimed `CLUSTER NODES`
+  support but the code never called it. Now reads `cluster_enabled`
+  from INFO and, when cluster mode is on, queries `CLUSTER INFO` and
+  emits `db.{redis,valkey}.cluster_enabled`, `.cluster_state`,
+  `.cluster_slots_assigned`, `.cluster_slots_ok`.
+- **`client.go` docstring corrected** to match reality
+  ("INFO, commandstats, keyspace, optional latency, optional cluster").
+- **InfoInterval default** added to `DefaultConfig()` for both Redis
+  and Valkey so `tfo-agent config show` exposes it.
+
+### Fixed — Process
+
+- **Test centralization** — moved 18 `_test.go` files out of `internal/`
+  into the project-standard `tests/unit/{domain,infrastructure}/` tree
+  with external `<name>_test` packages. `internal/` is now clean of
+  test files. Matches the existing convention used by 200+ centralized
+  test files.
+
+### Added — Documentation
+
+- `docs/collectors/REDIS.md` — comprehensive Redis collector reference
+  (403 lines): configuration, full metrics table by category (Server,
+  Clients, Memory, Keyspace, Commands, Replication, Persistence,
+  Cluster, Latency), labels reference, TLS guidance, multi-instance
+  example, TFO dashboard integration, troubleshooting, Telegraf
+  comparison.
+- `docs/collectors/VALKEY.md` — same comprehensive reference for the
+  Valkey collector (392 lines). Calls out that Telegraf has no native
+  Valkey input — this is a tfo-agent unique capability.
+- `tests/integration/redis_valkey_test.go` — testcontainers-based
+  integration tests (Redis 7-alpine + Valkey 7.2-alpine). Three tests:
+  real-instance metric assertions, auth-required flow, namespace
+  isolation (no `db.redis.*` bleed-through from Valkey).
+
+### Added — Tests
+
+- **18 centralized test packages** added covering M1+M2+M3 work:
+  - `tests/unit/domain/processor/{filter,drop,keep,converter,enum,
+    defaults,starlark,multiline,grok_parser,json_parser,regex_parser,
+    tail_sampling}/`
+  - `tests/unit/domain/collector/{ping,dns,tcp_probe,http_probe,snmp,
+    netflow,syslog_listener,sflow,internalstats}/`
+  - `tests/unit/domain/internal/{pipeline,persister,selfstat,secret}/`
+  - `tests/unit/infrastructure/{exporter,migration}/`
+- All packages pass `go test -count=1 -race`.
+- 11 new tests added to existing `tests/unit/domain/internal/collector/
+  {redis,valkey}/` for the cluster/latency/version bug fixes.
+
+### Changed
+
+- **Version bump**: 1.2.2 → 1.3.0-dev (M1 + M2 + M3-in-progress
+  development tag).
+- **Dependency additions**: `go.starlark.net` (Starlark processor),
+  `github.com/miekg/dns` (DNS collector), `github.com/gosnmp/gosnmp`
+  (SNMP collector), `github.com/leodido/go-syslog/v4` (syslog listener),
+  `github.com/testcontainers/testcontainers-go` (integration tests).
+  `golang.org/x/net` promoted from indirect to direct (ping collector).
+
+### Compatibility
+
+- A 1.2.x config works unchanged on 1.3.0-dev. Empty `pipeline:` section
+  means no processors; all new collectors default to `enabled: false`;
+  the buffer, persister, secret resolver, and migration framework are
+  no-ops when their respective config keys are unset.
+- The previously-inline `insecure_skip_verify → tls_skip_verify` rename
+  is now handled by the migration framework package
+  (`internal/migration/v1_3/`). No user action required.
+
 ## [1.2.2] - 2026-07-21
 
 ### Added

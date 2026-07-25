@@ -1,0 +1,42 @@
+# TelemetryFlow Agent - NetFlow v5/v9/IPFIX Listener Collector Configuration
+#
+# Example configuration for the NetFlow / IPFIX UDP listener.
+# Receives flow packets, aggregates counters per (agent, application),
+# and flushes metrics on a fixed cadence.
+#
+# Documentation: docs/collectors/NETFLOW.md (if exists)
+
+netflow:
+  enabled: false
+
+  # Bind address (default: "0.0.0.0")
+  address: "0.0.0.0"
+
+  # UDP port to listen on (default: 2055, IANA netflow)
+  port: 2055
+
+  # Transport. Only "udp" is currently implemented; "tcp" and "sctp"
+  # are reserved for future use (default: "udp")
+  protocol: "udp"
+
+  # Background parser goroutines (default: 4)
+  workers: 4
+
+  # UDP socket buffer size in bytes (default: 65535)
+  buffer_size: 65535
+
+  # NetFlow versions to accept. Unknown versions increment a
+  # parse-error counter and are dropped.
+  # Default: ["5", "9", "ipfix"]
+  protocols:
+    - "5"
+    - "9"
+    - "ipfix"
+
+  # How often buffered flow counters are emitted via Collect() (default: 30s)
+  flush_interval: 30s
+
+  # Collector-level tags applied to all netflow metrics.
+  tags:
+    site: "dc1"
+    env: "production"

@@ -1,0 +1,31 @@
+# TelemetryFlow Agent - HAProxy Load Balancer Collector Configuration
+#
+# Example configuration for monitoring HAProxy instances via the stats
+# endpoint in CSV format. Collects frontend/backend/session counters,
+# bytes in/out, and per-server health metrics.
+
+haproxy:
+  enabled: false
+
+  # Global interval for stats scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Public-facing load balancer
+    - name: "haproxy-public-1"
+      url: "http://haproxy-public-1.internal:8404/stats;csv"
+      username: "metrics"
+      password: "${HAPROXY_STATS_PASSWORD}"
+      timeout: 5s
+      # TLS options (uncomment for HTTPS stats endpoint)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Internal load balancer
+    - name: "haproxy-internal-1"
+      url: "http://haproxy-internal-1.internal:8404/stats;csv"
+      username: "metrics"
+      password: "${HAPROXY_STATS_PASSWORD}"
+      timeout: 5s
+      # tls_enabled: true
+      # tls_skip_verify: false

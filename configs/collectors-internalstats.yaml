@@ -1,0 +1,13 @@
+# TelemetryFlow Agent - Internal Stats (selfstat) Collector Configuration
+#
+# Emits internal selfstat metrics (agent/collector/exporter counters) into
+# the normal metric pipeline under the Telegraf-compatible name `internal`.
+# Use this to observe agent health from the same OTLP pipeline it serves.
+#
+# Documentation: docs/collectors/INTERNALSTATS.md (if exists)
+
+internalstats:
+  enabled: false
+
+  # Collection cadence. Defaults to 30s when zero.
+  interval: 30s

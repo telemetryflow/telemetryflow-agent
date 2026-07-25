@@ -1,0 +1,49 @@
+# TelemetryFlow Agent - HTTP Synthetic Probe Collector Configuration
+#
+# Example configuration for synthetic HTTP(S) checks.
+# Collects per-target response time, status code, body-match success,
+# and redirect-follow behavior.
+#
+# Documentation: docs/collectors/HTTP-PROBE.md (if exists)
+
+http_probe:
+  enabled: false
+
+  # Global interval between probe cycles (default: 30s)
+  interval: 30s
+
+  targets:
+    # Simple health endpoint
+    - name: "api-health"
+      url: "https://api.telemetryflow.id/healthz"
+      method: "GET"                       # default GET
+      expected_status: [200]              # default [200, 201, 204, 301, 302]
+      follow_redirects: true              # default true
+      timeout: 10s                        # default 10s
+      # tls_skip_verify: false            # set true to skip cert validation
+      headers:
+        User-Agent: "tfo-agent/probe"
+        Accept: "application/json"
+
+    # Authenticated POST with body regex assertion
+    - name: "api-login"
+      url: "https://api.telemetryflow.id/v1/login"
+      method: "POST"
+      expected_status: [200, 201]
+      follow_redirects: false
+      timeout: 10s
+      headers:
+        Content-Type: "application/json"
+      body: '{"username":"probe","password":"${PROBE_PASSWORD}"}'
+      expected_body_regex: '"token"\s*:\s*"[A-Za-z0-9._-]+"'
+      username: "probe"                   # basic auth (optional)
+      password: "${PROBE_PASSWORD}"       # basic auth (optional)
+
+    # Internal HTTP (insecure, self-signed cert)
+    # - name: "internal-metrics"
+    #   url: "http://ingress.internal:8080/metrics"
+    #   method: "GET"
+    #   expected_status: [200]
+    #   follow_redirects: true
+    #   timeout: 5s
+    #   tls_skip_verify: true

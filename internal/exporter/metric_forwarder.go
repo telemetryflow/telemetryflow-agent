@@ -29,6 +29,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	"github.com/telemetryflow/telemetryflow-agent/internal/selfstat"
 )
 
 // MetricSink is the interface for exporting collected metrics.
@@ -59,6 +60,7 @@ type MetricForwarder struct {
 	totalExport   atomic.Int64
 	totalError    atomic.Int64
 	totalMetric   atomic.Int64
+	gatherCycles  atomic.Int64
 	firstExportOK atomic.Bool
 }
 
@@ -143,6 +145,7 @@ func (f *MetricForwarder) Stats() ForwarderStats {
 		TotalExports: f.totalExport.Load(),
 		TotalMetrics: f.totalMetric.Load(),
 		TotalErrors:  f.totalError.Load(),
+		GatherCycles: f.gatherCycles.Load(),
 	}
 }
 
@@ -152,6 +155,7 @@ type ForwarderStats struct {
 	TotalExports int64 `json:"totalExports"`
 	TotalMetrics int64 `json:"totalMetrics"`
 	TotalErrors  int64 `json:"totalErrors"`
+	GatherCycles int64 `json:"gatherCycles"`
 }
 
 func (f *MetricForwarder) loop(ctx context.Context) {
@@ -173,6 +177,7 @@ func (f *MetricForwarder) loop(ctx context.Context) {
 }
 
 func (f *MetricForwarder) forwardAll(ctx context.Context) {
+	defer f.gatherCycles.Add(1)
 	var allMetrics []collector.Metric
 
 	for _, c := range f.collectors {
@@ -191,6 +196,8 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 			allMetrics = append(allMetrics, metrics...)
 		}
 	}
+	selfstat.AgentMetricsGathered.Incr(int64(len(allMetrics)))
+
 	if len(allMetrics) == 0 {
 		f.logger.Debug("no metrics collected in this cycle",
 			zap.Int("collectors_running", f.runningCollectorCount()),
@@ -229,6 +236,7 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 	if f.otlpSink != nil {
 		if err := f.otlpSink.Export(ctx, allMetrics, nil); err != nil {
 			f.totalError.Add(1)
+			selfstat.AgentWriteErrors.Incr(1)
 			f.logger.Warn("OTLP export failed",
 				zap.Int("metrics", len(allMetrics)),
 				zap.Int("unique_names", len(breakdown)),
@@ -237,6 +245,7 @@ func (f *MetricForwarder) forwardAll(ctx context.Context) {
 		} else {
 			f.totalExport.Add(1)
 			f.totalMetric.Add(int64(len(allMetrics)))
+			selfstat.AgentMetricsWritten.Incr(int64(len(allMetrics)))
 
 			f.logger.Info("metrics forwarded",
 				zap.Int("metrics", len(allMetrics)),

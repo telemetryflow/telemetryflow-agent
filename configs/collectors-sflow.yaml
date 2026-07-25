@@ -1,0 +1,33 @@
+# TelemetryFlow Agent - sFlow v5 Listener Collector Configuration
+#
+# Example configuration for the sFlow v5 UDP listener.
+# Receives flow + counter samples, aggregates counters per agent,
+# and flushes metrics on a fixed cadence.
+#
+# Documentation: docs/collectors/SFLOW.md (if exists)
+
+sflow:
+  enabled: false
+
+  # Bind address (default: "0.0.0.0")
+  address: "0.0.0.0"
+
+  # UDP port to listen on (default: 6343, IANA sFlow)
+  port: 6343
+
+  # Transport. Only "udp" is currently implemented (default: "udp")
+  protocol: "udp"
+
+  # Background parser goroutines (default: 4)
+  workers: 4
+
+  # UDP socket read-buffer size in bytes (default: 65535)
+  buffer_size: 65535
+
+  # How often buffered sample counters are emitted via Collect() (default: 30s)
+  flush_interval: 30s
+
+  # Collector-level tags applied to all sflow metrics.
+  tags:
+    site: "dc1"
+    env: "production"

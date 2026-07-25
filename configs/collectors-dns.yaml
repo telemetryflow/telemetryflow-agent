@@ -1,0 +1,39 @@
+# TelemetryFlow Agent - DNS Query Probe Collector Configuration
+#
+# Example configuration for active DNS resolution probes.
+# Collects per-query response time, response code, and answer count
+# across all configured servers x queries.
+#
+# Documentation: docs/collectors/DNS.md (if exists)
+
+dns:
+  enabled: false
+
+  # Global interval between probe cycles (default: 30s)
+  interval: 30s
+
+  # DNS servers to probe. Every query is issued against every server.
+  servers:
+    - name: "resolver-primary"
+      address: "10.0.0.53"
+    - name: "resolver-secondary"
+      address: "10.0.0.54"
+    - name: "public-resolver"
+      address: "1.1.1.1"
+
+  # Queries to issue against every server.
+  queries:
+    - domain: "telemetryflow.id"
+      record_type: "A"
+    - domain: "api.telemetryflow.id"
+      record_type: "AAAA"
+    - domain: "telemetryflow.id"
+      record_type: "MX"
+    # - domain: "1.0.0.10.in-addr.arpa"
+    #   record_type: "PTR"
+
+  # DNS port for all servers (default: 53)
+  port: 53
+
+  # Per-query timeout (default: 5s)
+  timeout: 5s

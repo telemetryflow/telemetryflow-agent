@@ -1,0 +1,40 @@
+# TelemetryFlow Agent - PgBouncer Connection Pooler Collector Configuration
+#
+# Example configuration for monitoring PgBouncer connection poolers via the
+# admin database. Collects SHOW STATS / SHOW POOLS / SHOW DATABASES metrics.
+
+pgbouncer:
+  enabled: false
+
+  # Global interval for SHOW STATS scraping (default: 15s)
+  interval: 15s
+
+  # Collector-level tags applied to all PgBouncer metrics
+  tags:
+    env: "production"
+    tier: "pooler"
+
+  instances:
+    # Primary PgBouncer (write pool)
+    - name: "pgbouncer-primary"
+      host: "pgbouncer-primary.internal"
+      port: 6432
+      database: "pgbouncer"        # admin database, usually "pgbouncer"
+      user: "pgbouncer"
+      password: "${PGBOUNCER_PASSWORD}"
+      ssl_mode: "disable"          # disable | require | verify-ca | verify-full
+      timeout: 10s
+      tags:
+        role: "primary"
+
+    # Replica-side PgBouncer (read pool, TLS required)
+    - name: "pgbouncer-replica"
+      host: "pgbouncer-replica.internal"
+      port: 6432
+      database: "pgbouncer"
+      user: "pgbouncer"
+      password: "${PGBOUNCER_PASSWORD}"
+      ssl_mode: "require"
+      timeout: 10s
+      tags:
+        role: "replica"

@@ -1,0 +1,35 @@
+# TelemetryFlow Agent - HashiCorp Vault Collector Configuration
+#
+# Example configuration for monitoring HashiCorp Vault instances via the
+# /v1/sys/metrics endpoint in Prometheus text exposition format. Collects
+# audit, request, raft storage, and listener metrics.
+
+vault:
+  enabled: false
+
+  # Global interval for metrics scraping (default: 15s)
+  interval: 15s
+
+  instances:
+    # Primary Vault cluster
+    - name: "vault-primary"
+      url: "http://vault-primary.internal:8200"
+      token: "${VAULT_METRICS_TOKEN}"
+      timeout: 10s
+      metrics_path: "/v1/sys/metrics"
+      format: "prometheus"
+      # Enterprise namespace header (Vault Enterprise multi-tenant only)
+      # namespace: "platform/team-a"
+      # TLS options (uncomment for HTTPS endpoints)
+      # tls_enabled: true
+      # tls_skip_verify: false
+
+    # Disaster-recovery (DR) secondary cluster
+    - name: "vault-dr-secondary"
+      url: "http://vault-dr.internal:8200"
+      token: "${VAULT_METRICS_TOKEN}"
+      timeout: 10s
+      metrics_path: "/v1/sys/metrics"
+      format: "prometheus"
+      # tls_enabled: true
+      # tls_skip_verify: false

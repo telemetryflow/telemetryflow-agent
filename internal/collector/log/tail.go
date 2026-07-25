@@ -46,6 +46,14 @@ type FileTailer struct {
 	stopped   bool
 	maxLine   int
 	pollDelay time.Duration
+
+	// restoredOffset / restoredInode are populated by SetOffset() from
+	// persisted state BEFORE Start() begins tailing. When Start() opens the
+	// file it consults them: if the current file's inode matches restoredInode
+	// (and the file is at least restoredOffset bytes long) the tailer resumes
+	// from restoredOffset; otherwise it falls back to EOF and logs a warning.
+	restoredOffset int64
+	restoredInode  uint64
 }
 
 // NewFileTailer creates a tailer for the given file path.
@@ -70,21 +78,90 @@ func (t *FileTailer) Lines() <-chan string { return t.lines }
 // Path returns the file path being tailed.
 func (t *FileTailer) Path() string { return t.path }
 
-// Start begins tailing the file from the current end. Blocks until ctx is cancelled or Stop is called.
+// State returns the current path/inode/offset snapshot for persistence. It is
+// called by LogCollector.GetState() so the persister can serialize tail
+// offsets across agent restarts.
+func (t *FileTailer) State() TailerState {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return TailerState{
+		Path:   t.path,
+		Inode:  t.inode,
+		Offset: t.offset,
+		// Fingerprint intentionally omitted for M3 v1 — reserved for a future
+		// sha256-of-first-1KB scheme to disambiguate inode collisions.
+	}
+}
+
+// SetOffset restores a previously persisted offset and inode. It must be
+// called BEFORE Start() opens the file. When Start() runs it consults these
+// values: if the current file's inode matches inode (and offset > 0) reading
+// resumes from offset; otherwise the tailer falls back to EOF and logs a
+// warning. Calling SetOffset after Start() has begun has no effect.
+func (t *FileTailer) SetOffset(offset int64, inode uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.restoredOffset = offset
+	t.restoredInode = inode
+}
+
+// Start begins tailing the file. By default it seeks to the end of the file so
+// only newly-appended lines are emitted. If a restored offset was supplied via
+// SetOffset() and the current file's inode matches the persisted inode, the
+// tailer resumes from that offset instead — preserving logs written between
+// agent shutdown and restart. Blocks until ctx is cancelled or Stop is called.
 func (t *FileTailer) Start(ctx context.Context) error {
 	f, err := os.Open(t.path)
 	if err != nil {
 		return err
 	}
 
-	// Seek to end — only collect new lines
-	offset, err := f.Seek(0, io.SeekEnd)
-	if err != nil {
-		_ = f.Close()
-		return err
+	t.mu.Lock()
+	currentInode := fileInode(f)
+	appliedRestore := false
+	if t.restoredOffset > 0 {
+		if t.restoredInode != 0 && t.restoredInode == currentInode {
+			// Same file (no rotation since shutdown): resume from saved offset.
+			if _, err := f.Seek(t.restoredOffset, io.SeekStart); err != nil {
+				_ = f.Close()
+				t.mu.Unlock()
+				return err
+			}
+			t.offset = t.restoredOffset
+			t.inode = currentInode
+			appliedRestore = true
+			t.logger.Info("resuming tailer from persisted offset",
+				zap.String("path", t.path),
+				zap.Uint64("inode", currentInode),
+				zap.Int64("offset", t.restoredOffset),
+			)
+		} else {
+			// File was rotated/truncated/replaced while the agent was down —
+			// fall back to EOF so we don't silently drop new content or read
+			// unrelated bytes at the saved offset of a different file.
+			t.logger.Warn("persisted inode does not match current file; starting from EOF",
+				zap.String("path", t.path),
+				zap.Uint64("persisted_inode", t.restoredInode),
+				zap.Uint64("current_inode", currentInode),
+				zap.Int64("persisted_offset", t.restoredOffset),
+			)
+		}
 	}
-	t.offset = offset
-	t.inode = fileInode(f)
+	if !appliedRestore {
+		// Default behaviour: seek to end — only collect new lines.
+		offset, err := f.Seek(0, io.SeekEnd)
+		if err != nil {
+			_ = f.Close()
+			t.mu.Unlock()
+			return err
+		}
+		t.offset = offset
+		t.inode = currentInode
+	}
+	// Clear restored state so a later Stop/Start cycle doesn't replay it.
+	t.restoredOffset = 0
+	t.restoredInode = 0
+	t.mu.Unlock()
 
 	defer func() { _ = f.Close() }()
 
@@ -109,8 +186,10 @@ func (t *FileTailer) Start(ctx context.Context) error {
 					t.logger.Debug("File disappeared during rotation, waiting", zap.String("path", t.path))
 					continue
 				}
+				t.mu.Lock()
 				t.offset = 0
 				t.inode = fileInode(f)
+				t.mu.Unlock()
 				scanner = bufio.NewScanner(f)
 				scanner.Buffer(make([]byte, 0, t.maxLine), t.maxLine*2)
 			}
@@ -130,7 +209,9 @@ func (t *FileTailer) Start(ctx context.Context) error {
 
 			// Update offset
 			pos, _ := f.Seek(0, io.SeekCurrent)
+			t.mu.Lock()
 			t.offset = pos
+			t.mu.Unlock()
 		}
 	}
 }

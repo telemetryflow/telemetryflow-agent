@@ -32,6 +32,19 @@ import (
 // It returns the host:port and a stop function.
 func startFakeRedis(t *testing.T, infoBody string) (string, func()) {
 	t.Helper()
+	return startFakeRedisExt(t, fakeRedisBodies{info: infoBody})
+}
+
+// fakeRedisBodies configures the canned replies returned by startFakeRedisExt
+// for non-INFO commands. Empty fields yield the default -ERR reply.
+type fakeRedisBodies struct {
+	info    string
+	cluster string
+	latency string
+}
+
+func startFakeRedisExt(t *testing.T, bodies fakeRedisBodies) (string, func()) {
+	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -42,13 +55,13 @@ func startFakeRedis(t *testing.T, infoBody string) (string, func()) {
 			if err != nil {
 				return
 			}
-			go handleFakeRedis(conn, infoBody)
+			go handleFakeRedis(conn, bodies)
 		}
 	}()
 	return ln.Addr().String(), func() { _ = ln.Close() }
 }
 
-func handleFakeRedis(conn net.Conn, infoBody string) {
+func handleFakeRedis(conn net.Conn, bodies fakeRedisBodies) {
 	defer func() { _ = conn.Close() }()
 	r := bufio.NewReader(conn)
 	for {
@@ -63,11 +76,23 @@ func handleFakeRedis(conn net.Conn, infoBody string) {
 		case "SELECT":
 			_, _ = conn.Write([]byte("+OK\r\n"))
 		case "INFO":
-			body := infoBody
+			body := bodies.info
 			if len(args) > 1 && strings.EqualFold(args[1], "commandstats") {
 				body = "cmdstat_GET:calls=500,usec=1000,usec_per_call=2.00\r\n"
 			}
 			_, _ = conn.Write([]byte("$" + strconv.Itoa(len(body)) + "\r\n" + body + "\r\n"))
+		case "CLUSTER":
+			if bodies.cluster == "" {
+				_, _ = conn.Write([]byte("-ERR cluster disabled\r\n"))
+			} else {
+				_, _ = conn.Write([]byte("$" + strconv.Itoa(len(bodies.cluster)) + "\r\n" + bodies.cluster + "\r\n"))
+			}
+		case "LATENCY":
+			if bodies.latency == "" {
+				_, _ = conn.Write([]byte("-ERR latency disabled\r\n"))
+			} else {
+				_, _ = conn.Write([]byte("$" + strconv.Itoa(len(bodies.latency)) + "\r\n" + bodies.latency + "\r\n"))
+			}
 		default:
 			_, _ = conn.Write([]byte("-ERR unknown command\r\n"))
 		}
@@ -149,7 +174,9 @@ func TestBuildRedisMetrics(t *testing.T) {
 		"role":                     "master",
 	}
 	cmd := map[string]string{"cmdstat_GET": "calls=500,usec=1000,usec_per_call=2.00"}
-	metrics := rediscol.BuildRedisMetrics(info, cmd, map[string]string{"env": "prod"})
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{
+		Info: info, CommandStats: cmd, Labels: map[string]string{"env": "prod"},
+	})
 
 	names := map[string]bool{}
 	for _, m := range metrics {
@@ -296,7 +323,7 @@ func startFakeRedisTLS(t *testing.T, infoBody string) (string, func()) {
 			if err != nil {
 				return
 			}
-			go handleFakeRedis(conn, infoBody)
+			go handleFakeRedis(conn, fakeRedisBodies{info: infoBody})
 		}
 	}()
 	return ln.Addr().String(), func() { _ = ln.Close() }
@@ -459,7 +486,9 @@ func TestBuildRedisMetrics_MalformedLines(t *testing.T) {
 		"cmdstat_GET": "calls=5,badentry",
 	}
 	// Should not panic; valid entries still emitted.
-	m := rediscol.BuildRedisMetrics(info, cmd, nil)
+	m := rediscol.BuildRedisMetrics(rediscol.MetricsInput{
+		Info: info, CommandStats: cmd,
+	})
 	if len(m) < 2 {
 		t.Fatalf("expected at least 2 metrics, got %d", len(m))
 	}
@@ -551,3 +580,273 @@ func hostPort(addr string) (string, int) {
 }
 
 func testLogger() *zap.Logger { return zap.NewNop() }
+
+// ===========================================================================
+// Bug 1 (P0): redis_version is a semver string; ToFloat on it returned 0.
+// ParseSemver splits it into numeric major/minor/patch components.
+// ===========================================================================
+
+func TestParseSemver(t *testing.T) {
+	cases := []struct {
+		name                string
+		in                  string
+		major, minor, patch int
+	}{
+		{name: "typical_semver", in: "7.2.5", major: 7, minor: 2, patch: 5},
+		{name: "major_only", in: "7", major: 7, minor: 0, patch: 0},
+		{name: "major_minor", in: "7.2", major: 7, minor: 2, patch: 0},
+		{name: "with_prerelease", in: "7.2.5-rc1", major: 7, minor: 2, patch: 5},
+		{name: "empty", in: "", major: 0, minor: 0, patch: 0},
+		{name: "non_numeric", in: "abc", major: 0, minor: 0, patch: 0},
+		{name: "mixed", in: "7.x.5", major: 7, minor: 0, patch: 5},
+		{name: "leading_zero", in: "07.02.05", major: 7, minor: 2, patch: 5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			maj, min, patch := rediscol.ParseSemver(tc.in)
+			if maj != tc.major || min != tc.minor || patch != tc.patch {
+				t.Errorf("ParseSemver(%q) = (%d,%d,%d); want (%d,%d,%d)",
+					tc.in, maj, min, patch, tc.major, tc.minor, tc.patch)
+			}
+		})
+	}
+}
+
+func TestBuildRedisMetrics_VersionSemver(t *testing.T) {
+	// Regression for the P0 bug where db.redis.version_info was always 0.
+	// Input "7.2.5" must produce version_major=7, version_minor=2, version_patch=5.
+	info := map[string]string{"redis_version": "7.2.5"}
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{Info: info})
+	want := map[string]float64{
+		"db.redis.version_major": 7,
+		"db.redis.version_minor": 2,
+		"db.redis.version_patch": 5,
+	}
+	saw := map[string]float64{}
+	for _, m := range metrics {
+		if v, ok := want[m.Name]; ok {
+			saw[m.Name] = m.Value
+			_ = v
+		}
+	}
+	for name, wantVal := range want {
+		if saw[name] != wantVal {
+			t.Errorf("%s = %v; want %v", name, saw[name], wantVal)
+		}
+	}
+	// Sanity: the old broken metric name must no longer be emitted.
+	for _, m := range metrics {
+		if m.Name == "db.redis.version_info" {
+			t.Errorf("legacy db.redis.version_info metric still emitted: %+v", m)
+		}
+	}
+}
+
+func TestBuildRedisMetrics_VersionMalformed(t *testing.T) {
+	// Non-semver input must yield 0,0,0 rather than panicking.
+	info := map[string]string{"redis_version": "nonsense"}
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{Info: info})
+	for _, m := range metrics {
+		switch m.Name {
+		case "db.redis.version_major", "db.redis.version_minor", "db.redis.version_patch":
+			if m.Value != 0 {
+				t.Errorf("%s = %v; want 0 for malformed input", m.Name, m.Value)
+			}
+		}
+	}
+}
+
+// ===========================================================================
+// Bug 3 (P1): CLUSTER INFO parsing.
+// ===========================================================================
+
+func TestParseClusterInfo(t *testing.T) {
+	body := "cluster_enabled:1\r\ncluster_state:ok\r\n" +
+		"cluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\n" +
+		"cluster_known_nodes:6\r\n"
+	m := rediscol.ParseClusterInfo(body)
+	if m["cluster_state"] != "ok" {
+		t.Errorf("cluster_state = %q", m["cluster_state"])
+	}
+	if m["cluster_slots_assigned"] != "16384" {
+		t.Errorf("cluster_slots_assigned = %q", m["cluster_slots_assigned"])
+	}
+	if m["cluster_slots_ok"] != "16384" {
+		t.Errorf("cluster_slots_ok = %q", m["cluster_slots_ok"])
+	}
+}
+
+func TestBuildRedisMetrics_ClusterEnabledFlag(t *testing.T) {
+	// cluster_enabled lives in INFO and must always emit a gauge, independent
+	// of whether CLUSTER INFO was fetched.
+	info := map[string]string{"cluster_enabled": "1"}
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{Info: info})
+	found := false
+	for _, m := range metrics {
+		if m.Name == "db.redis.cluster_enabled" && m.Value == 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected db.redis.cluster_enabled=1 metric; not emitted")
+	}
+}
+
+func TestBuildRedisMetrics_ClusterInfoMetrics(t *testing.T) {
+	// When CLUSTER INFO is supplied, cluster_state + slots_* must be emitted.
+	info := map[string]string{"cluster_enabled": "1"}
+	cluster := map[string]string{
+		"cluster_state":          "ok",
+		"cluster_slots_assigned": "16384",
+		"cluster_slots_ok":       "16300",
+	}
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{
+		Info: info, ClusterInfo: cluster,
+	})
+	saw := map[string]float64{}
+	for _, m := range metrics {
+		saw[m.Name] = m.Value
+	}
+	if saw["db.redis.cluster_state"] != 1 {
+		t.Errorf("cluster_state = %v; want 1 (ok)", saw["db.redis.cluster_state"])
+	}
+	if saw["db.redis.cluster_slots_assigned"] != 16384 {
+		t.Errorf("cluster_slots_assigned = %v; want 16384", saw["db.redis.cluster_slots_assigned"])
+	}
+	if saw["db.redis.cluster_slots_ok"] != 16300 {
+		t.Errorf("cluster_slots_ok = %v; want 16300", saw["db.redis.cluster_slots_ok"])
+	}
+}
+
+func TestBuildRedisMetrics_ClusterStateFail(t *testing.T) {
+	// cluster_state values other than "ok" must encode as 0.
+	cluster := map[string]string{"cluster_state": "fail"}
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{ClusterInfo: cluster})
+	for _, m := range metrics {
+		if m.Name == "db.redis.cluster_state" && m.Value != 0 {
+			t.Errorf("cluster_state=fail should yield 0, got %v", m.Value)
+		}
+	}
+}
+
+// ===========================================================================
+// Bug 2 (P1): LATENCY LATEST parsing.
+// ===========================================================================
+
+func TestParseLatencyLatest(t *testing.T) {
+	body := "expire-cycle 1700000000 12 40\r\n" +
+		"rdb-unicopy-aof-write 1700000001 5 25\r\n"
+	m := rediscol.ParseLatencyLatest(body)
+	if len(m) != 2 {
+		t.Fatalf("expected 2 events, got %d: %v", len(m), m)
+	}
+	ev, ok := m["expire-cycle"]
+	if !ok {
+		t.Fatal("missing expire-cycle event")
+	}
+	if ev.Timestamp != 1700000000 {
+		t.Errorf("timestamp = %d", ev.Timestamp)
+	}
+	if ev.LatencyMs != 12 {
+		t.Errorf("latency_ms = %v", ev.LatencyMs)
+	}
+	if ev.MaxLatencyMs != 40 {
+		t.Errorf("max_latency_ms = %v", ev.MaxLatencyMs)
+	}
+}
+
+func TestParseLatencyLatest_Malformed(t *testing.T) {
+	// Lines with too few fields or blank lines are skipped without panic.
+	body := "\r\none-field-only\r\nok 1700 5\r\n"
+	m := rediscol.ParseLatencyLatest(body)
+	if len(m) != 1 {
+		t.Fatalf("expected 1 event after skipping malformed lines, got %d: %v", len(m), m)
+	}
+	if _, ok := m["ok"]; !ok {
+		t.Errorf("missing 'ok' event: %v", m)
+	}
+}
+
+func TestBuildRedisMetrics_Latency(t *testing.T) {
+	// LATENCY data must produce latency_ms + latency_max_ms per event, tagged
+	// with redis_event.
+	latency := map[string]rediscol.LatencyEvent{
+		"expire-cycle": {Event: "expire-cycle", LatencyMs: 12, MaxLatencyMs: 40, Timestamp: 1700},
+	}
+	metrics := rediscol.BuildRedisMetrics(rediscol.MetricsInput{
+		Latency: latency, Labels: map[string]string{"env": "prod"},
+	})
+	saw := map[string]map[string]float64{} // metric_name -> label_value -> value
+	for _, m := range metrics {
+		if m.Name != "db.redis.latency_ms" && m.Name != "db.redis.latency_max_ms" {
+			continue
+		}
+		if saw[m.Name] == nil {
+			saw[m.Name] = map[string]float64{}
+		}
+		saw[m.Name][m.Labels["redis_event"]] = m.Value
+		if m.Labels["env"] != "prod" {
+			t.Errorf("base label env=prod missing on %s", m.Name)
+		}
+	}
+	if saw["db.redis.latency_ms"]["expire-cycle"] != 12 {
+		t.Errorf("latency_ms wrong: %v", saw["db.redis.latency_ms"])
+	}
+	if saw["db.redis.latency_max_ms"]["expire-cycle"] != 40 {
+		t.Errorf("latency_max_ms wrong: %v", saw["db.redis.latency_max_ms"])
+	}
+}
+
+// ===========================================================================
+// End-to-end (fake server) coverage for cluster + latency collection paths.
+// ===========================================================================
+
+func TestRedisCollector_ClusterAndLatencyPath(t *testing.T) {
+	infoBody := "redis_version:7.2.5\r\ncluster_enabled:1\r\nconnected_clients:1\r\nrole:master\r\n"
+	clusterBody := "cluster_state:ok\r\ncluster_slots_assigned:16384\r\ncluster_slots_ok:16384\r\n"
+	latencyBody := "expire-cycle 1700000000 12 40\r\n"
+	addr, stop := startFakeRedisExt(t, fakeRedisBodies{
+		info:    infoBody,
+		cluster: clusterBody,
+		latency: latencyBody,
+	})
+	defer stop()
+	host, port := hostPort(addr)
+
+	cfg := config.RedisCollectorConfig{
+		Enabled: true,
+		Instances: []config.RedisInstanceConfig{
+			{
+				Name: "c", Host: host, Port: port,
+				CollectLatency: true, CollectCommandStats: false,
+			},
+		},
+	}
+	c := rediscol.NewRedisCollector(cfg, testLogger())
+	_ = c.Start(context.Background())
+	defer func() { _ = c.Stop() }()
+	metrics, err := c.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	want := map[string]bool{
+		"db.redis.version_major":          true,
+		"db.redis.version_minor":          true,
+		"db.redis.version_patch":          true,
+		"db.redis.cluster_enabled":        true,
+		"db.redis.cluster_state":          true,
+		"db.redis.cluster_slots_assigned": true,
+		"db.redis.cluster_slots_ok":       true,
+		"db.redis.latency_ms":             true,
+		"db.redis.latency_max_ms":         true,
+	}
+	saw := map[string]bool{}
+	for _, m := range metrics {
+		saw[m.Name] = true
+	}
+	for name := range want {
+		if !saw[name] {
+			t.Errorf("missing metric %s", name)
+		}
+	}
+}

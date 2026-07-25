@@ -56,8 +56,27 @@ type Config struct {
 	// When disabled (default), QAN collectors and forwarder have zero overhead.
 	QAN qan.QANConfig `mapstructure:"qan"`
 
+	// Persister enables plugin state persistence across agent restarts.
+	// When Statefile is empty (default), persistence is disabled. StatefulPlugins
+	// (e.g. log tail offsets in M3) opt in via the plugin.StatefulPlugin mixin.
+	Persister PersisterConfig `mapstructure:"persister"`
+
 	// Deprecated: Use TelemetryFlow instead. Kept for backward compatibility.
 	API APIConfig `mapstructure:"api"`
+}
+
+// PersisterConfig controls plugin state persistence.
+type PersisterConfig struct {
+	// Enabled gates persister wiring. When false the Persister is not created.
+	Enabled bool `mapstructure:"enabled"`
+
+	// Statefile is the JSON path where plugin state is stored atomically.
+	// Default: /var/lib/tfo-agent/state.json when Enabled.
+	Statefile string `mapstructure:"statefile"`
+
+	// SaveInterval is the periodic save cadence in addition to shutdown save.
+	// Default: 5m.
+	SaveInterval time.Duration `mapstructure:"save_interval"`
 }
 
 // AgentAPIConfig contains the Agent HTTP API server settings for real-time K8s queries.
@@ -276,11 +295,17 @@ type CollectorConfig struct {
 	// SQLite3 contains SQLite3 database monitoring collector settings
 	SQLite3 SQLite3CollectorConfig `mapstructure:"sqlite3"`
 
+	// SQLGeneric contains user-defined SQL query collector settings (M4)
+	SQLGeneric SQLGenericCollectorConfig `mapstructure:"sql_generic"`
+
 	// MongoDBCommunity contains MongoDB Community database monitoring collector settings
 	MongoDBCommunity MongoDBCommunityCollectorConfig `mapstructure:"mongodb_community"`
 
 	// CockroachDB contains CockroachDB database monitoring collector settings
 	CockroachDB CockroachDBCollectorConfig `mapstructure:"cockroachdb"`
+
+	// InfluxDB contains InfluxDB v1/v2 database monitoring collector settings (/debug/vars)
+	InfluxDB InfluxDBCollectorConfig `mapstructure:"influxdb"`
 
 	// MSSQL contains Microsoft SQL Server database monitoring collector settings
 	MSSQL MSSQLCollectorConfig `mapstructure:"mssql"`
@@ -303,6 +328,9 @@ type CollectorConfig struct {
 	// Memcache contains Memcached cache monitoring collector settings
 	Memcache MemcacheCollectorConfig `mapstructure:"memcache"`
 
+	// Apache contains Apache HTTPD server-status monitoring collector settings
+	Apache ApacheCollectorConfig `mapstructure:"apache"`
+
 	// RabbitMQ contains RabbitMQ queueing monitoring collector settings (Management API)
 	RabbitMQ RabbitMQCollectorConfig `mapstructure:"rabbitmq"`
 
@@ -323,6 +351,54 @@ type CollectorConfig struct {
 
 	// RemoteWriteReceiver contains Prometheus remote_write push receiver settings
 	RemoteWriteReceiver RemoteWriteReceiverConfig `mapstructure:"remote_write_receiver"`
+
+	// === M2 Network Monitoring Collectors ===
+
+	// Ping contains ICMP ping probe settings.
+	Ping PingCollectorConfig `mapstructure:"ping"`
+
+	// DNS contains DNS query probe settings.
+	DNS DNSCollectorConfig `mapstructure:"dns"`
+
+	// TCPProbe contains TCP/UDP port probe settings.
+	TCPProbe TCPProbeCollectorConfig `mapstructure:"tcp_probe"`
+
+	// HTTPProbe contains HTTP synthetic check settings.
+	HTTPProbe HTTPProbeCollectorConfig `mapstructure:"http_probe"`
+
+	// SNMP contains SNMP polling settings.
+	SNMP SNMPCollectorConfig `mapstructure:"snmp"`
+
+	// Netflow contains NetFlow v5/v9/IPFIX listener settings.
+	Netflow NetflowCollectorConfig `mapstructure:"netflow"`
+
+	// Sflow contains sFlow v5 listener settings.
+	Sflow SflowCollectorConfig `mapstructure:"sflow"`
+
+	// SyslogListener contains syslog receiver settings.
+	SyslogListener SyslogListenerConfig `mapstructure:"syslog_listener"`
+
+	// Elasticsearch contains Elasticsearch cluster monitoring collector settings (M4).
+	Elasticsearch ElasticsearchCollectorConfig `mapstructure:"elasticsearch"`
+
+	// Couchbase contains Couchbase cluster monitoring collector settings (M4).
+	Couchbase CouchbaseCollectorConfig `mapstructure:"couchbase"`
+
+	// OpenSearch contains OpenSearch cluster monitoring collector settings (M4).
+	// OpenSearch is the AWS-backed fork of Elasticsearch and exposes the same API.
+	OpenSearch OpenSearchCollectorConfig `mapstructure:"opensearch"`
+
+	// Nginx contains Nginx stub_status scraper settings (M4).
+	Nginx NginxCollectorConfig `mapstructure:"nginx"`
+
+	// HAProxy contains HAProxy CSV stats scraper settings (M4).
+	HAProxy HAProxyCollectorConfig `mapstructure:"haproxy"`
+
+	// PgBouncer contains PgBouncer SHOW STATS/POOLS collector settings (M4).
+	PgBouncer PgBouncerCollectorConfig `mapstructure:"pgbouncer"`
+
+	// Vault contains HashiCorp Vault /v1/sys/metrics scraper settings (M4).
+	Vault VaultCollectorConfig `mapstructure:"vault"`
 }
 
 // ClickHouseCollectorConfig contains settings for monitoring external ClickHouse instances.
@@ -867,7 +943,7 @@ type RedisInstanceConfig struct {
 	// TLSEnabled enables TLS for the Redis connection (default: false)
 	TLSEnabled    bool `mapstructure:"tls_enabled"`
 	TLSSkipVerify bool `mapstructure:"tls_skip_verify"`
-	// CollectLatency enables LATENCY HISTORY/RESET collection (default: false)
+	// CollectLatency enables LATENCY LATEST collection (default: false)
 	CollectLatency bool `mapstructure:"collect_latency"`
 	// CollectCommandStats enables INFO commandstats (default: true)
 	CollectCommandStats bool              `mapstructure:"collect_command_stats"`
@@ -886,13 +962,16 @@ type ValkeyCollectorConfig struct {
 
 // ValkeyInstanceConfig contains connection settings for a single Valkey instance.
 type ValkeyInstanceConfig struct {
-	Name                string            `mapstructure:"name"`
-	Host                string            `mapstructure:"host"`
-	Port                int               `mapstructure:"port"`
-	Password            string            `mapstructure:"password"`
-	DB                  int               `mapstructure:"db"`
-	TLSEnabled          bool              `mapstructure:"tls_enabled"`
-	TLSSkipVerify       bool              `mapstructure:"tls_skip_verify"`
+	Name          string `mapstructure:"name"`
+	Host          string `mapstructure:"host"`
+	Port          int    `mapstructure:"port"`
+	Password      string `mapstructure:"password"`
+	DB            int    `mapstructure:"db"`
+	TLSEnabled    bool   `mapstructure:"tls_enabled"`
+	TLSSkipVerify bool   `mapstructure:"tls_skip_verify"`
+	// CollectLatency enables LATENCY LATEST collection (default: false)
+	CollectLatency bool `mapstructure:"collect_latency"`
+	// CollectCommandStats enables INFO commandstats (default: true)
 	CollectCommandStats bool              `mapstructure:"collect_command_stats"`
 	Tags                map[string]string `mapstructure:"tags"`
 }
@@ -1591,6 +1670,13 @@ type ExporterConfig struct {
 type OTLPExporterConfig struct {
 	// Enabled enables the OTLP exporter
 	Enabled bool `mapstructure:"enabled"`
+
+	// Protocol selects the OTLP transport for the metric bridge: "http" (default)
+	// or "grpc". Empty is treated as "http" so existing configurations are
+	// preserved. The legacy OTLPExporter reads its protocol from
+	// TelemetryFlowConfig.Protocol; this field only governs the
+	// OTLPMetricBridge vs OTLPMetricGRPCBridge selection in agent.go.
+	Protocol string `mapstructure:"protocol"`
 
 	// BatchSize is the maximum batch size
 	BatchSize int `mapstructure:"batch_size"`
@@ -2830,6 +2916,11 @@ func DefaultConfig() *Config {
 				MaxDatabases:       50,
 				Databases:          []SQLite3DatabaseConfig{},
 			},
+			SQLGeneric: SQLGenericCollectorConfig{
+				Enabled:   false,
+				Interval:  30 * time.Second,
+				Instances: []SQLGenericInstance{},
+			},
 			CockroachDB: CockroachDBCollectorConfig{
 				Enabled:            false,
 				InstanceInterval:   15 * time.Second,
@@ -2899,6 +2990,11 @@ func DefaultConfig() *Config {
 				Enabled:       false,
 				StatsInterval: 15 * time.Second,
 				Instances:     []MemcacheInstanceConfig{},
+			},
+			Apache: ApacheCollectorConfig{
+				Enabled:   false,
+				Interval:  15 * time.Second,
+				Instances: []ApacheInstance{},
 			},
 			RabbitMQ: RabbitMQCollectorConfig{
 				Enabled:          false,

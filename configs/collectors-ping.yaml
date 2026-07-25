@@ -1,0 +1,36 @@
+# TelemetryFlow Agent - ICMP Ping Probe Collector Configuration
+#
+# Example configuration for active ICMP echo probes against named targets.
+# Collects per-target RTT (min/avg/max/mdev), packet-loss %, and jitter.
+#
+# Documentation: docs/collectors/PING.md (if exists)
+
+ping:
+  enabled: false
+
+  # Global interval between probe cycles (default: 30s)
+  interval: 30s
+
+  # Targets to probe. Each target is emitted with a `target` tag = Name
+  # (falls back to Host when Name is empty).
+  targets:
+    - name: "edge-router"
+      host: "10.0.0.1"
+    - name: "dns-resolver"
+      host: "10.0.0.53"
+    - name: "public-dns"
+      host: "1.1.1.1"
+
+  # Number of echo requests issued per target per cycle (default: 5)
+  count: 5
+
+  # Per-target probe timeout, including all `count` packets (default: 5s)
+  timeout: 5s
+
+  # Wait between successive packets within one probe cycle (default: 1s)
+  interval_between: 1s
+
+  # Privileged selects raw-socket mode. When true the agent must run as
+  # root or with CAP_NET_RAW. When false (default), unprivileged UDP-mode
+  # ICMP is used (Linux requires net.ipv4.ping_group_range to be widened).
+  privileged: false

@@ -7,10 +7,10 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.2.2-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.0--dev-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
 [![Coverage](https://img.shields.io/badge/Coverage-91.3%25-green.svg)](CHANGELOG.md)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -18,7 +18,7 @@
 
 ---
 
-Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.43.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
+Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.47.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
 
 This agent works as the **client-side counterpart** to the TelemetryFlow Backend Agent Module (NestJS), providing:
 
@@ -35,11 +35,11 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 graph LR
     subgraph "TelemetryFlow Ecosystem v1.4.2"
         subgraph "Instrumentation"
-            SDK[TFO-Go-SDK<br/>OTEL SDK v1.43.0]
+            SDK[TFO-Go-SDK<br/>OTEL SDK v1.47.0]
         end
 
         subgraph "Collection"
-            AGENT[TFO-Agent<br/>OTEL SDK v1.43.0]
+            AGENT[TFO-Agent<br/>OTEL SDK v1.47.0]
         end
 
         subgraph "Processing"
@@ -58,17 +58,17 @@ graph LR
     style COLLECTOR fill:#FFB74D,stroke:#F57C00
 ```
 
-| Component         | Version | OTEL Base          | Description                 |
-| ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.2.2  | SDK v1.43.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.2.2  | SDK v1.43.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.2.0  | Collector v0.151.0 | Central telemetry collector |
+| Component         | Version     | OTEL Base          | Description                 |
+| ----------------- | ----------- | ------------------ | --------------------------- |
+| **TFO-Agent**     | v1.3.0-dev  | SDK v1.47.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.3.0-dev  | SDK v1.47.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.2.0      | Collector v0.151.0 | Central telemetry collector |
 
 ## Features
 
 ### OpenTelemetry Core
 
-- **OpenTelemetry SDK v1.43.0**: Built on standard OTEL Go SDK (aligned with TFO-Go-SDK)
+- **OpenTelemetry SDK v1.47.0**: Built on standard OTEL Go SDK (aligned with TFO-Go-SDK)
 - **OTLP Export**: OpenTelemetry Protocol for metrics, logs, and traces
 - **Multi-Signal Support**: Metrics, logs, and traces collection
 
@@ -97,6 +97,20 @@ graph LR
 
 - **Cross-Platform**: Linux, macOS, and Windows support
 - **LEGO Building Blocks**: Modular architecture for easy extensibility
+
+## Roadmap Status (1.3.0-dev)
+
+The `1.3.0` line is a multi-milestone rollout that closes the Telegraf capability gap. All features are opt-in via the new `collectors.*` / `pipeline.*` config keys — existing 1.2.x configurations continue to work unchanged.
+
+| Milestone                              | Status | Scope                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------- | :----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M1 Foundation**                      |   ✅   | Plugin system (`internal/plugin/`), disk-backed retry buffer wired into the OTLP sink, channel-based processor pipeline engine (`internal/pipeline/`), `@{store:key}` SecretStore (env / file / Vault), atomic plugin state persister (`internal/persister/`), self-observability layer (`internal/selfstat/`), config migration framework |
+| **M2 Network Monitoring**              |   ✅   | `ping` (ICMP), `dns` (miekg/dns), `tcp_probe`, `http_probe`, `snmp` (v1/v2c/v3 via gosnmp), `netflow` (v5/v9/IPFIX listener), `syslog_listener` (RFC 3164/5424/Cisco), `sflow` v5 listener                                                                                                                                           |
+| **M3 Logs & Self-Observation**         |   🚧   | 4 log parser processors (`multiline`, `grok_parser`, `json_parser`, `regex_parser`), `tail_sampling` probabilistic + policy sampler, `internalstats` selfstat internal collector                                                                                                                                                  |
+| **M4 Database & Application**          |   ⏳   | Expanded database & app-tier collectors                                                                                                                                                                                                                                                                                            |
+| **M5 Multi-Output**                    |   ⏳   | Pluggable output sinks beyond OTLP                                                                                                                                                                                                                                                                                                 |
+
+Legend: ✅ Shipped · 🚧 In Progress · ⏳ Planned
 
 ## Quick Start
 
@@ -142,11 +156,11 @@ docker-compose down
 ```bash
 # Build image
 docker build \
-  --build-arg VERSION=1.1.8 \
+  --build-arg VERSION=1.3.0-dev \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.2.2 .
+  -t telemetryflow/telemetryflow-agent:1.3.0-dev .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -156,7 +170,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.2.2
+  telemetryflow/telemetryflow-agent:1.3.0-dev
 ```
 
 ### OTEL Collector Ports
@@ -292,15 +306,18 @@ tfo-agent/
 ├── cmd/tfo-agent/         # CLI entry point
 ├── internal/
 │   ├── agent/             # Core agent lifecycle
-│   ├── buffer/            # Disk-backed retry buffer
+│   ├── buffer/            # Disk-backed retry buffer (wired into OTLP sink)
 │   ├── collector/         # Metric collectors
 │   │   ├── aurora/        # Amazon Aurora CloudWatch/PI/RDS collector
 │   │   ├── cadvisor/      # cAdvisor Prometheus scraper collector
 │   │   ├── clickhouse/    # ClickHouse database collector
 │   │   ├── cockroachdb/   # CockroachDB database collector
 │   │   ├── confluent_kafka/ # Confluent Kafka Metrics API collector
+│   │   ├── dns/           # DNS query probe (M2)
 │   │   ├── docker/        # Docker container metrics collector
 │   │   ├── ebpf/          # eBPF kernel-level metrics collector
+│   │   ├── http_probe/    # HTTP synthetic probe (M2)
+│   │   ├── internalstats/ # Selfstat internal collector (M3)
 │   │   ├── kafka/         # Apache Kafka (JMX exporter) collector
 │   │   ├── kubernetes/    # Kubernetes metrics collector
 │   │   ├── memcache/      # Memcached cache collector
@@ -308,17 +325,44 @@ tfo-agent/
 │   │   ├── mssql/         # Microsoft SQL Server collector
 │   │   ├── mysql/         # MySQL/MariaDB/Percona collector
 │   │   ├── nats/          # NATS messaging collector
+│   │   ├── netflow/       # NetFlow v5/v9/IPFIX listener (M2)
 │   │   ├── nodeexporter/  # Node Exporter metrics collector
+│   │   ├── ping/          # ICMP ping probe (M2)
 │   │   ├── postgresql/    # PostgreSQL/RDS PostgreSQL collector
 │   │   ├── pubsub/        # Google Cloud Pub/Sub collector
 │   │   ├── rabbitmq/      # RabbitMQ (Management API) collector
 │   │   ├── redis/         # Redis cache collector
+│   │   ├── sflow/         # sFlow v5 listener (M2)
+│   │   ├── snmp/          # SNMP v1/v2c/v3 collector (M2)
 │   │   ├── sqlite3/       # SQLite3 database collector
+│   │   ├── syslog_listener/ # Syslog (RFC 3164/5424/Cisco) receiver (M2)
 │   │   ├── system/        # System metrics collector
+│   │   ├── tcp_probe/     # TCP/UDP port probe (M2)
 │   │   ├── timescaledb/   # TimescaleDB collector
 │   │   └── valkey/        # Valkey cache collector
 │   ├── config/            # Configuration management
 │   ├── exporter/          # OTLP data exporters
+│   ├── migration/         # Versioned config schema migration framework (M1)
+│   ├── persister/         # Disk-backed plugin state persistence (M1)
+│   ├── pipeline/          # Channel-based metric pipeline engine (M1)
+│   ├── plugin/            # Typed plugin contracts + registry (M1)
+│   ├── processor/         # Processor plugins (M1 + M3)
+│   │   ├── all/           # Registry aggregator
+│   │   ├── converter/     # Float rounding
+│   │   ├── defaults/      # Default tag values
+│   │   ├── drop/          # Drop-by-rule
+│   │   ├── enum/          # Value mapping
+│   │   ├── filter/        # Keep/drop by name + tag
+│   │   ├── grok_parser/   # Grok pattern parser (M3)
+│   │   ├── json_parser/   # JSON dotted-path parser (M3)
+│   │   ├── keep/          # Keep-by-rule
+│   │   ├── multiline/     # Continuation line aggregator (M3)
+│   │   ├── regex_parser/  # RE2 named-capture parser (M3)
+│   │   ├── rename/        # Metric name rename
+│   │   ├── starlark/      # Turing-complete Starlark scripts
+│   │   └── tail_sampling/ # Probabilistic + policy sampler (M3)
+│   ├── secret/            # SecretStore backends: env / file / vault (M1)
+│   ├── selfstat/          # Internal self-observability stats (M1)
 │   └── version/           # Version and banner info
 ├── pkg/                   # LEGO Building Blocks
 │   ├── api/               # HTTP API client
@@ -560,23 +604,27 @@ sudo systemctl start tfo-agent
 
 ## 3rd Party Integrations
 
-TelemetryFlow Agent supports **39+ integrations** for enterprise environments across multiple categories.
+TelemetryFlow Agent supports **47+ integrations** across 34 native collectors and the 3rd-party ecosystem, spanning network monitoring, cache, database, kernel, and pipeline categories.
 
 ### Integration Categories
 
-| Category              | Integrations                                                 | Count |
-| --------------------- | ------------------------------------------------------------ | ----- |
-| **Cloud Providers**   | GCP, Azure, Alibaba Cloud, AWS CloudWatch                    | 4     |
-| **Infrastructure**    | Proxmox, VMware vSphere, Nutanix, Azure Arc                  | 4     |
-| **Network & IoT**     | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3, MQTT              | 3     |
-| **Kernel/System**     | eBPF (syscalls, network, file I/O, scheduler), Cilium Hubble | 2     |
-| **APM Platforms**     | Dynatrace, IBM Instana, Datadog, New Relic                   | 4     |
-| **OSS Observability** | SigNoz, Coroot, HyperDX, OpenObserve, Netdata                | 5     |
-| **Observability**     | Prometheus, Splunk, Elasticsearch                            | 3     |
-| **Streaming & Logs**  | Kafka, Loki, InfluxDB                                        | 3     |
-| **Tracing**           | Jaeger, Zipkin                                               | 2     |
-| **Monitoring Tools**  | Telegraf, Grafana Alloy, Percona PMM, Blackbox, ManageEngine | 5     |
-| **Custom**            | Webhook                                                      | 1     |
+| Category                   | Integrations                                                                                              | Count |
+| -------------------------- | --------------------------------------------------------------------------------------------------------- | ----- |
+| **Cloud Providers**        | GCP, Azure, Alibaba Cloud, AWS CloudWatch                                                                 | 4     |
+| **Infrastructure**         | Proxmox, VMware vSphere, Nutanix, Azure Arc                                                               | 4     |
+| **Network Monitoring (M2)**| ICMP Ping, DNS Query, TCP/UDP Probe, HTTP Probe, SNMP v1/v2c/v3, NetFlow v5/v9/IPFIX, sFlow v5, Syslog    | 8     |
+| **Network & IoT**          | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3 (legacy wiring), MQTT                                           | 3     |
+| **Kernel/System**          | eBPF (syscalls, network, file I/O, scheduler), Cilium Hubble                                              | 2     |
+| **APM Platforms**          | Dynatrace, IBM Instana, Datadog, New Relic                                                                | 4     |
+| **OSS Observability**      | SigNoz, Coroot, HyperDX, OpenObserve, Netdata                                                             | 5     |
+| **Observability**          | Prometheus, Splunk, Elasticsearch                                                                         | 3     |
+| **Streaming & Logs**       | Kafka, Loki, InfluxDB                                                                                     | 3     |
+| **Tracing**                | Jaeger, Zipkin                                                                                            | 2     |
+| **Monitoring Tools**       | Telegraf, Grafana Alloy, Percona PMM, Blackbox, ManageEngine                                              | 5     |
+| **Cache (enhanced)**       | Redis (cluster + latency + version), Valkey (cluster + latency + version)                                 | 2     |
+| **Pipeline (M1+M3)**       | filter / drop / keep / rename / converter / enum / defaults / starlark / multiline / grok / json / regex / tail_sampling | 13 |
+| **Foundation (M1)**        | Disk-backed retry buffer, Secret management (env/file/vault), Plugin state persister, Config migration    | 4     |
+| **Custom**                 | Webhook                                                                                                   | 1     |
 
 ### Data Type Support Matrix
 
@@ -596,6 +644,17 @@ TelemetryFlow Agent supports **39+ integrations** for enterprise environments ac
 | Cisco              |   ✅    |  ❌  |   ❌   | REST           |
 | SNMP               |   ✅    |  ❌  |   ❌   | SNMP v1/v2c/v3 |
 | MQTT               |   ✅    |  ✅  |   ✅   | MQTT           |
+| **Network Mon. (M2)** |      |      |        |                |
+| ICMP Ping          |   ✅    |  ❌  |   ❌   | ICMP           |
+| DNS Query          |   ✅    |  ❌  |   ❌   | DNS            |
+| TCP/UDP Probe      |   ✅    |  ❌  |   ❌   | TCP/UDP        |
+| HTTP Probe         |   ✅    |  ❌  |   ❌   | HTTP(S)        |
+| NetFlow            |   ✅    |  ❌  |   ❌   | NetFlow v5/v9  |
+| sFlow              |   ✅    |  ❌  |   ❌   | sFlow v5       |
+| Syslog Receiver    |   ❌    |  ✅  |   ❌   | UDP/TCP/Unix   |
+| **Cache (enhanced)** |       |      |        |                |
+| Redis              |   ✅    |  ❌  |   ❌   | RESP           |
+| Valkey             |   ✅    |  ❌  |   ❌   | RESP           |
 | **System**         |         |      |        |                |
 | eBPF               |   ✅    |  ❌  |   ❌   | Kernel         |
 | Cilium Hubble      |   ✅    |  ❌  |   ✅   | gRPC           |
@@ -638,6 +697,15 @@ TelemetryFlow Agent supports **39+ integrations** for enterprise environments ac
 | **Hybrid Infrastructure** |    ✅     |   ⚠️    |    ⚠️     |    ✅     |   ✅    |   ⚠️   |      ✅      |         ⚠️          |
 | **eBPF Support**          |    ✅     |   ✅    |    ⚠️     |    ✅     |   ✅    |   ❌   |      ❌      |         ⚠️          |
 | **Network Devices**       |    ✅     |   ⚠️    |    ⚠️     |    ⚠️     |   ⚠️    |   ✅   |      ✅      |         ⚠️          |
+| **Synthetic Probes**      |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ⚠️   |      ⚠️      |         ✅          |
+| **Flow Collectors**       |    ✅     |   ⚠️    |    ⚠️     |    ⚠️     |   ⚠️    |   ✅   |      ❌      |         ⚠️          |
+| **Syslog Ingest**         |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ✅   |      ✅      |         ✅          |
+| **Processor Pipeline**    |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ✅   |      ⚠️      |         ✅          |
+| **Starlark Scripts**      |    ✅     |   ❌    |    ❌     |    ⚠️     |   ❌    |   ❌   |      ❌      |         ❌          |
+| **Tail Sampling**         |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ✅   |      ⚠️      |         ✅          |
+| **SecretStore (vault)**   |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ✅   |      ⚠️      |         ✅          |
+| **Plugin Persistence**    |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ⚠️   |      ⚠️      |         ✅          |
+| **Config Migration**      |    ✅     |   ⚠️    |    ⚠️     |    ⚠️     |   ⚠️    |   ⚠️   |      ⚠️      |         ⚠️          |
 | **IoT/MQTT**              |    ✅     |   ❌    |    ❌     |    ⚠️     |   ⚠️    |   ⚠️   |      ⚠️      |         ⚠️          |
 | **Disk-Backed Buffer**    |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ✅   |      ❌      |         ✅          |
 | **APM/Traces**            |    ✅     |   ✅    |    ✅     |    ✅     |   ✅    |   ⚠️   |      ⚠️      |         ✅          |

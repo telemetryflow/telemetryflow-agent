@@ -30,15 +30,23 @@ import (
 	"go.uber.org/zap"
 
 	agentapi "github.com/telemetryflow/telemetryflow-agent/internal/api"
+	"github.com/telemetryflow/telemetryflow-agent/internal/buffer"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	apachecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/apache"
 	auroracollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/aurora"
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
 	clickhousecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/clickhouse"
 	cockroachdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cockroachdb"
 	confluentkafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/confluent_kafka"
+	couchbasecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/couchbase"
+	dnscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/dns"
 	dockercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/docker"
 	ebpfcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ebpf"
+	elasticsearchcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/elasticsearch"
 	fluentbitcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/fluentbit"
+	haproxycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/haproxy"
+	httprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/http_probe"
+	influxdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/influxdb"
 	kafkacollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/kafka"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/kubernetes"
 	logcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/log"
@@ -47,24 +55,44 @@ import (
 	mssqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mssql"
 	mysqlcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/mysql"
 	natscollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nats"
+	netflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/netflow"
+	nginxcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/nginx"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/nodeexporter"
+	opensearchcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/opensearch"
+	pgbouncercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pgbouncer"
+	pingcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/ping"
 	pgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/postgresql"
 	pubsubcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/pubsub"
 	rabbitmqcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rabbitmq"
 	rdspgcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/rds_postgresql"
 	redicollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/redis"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
+	sflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sflow"
+	snmpcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/snmp"
+	sqlgenericcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sql_generic"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
+	sysloglistenercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/syslog_listener"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/system"
+	tcpprobecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/tcp_probe"
 	tsdbcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/timescaledb"
 	valkeycollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/valkey"
+	vaultcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/vault"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/exporter"
+	"github.com/telemetryflow/telemetryflow-agent/internal/persister"
 	"github.com/telemetryflow/telemetryflow-agent/internal/qan"
 	"github.com/telemetryflow/telemetryflow-agent/internal/receiver/remotewrite"
+	"github.com/telemetryflow/telemetryflow-agent/internal/selfstat"
 	"github.com/telemetryflow/telemetryflow-agent/pkg/api"
 	k8s "k8s.io/client-go/kubernetes"
 )
+
+// otlpMetricBridge is the contract satisfied by both the HTTP and gRPC OTLP
+// metric bridges so the agent run/shutdown paths are transport-agnostic.
+type otlpMetricBridge interface {
+	exporter.MetricSink
+	Shutdown(ctx context.Context) error
+}
 
 // Agent is the main telemetry agent
 type Agent struct {
@@ -81,10 +109,18 @@ type Agent struct {
 	collectorManager *collector.Manager
 	prometheusServer *exporter.PrometheusServer
 	agentAPIServer   *agentapi.Server
-	otlpBridge       *exporter.OTLPMetricBridge
-	metricForwarder  *exporter.MetricForwarder
-	qanForwarder     *qan.QANForwarder
-	qanExporter      *qan.QANExporter
+	// otlpBridge holds whichever metric bridge was constructed (HTTP or gRPC).
+	// Both implementations satisfy MetricSink + Shutdown so the run/shutdown
+	// paths do not need to care about the transport.
+	otlpBridge      otlpMetricBridge
+	logBridge       *exporter.OTLPLogBridge
+	logCollector    *logcollector.LogCollector
+	metricForwarder *exporter.MetricForwarder
+	bufferRetry     *exporter.BufferRetrySink
+	diskBuffer      *buffer.Buffer
+	persister       *persister.Persister
+	qanForwarder    *qan.QANForwarder
+	qanExporter     *qan.QANExporter
 
 	// State
 	mu         sync.RWMutex
@@ -176,6 +212,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		)
 	}
 
+	// Add InfluxDB collector if enabled (/debug/vars scrape)
+	if cfg.Collector.InfluxDB.Enabled {
+		influxCol := influxdbcollector.NewInfluxDBCollector(cfg.Collector.InfluxDB, logger)
+		collectors = append(collectors, influxCol)
+		logger.Info("InfluxDB collector enabled",
+			zap.Int("instances", len(cfg.Collector.InfluxDB.Instances)),
+			zap.Duration("interval", cfg.Collector.InfluxDB.Interval),
+		)
+	}
+
 	// Add Aurora collector if enabled
 	if cfg.Collector.Aurora.Enabled {
 		auroraCol = auroracollector.NewAuroraCollector(cfg.Collector.Aurora, logger)
@@ -224,6 +270,23 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			zap.Int("databases", len(cfg.Collector.SQLite3.Databases)),
 			zap.Duration("collection_interval", cfg.Collector.SQLite3.CollectionInterval),
 		)
+	}
+
+	// Add SQL generic collector if enabled
+	if cfg.Collector.SQLGeneric.Enabled {
+		sqlGenCol, err := sqlgenericcollector.NewSQLGenericCollector(cfg.Collector.SQLGeneric, logger)
+		if err != nil {
+			logger.Warn("SQL generic collector failed to initialize",
+				zap.Int("instances", len(cfg.Collector.SQLGeneric.Instances)),
+				zap.Error(err),
+			)
+		} else {
+			collectors = append(collectors, sqlGenCol)
+			logger.Info("SQL generic collector enabled",
+				zap.Int("instances", len(cfg.Collector.SQLGeneric.Instances)),
+				zap.Duration("interval", cfg.Collector.SQLGeneric.Interval),
+			)
+		}
 	}
 
 	// Add MongoDB Community collector if enabled
@@ -286,6 +349,86 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		)
 	}
 
+	// Add Apache HTTPD collector if enabled (server-status scrape)
+	if cfg.Collector.Apache.Enabled {
+		apacheCol := apachecollector.NewApacheCollector(cfg.Collector.Apache, logger)
+		collectors = append(collectors, apacheCol)
+		logger.Info("Apache collector enabled",
+			zap.Int("instances", len(cfg.Collector.Apache.Instances)),
+			zap.Duration("interval", cfg.Collector.Apache.Interval),
+		)
+	}
+
+	// Add Elasticsearch collector if enabled (cluster + node stats scrape)
+	if cfg.Collector.Elasticsearch.Enabled {
+		esCol := elasticsearchcollector.NewElasticsearchCollector(cfg.Collector.Elasticsearch, logger)
+		collectors = append(collectors, esCol)
+		logger.Info("Elasticsearch collector enabled",
+			zap.Int("instances", len(cfg.Collector.Elasticsearch.Instances)),
+			zap.Duration("interval", cfg.Collector.Elasticsearch.Interval),
+		)
+	}
+
+	// Add OpenSearch collector if enabled (cluster + node stats scrape)
+	if cfg.Collector.OpenSearch.Enabled {
+		osCol := opensearchcollector.NewOpenSearchCollector(cfg.Collector.OpenSearch, logger)
+		collectors = append(collectors, osCol)
+		logger.Info("OpenSearch collector enabled",
+			zap.Int("instances", len(cfg.Collector.OpenSearch.Instances)),
+			zap.Duration("interval", cfg.Collector.OpenSearch.Interval),
+		)
+	}
+
+	// Add Couchbase collector if enabled (cluster + node + bucket stats scrape)
+	if cfg.Collector.Couchbase.Enabled {
+		cbCol := couchbasecollector.NewCouchbaseCollector(cfg.Collector.Couchbase, logger)
+		collectors = append(collectors, cbCol)
+		logger.Info("Couchbase collector enabled",
+			zap.Int("instances", len(cfg.Collector.Couchbase.Instances)),
+			zap.Duration("interval", cfg.Collector.Couchbase.Interval),
+		)
+	}
+
+	// Add Nginx collector if enabled (stub_status scrape)
+	if cfg.Collector.Nginx.Enabled {
+		nginxCol := nginxcollector.NewNginxCollector(cfg.Collector.Nginx, logger)
+		collectors = append(collectors, nginxCol)
+		logger.Info("Nginx collector enabled",
+			zap.Int("instances", len(cfg.Collector.Nginx.Instances)),
+			zap.Duration("interval", cfg.Collector.Nginx.Interval),
+		)
+	}
+
+	// Add HAProxy collector if enabled (CSV stats scrape)
+	if cfg.Collector.HAProxy.Enabled {
+		hapCol := haproxycollector.NewHAProxyCollector(cfg.Collector.HAProxy, logger)
+		collectors = append(collectors, hapCol)
+		logger.Info("HAProxy collector enabled",
+			zap.Int("instances", len(cfg.Collector.HAProxy.Instances)),
+			zap.Duration("interval", cfg.Collector.HAProxy.Interval),
+		)
+	}
+
+	// Add PgBouncer collector if enabled (SHOW STATS / SHOW POOLS)
+	if cfg.Collector.PgBouncer.Enabled {
+		pgbCol := pgbouncercollector.NewPgBouncerCollector(cfg.Collector.PgBouncer, logger)
+		collectors = append(collectors, pgbCol)
+		logger.Info("PgBouncer collector enabled",
+			zap.Int("instances", len(cfg.Collector.PgBouncer.Instances)),
+			zap.Duration("interval", cfg.Collector.PgBouncer.Interval),
+		)
+	}
+
+	// Add Vault collector if enabled (Prometheus /v1/sys/metrics scrape)
+	if cfg.Collector.Vault.Enabled {
+		vaultCol := vaultcollector.NewVaultCollector(cfg.Collector.Vault, logger)
+		collectors = append(collectors, vaultCol)
+		logger.Info("Vault collector enabled",
+			zap.Int("instances", len(cfg.Collector.Vault.Instances)),
+			zap.Duration("interval", cfg.Collector.Vault.Interval),
+		)
+	}
+
 	// Add RabbitMQ collector if enabled
 	if cfg.Collector.RabbitMQ.Enabled {
 		rabbitCol := rabbitmqcollector.NewRabbitMQCollector(cfg.Collector.RabbitMQ, logger)
@@ -323,6 +466,92 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("NATS collector enabled",
 			zap.Int("instances", len(cfg.Collector.NATS.Instances)),
 			zap.Duration("stats_interval", cfg.Collector.NATS.StatsInterval),
+		)
+	}
+
+	// === M2 Network Monitoring Collectors ===
+
+	// Add DNS probe collector if enabled
+	if cfg.Collector.DNS.Enabled {
+		dnsCol := dnscollector.NewDNSCollector(cfg.Collector.DNS, logger)
+		collectors = append(collectors, dnsCol)
+		logger.Info("DNS collector enabled",
+			zap.Int("servers", len(cfg.Collector.DNS.Servers)),
+			zap.Int("queries", len(cfg.Collector.DNS.Queries)),
+			zap.Duration("interval", cfg.Collector.DNS.Interval),
+		)
+	}
+
+	// Add HTTP probe collector if enabled
+	if cfg.Collector.HTTPProbe.Enabled {
+		httpProbeCol := httprobecollector.NewHTTPProbeCollector(cfg.Collector.HTTPProbe, logger)
+		collectors = append(collectors, httpProbeCol)
+		logger.Info("HTTP probe collector enabled",
+			zap.Int("targets", len(cfg.Collector.HTTPProbe.Targets)),
+			zap.Duration("interval", cfg.Collector.HTTPProbe.Interval),
+		)
+	}
+
+	// Add NetFlow listener collector if enabled
+	if cfg.Collector.Netflow.Enabled {
+		netflowCol := netflowcollector.NewNetflowCollector(cfg.Collector.Netflow, logger)
+		collectors = append(collectors, netflowCol)
+		logger.Info("Netflow collector enabled",
+			zap.String("address", cfg.Collector.Netflow.Address),
+			zap.Int("port", cfg.Collector.Netflow.Port),
+			zap.Strings("protocols", cfg.Collector.Netflow.Protocols),
+		)
+	}
+
+	// Add sFlow listener collector if enabled
+	if cfg.Collector.Sflow.Enabled {
+		sflowCol := sflowcollector.NewSflowCollector(cfg.Collector.Sflow, logger)
+		collectors = append(collectors, sflowCol)
+		logger.Info("sFlow collector enabled",
+			zap.String("address", cfg.Collector.Sflow.Address),
+			zap.Int("port", cfg.Collector.Sflow.Port),
+		)
+	}
+
+	// Add Ping probe collector if enabled
+	if cfg.Collector.Ping.Enabled {
+		pingCol := pingcollector.NewPingCollector(cfg.Collector.Ping, logger)
+		collectors = append(collectors, pingCol)
+		logger.Info("Ping collector enabled",
+			zap.Int("targets", len(cfg.Collector.Ping.Targets)),
+			zap.Duration("interval", cfg.Collector.Ping.Interval),
+		)
+	}
+
+	// Add SNMP poll collector if enabled
+	if cfg.Collector.SNMP.Enabled {
+		snmpCol := snmpcollector.NewSNMPCollector(cfg.Collector.SNMP, logger)
+		collectors = append(collectors, snmpCol)
+		logger.Info("SNMP collector enabled",
+			zap.Int("agents", len(cfg.Collector.SNMP.Agents)),
+			zap.Int("fields", len(cfg.Collector.SNMP.Fields)),
+			zap.Int("tables", len(cfg.Collector.SNMP.Tables)),
+			zap.Duration("interval", cfg.Collector.SNMP.Interval),
+		)
+	}
+
+	// Add Syslog listener collector if enabled
+	if cfg.Collector.SyslogListener.Enabled {
+		syslogCol := sysloglistenercollector.NewSyslogListenerCollector(cfg.Collector.SyslogListener, logger)
+		collectors = append(collectors, syslogCol)
+		logger.Info("Syslog listener collector enabled",
+			zap.Int("listeners", len(cfg.Collector.SyslogListener.Listeners)),
+			zap.String("default_format", cfg.Collector.SyslogListener.DefaultFormat),
+		)
+	}
+
+	// Add TCP probe collector if enabled
+	if cfg.Collector.TCPProbe.Enabled {
+		tcpProbeCol := tcpprobecollector.NewTCPProbeCollector(cfg.Collector.TCPProbe, logger)
+		collectors = append(collectors, tcpProbeCol)
+		logger.Info("TCP probe collector enabled",
+			zap.Int("targets", len(cfg.Collector.TCPProbe.Targets)),
+			zap.Duration("interval", cfg.Collector.TCPProbe.Interval),
 		)
 	}
 
@@ -468,6 +697,10 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 
 	// Add log collector: Fluent Bit (preferred) or native (fallback).
 	// Mutual exclusion — Fluent Bit replaces native when both are enabled.
+	// nativeLogCol tracks any native LogCollector created below so it can be
+	// registered with the persister once the persister is initialised later
+	// in this function (the persister is created after the collectors).
+	var nativeLogCol *logcollector.LogCollector
 	if cfg.Collector.FluentBit.Enabled {
 		// Route Fluent Bit's OTLP output to the same logs endpoint the OTLP exporter
 		// uses. Without this, logs would go to telemetryflow.endpoint + /v1/logs,
@@ -490,8 +723,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 			// Fall back to native log collector
 			if cfg.Collector.Logs.Enabled {
-				logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
-				collectors = append(collectors, logCol)
+				nativeLogCol = logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
+				collectors = append(collectors, nativeLogCol)
 				logger.Info("Native log collector enabled (Fluent Bit fallback)")
 			}
 		} else {
@@ -504,8 +737,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			)
 		}
 	} else if cfg.Collector.Logs.Enabled {
-		logCol := logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
-		collectors = append(collectors, logCol)
+		nativeLogCol = logcollector.NewLogCollector(cfg.Collector.Logs, agentID, logger)
+		collectors = append(collectors, nativeLogCol)
 		logger.Info("Native log collector enabled",
 			zap.Int("paths", len(cfg.Collector.Logs.Paths)),
 			zap.Bool("journald", cfg.Collector.Logs.Journald.Enabled),
@@ -599,32 +832,135 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 
 	// Create OTLP metric bridge if metrics export is enabled.
 	// This is the export pipeline that forwards collected metrics to the
-	// TelemetryFlow Platform backend via OTLP HTTP.
-	var otlpBridge *exporter.OTLPMetricBridge
+	// TelemetryFlow Platform backend via OTLP. The transport is selected by
+	// cfg.Exporter.OTLP.Protocol: "grpc" instantiates the gRPC bridge, any
+	// other value (including the empty default) keeps the HTTP bridge so
+	// existing configurations are unchanged.
+	var otlpBridge otlpMetricBridge
+	var otlpSink exporter.MetricSink
 	if cfg.IsMetricsEnabled() {
 		bridgeCtx := context.Background()
 		otlpHost, otlpPath, otlpTLS := cfg.GetOTLPEndpoint("metrics")
-		bridge, err := exporter.NewOTLPMetricBridge(bridgeCtx, exporter.OTLPMetricBridgeConfig{
-			Endpoint:      otlpHost,
-			Path:          otlpPath,
-			TLSEnabled:    otlpTLS,
+		authHeaders := map[string]string{
+			"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
+			"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
+			"X-TelemetryFlow-Agent-ID":   agentID,
+		}
+		switch strings.ToLower(cfg.Exporter.OTLP.Protocol) {
+		case "grpc":
+			grpcBridge, err := exporter.NewOTLPMetricGRPCBridge(bridgeCtx, exporter.OTLPMetricGRPCBridgeConfig{
+				Endpoint:      otlpHost,
+				TLSEnabled:    otlpTLS,
+				TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
+				Headers:       authHeaders,
+				Logger:        logger,
+				Timeout:       cfg.GetEffectiveTimeout(),
+				Compression:   cfg.Exporter.OTLP.Compression,
+			})
+			if err != nil {
+				logger.Warn("Failed to create OTLP gRPC metric bridge, metrics will not be exported",
+					zap.Error(err),
+				)
+			} else {
+				otlpBridge = grpcBridge
+				otlpSink = grpcBridge
+				logger.Info("OTLP gRPC metric bridge enabled",
+					zap.String("endpoint", otlpHost),
+				)
+			}
+		default: // "http" and empty both fall through to HTTP for backward compat
+			httpBridge, err := exporter.NewOTLPMetricBridge(bridgeCtx, exporter.OTLPMetricBridgeConfig{
+				Endpoint:      otlpHost,
+				Path:          otlpPath,
+				TLSEnabled:    otlpTLS,
+				TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
+				Headers:       authHeaders,
+				Logger:        logger,
+			})
+			if err != nil {
+				logger.Warn("Failed to create OTLP metric bridge, metrics will not be exported",
+					zap.Error(err),
+				)
+			} else {
+				otlpBridge = httpBridge
+				otlpSink = httpBridge
+				logger.Info("OTLP metric bridge enabled",
+					zap.String("endpoint", otlpHost),
+					zap.String("path", otlpPath),
+				)
+			}
+		}
+	}
+
+	// Wire OTLP log bridge into the native LogCollector's SetLogCallback.
+	// Without this, the native log collector tails files / journald but the
+	// logCallback is never set, so collected logs go nowhere. The bridge
+	// batches and POSTs to the OTLP /v1/logs endpoint, mirroring the metric
+	// bridge. Fluent Bit has its own OTLP output and does not need this.
+	var logBridge *exporter.OTLPLogBridge
+	if nativeLogCol != nil && cfg.IsLogsEnabled() {
+		logHost, logPath, logTLS := cfg.GetOTLPEndpoint("logs")
+		lb, err := exporter.NewOTLPLogBridge(exporter.OTLPLogBridgeConfig{
+			Endpoint:      logHost,
+			Path:          logPath,
+			TLSEnabled:    logTLS,
 			TLSSkipVerify: cfg.GetEffectiveTLSConfig().SkipVerify,
 			Headers: map[string]string{
 				"X-TelemetryFlow-Key-ID":     cfg.GetEffectiveAPIKeyID(),
 				"X-TelemetryFlow-Key-Secret": cfg.GetEffectiveAPIKeySecret(),
 				"X-TelemetryFlow-Agent-ID":   agentID,
 			},
-			Logger: logger,
+			Logger:  logger,
+			Timeout: 10 * time.Second,
 		})
 		if err != nil {
-			logger.Warn("Failed to create OTLP metric bridge, metrics will not be exported",
+			logger.Warn("Failed to create OTLP log bridge, native logs will not be exported",
 				zap.Error(err),
 			)
 		} else {
-			otlpBridge = bridge
-			logger.Info("OTLP metric bridge enabled",
-				zap.String("endpoint", otlpHost),
-				zap.String("path", otlpPath),
+			logBridge = lb
+			nativeLogCol.SetLogCallback(lb.Emit)
+			logger.Info("OTLP log bridge wired to native log collector",
+				zap.String("endpoint", logHost),
+				zap.String("path", logPath),
+			)
+		}
+	}
+
+	// Wire disk-backed buffer around the OTLP sink so transient backend
+	// failures do not lose metrics (M1.2 — internal/buffer existed but was
+	// not instantiated; this closes that gap).
+	var bufferRetry *exporter.BufferRetrySink
+	var diskBuf *buffer.Buffer
+	if cfg.Buffer.Enabled && otlpSink != nil {
+		bufPath := cfg.Buffer.Path
+		if bufPath == "" {
+			bufPath = "/var/lib/tfo-agent/buffer"
+		}
+		buf, err := buffer.New(buffer.Config{
+			Enabled:       true,
+			Path:          bufPath,
+			MaxSizeMB:     cfg.Buffer.MaxSizeMB,
+			MaxAge:        cfg.Buffer.MaxAge,
+			FlushInterval: cfg.Buffer.FlushInterval,
+		})
+		if err != nil {
+			logger.Warn("Failed to initialise disk buffer — metrics will be lost on backend outage",
+				zap.String("path", bufPath),
+				zap.Error(err),
+			)
+		} else {
+			diskBuf = buf
+			selfstat.AgentBufferLimit.Set(cfg.Buffer.MaxSizeMB * 1024 * 1024)
+			bufferRetry = exporter.NewBufferRetrySink(otlpSink, exporter.BufferRetryConfig{
+				Enabled: true,
+				Buffer:  buf,
+				Logger:  logger,
+			})
+			otlpSink = bufferRetry
+			logger.Info("Disk-backed retry buffer wired",
+				zap.String("path", bufPath),
+				zap.Int64("max_size_mb", cfg.Buffer.MaxSizeMB),
 			)
 		}
 	}
@@ -642,8 +978,8 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			Interval:   fwdInterval,
 			Logger:     logger,
 		}
-		if otlpBridge != nil {
-			fwdCfg.OTLPSink = otlpBridge
+		if otlpSink != nil {
+			fwdCfg.OTLPSink = otlpSink
 		}
 		if promServer != nil {
 			fwdCfg.PromSink = promServer
@@ -809,6 +1145,44 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		}
 	}
 
+	// Initialise persister (M1.7). When cfg.Persister.Enabled is true the agent
+	// persists StatefulPlugin state to a JSON file across restarts. Plugins opt
+	// in by implementing plugin.StatefulPlugin (e.g. M3 log tail offset). When
+	// no plugin implements the mixin the persister is wired but inert.
+	var agentPersister *persister.Persister
+	if cfg.Persister.Enabled {
+		statefile := cfg.Persister.Statefile
+		if statefile == "" {
+			statefile = "/var/lib/tfo-agent/state.json"
+		}
+		agentPersister = persister.New(statefile).WithLogger(logger)
+
+		// Register stateful collectors BEFORE Load() so the persister can
+		// dispatch the restored state to them via SetState. Registration must
+		// also happen before the collectors' Start() (which runs later in
+		// Agent.Run) so the restored state is available when each collector
+		// spins up its workers. The native LogCollector persists per-file
+		// tail offsets so collection resumes across agent restarts (M3).
+		if nativeLogCol != nil {
+			if err := agentPersister.Register("log_collector", nativeLogCol); err != nil {
+				logger.Warn("failed to register log collector with persister",
+					zap.Error(err))
+			}
+		}
+
+		// Load previously persisted state BEFORE collectors start so they can
+		// pick up their saved state during Init/Start. Errors here are non-fatal
+		// — a missing or corrupt statefile just means plugins start fresh.
+		if err := agentPersister.Load(); err != nil {
+			logger.Warn("persister load failed — starting with empty state",
+				zap.String("statefile", statefile),
+				zap.Error(err))
+		} else {
+			logger.Info("persister loaded",
+				zap.String("statefile", statefile))
+		}
+	}
+
 	ag := &Agent{
 		id:               agentID,
 		config:           cfg,
@@ -822,7 +1196,12 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		prometheusServer: promServer,
 		agentAPIServer:   apiServer,
 		otlpBridge:       otlpBridge,
+		logBridge:        logBridge,
+		logCollector:     nativeLogCol,
 		metricForwarder:  forwarder,
+		bufferRetry:      bufferRetry,
+		diskBuffer:       diskBuf,
+		persister:        agentPersister,
 		qanForwarder:     qanFwd,
 		qanExporter:      qanExp,
 		configFile:       configFile,
@@ -980,6 +1359,54 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	}
 
+	// Start OTLP log bridge flusher (native log collector export path).
+	if a.logBridge != nil {
+		if err := a.logBridge.Start(ctx); err != nil {
+			errChan <- fmt.Errorf("otlp log bridge start: %w", err)
+		}
+	}
+
+	// Start buffer retry loop (drains failed batches back into OTLP sink).
+	if a.bufferRetry != nil {
+		a.bufferRetry.StartRetryLoop(ctx)
+	}
+
+	// Periodically report the disk buffer occupancy so AgentBufferSize
+	// reflects live state rather than staying pinned at zero. The limit is
+	// set once at construction (see NewWithConfigFile); only the gauge is
+	// refreshed here.
+	if a.diskBuffer != nil {
+		buf := a.diskBuffer
+		go func() {
+			selfstat.AgentBufferSize.Set(buf.Size())
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					selfstat.AgentBufferSize.Set(buf.Size())
+				}
+			}
+		}()
+	}
+
+	// Start persister save loop (M1.7). Plugins implementing
+	// plugin.StatefulPlugin are registered with the persister so their state
+	// is checkpointed periodically and on shutdown.
+	if a.persister != nil {
+		// Register any stateful plugin via type assertion. The plugin system
+		// adapter exposes the underlying legacy collector via Impl(); we
+		// type-assert on that. Legacy collectors that wish to persist state
+		// must implement plugin.StatefulPlugin on their concrete type.
+		saveInterval := a.config.Persister.SaveInterval
+		if saveInterval == 0 {
+			saveInterval = 5 * time.Minute
+		}
+		a.persister.StartSaveLoop(ctx, saveInterval)
+	}
+
 	// Start QAN exporter and forwarder (separate data path from OTLP)
 	if a.qanExporter != nil {
 		if err := a.qanExporter.Start(ctx); err != nil && err != context.Canceled {
@@ -1024,6 +1451,16 @@ func (a *Agent) Run(ctx context.Context) error {
 // shutdown gracefully stops all components
 func (a *Agent) shutdown() error {
 	a.logger.Info("Shutting down agent components")
+
+	// Final persister save BEFORE components stop so StatefulPlugin state is
+	// captured while plugins are still alive to serve GetState().
+	if a.persister != nil {
+		if err := a.persister.Store(); err != nil {
+			a.logger.Warn("persister final store failed", zap.Error(err))
+		} else {
+			a.logger.Info("persister state saved")
+		}
+	}
 
 	var wg sync.WaitGroup
 	var errs []error
@@ -1140,6 +1577,19 @@ func (a *Agent) shutdown() error {
 			if err := a.otlpBridge.Shutdown(shutdownCtx); err != nil {
 				errMu.Lock()
 				errs = append(errs, fmt.Errorf("otlp bridge shutdown: %w", err))
+				errMu.Unlock()
+			}
+		}()
+	}
+
+	// Stop OTLP log bridge — flushes pending records before returning.
+	if a.logBridge != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := a.logBridge.Stop(); err != nil {
+				errMu.Lock()
+				errs = append(errs, fmt.Errorf("otlp log bridge stop: %w", err))
 				errMu.Unlock()
 			}
 		}()
@@ -1301,6 +1751,13 @@ func (a *Agent) rebuildCollectors(cfg *config.Config) []collector.Collector {
 	}
 	if cfg.Collector.SQLite3.Enabled {
 		collectors = append(collectors, sqlite3collector.NewSQLite3Collector(cfg.Collector.SQLite3, a.logger))
+	}
+	if cfg.Collector.SQLGeneric.Enabled {
+		if sqlGenCol, err := sqlgenericcollector.NewSQLGenericCollector(cfg.Collector.SQLGeneric, a.logger); err == nil {
+			collectors = append(collectors, sqlGenCol)
+		} else {
+			a.logger.Warn("SQL generic collector failed to initialize", zap.Error(err))
+		}
 	}
 	if cfg.Collector.MongoDBCommunity.Enabled {
 		collectors = append(collectors, mongodbcollector.NewMongoDBCollector(cfg.Collector.MongoDBCommunity, a.logger))
