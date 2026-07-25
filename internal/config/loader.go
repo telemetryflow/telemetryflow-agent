@@ -27,12 +27,33 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+
+	"github.com/telemetryflow/telemetryflow-agent/internal/migration"
+	"go.uber.org/zap"
 )
+
+// SecretResolver is the contract for an @{store:key} resolver. The concrete
+// implementation lives in internal/secret; the interface is declared here to
+// avoid an import cycle (config -> secret -> plugin -> collector -> config).
+// Callers (cmd/tfo-agent) wire a *secret.Resolver into the loader.
+type SecretResolver interface {
+	Resolve(input string) (string, error)
+	ResolveBytes(input []byte) ([]byte, error)
+}
 
 // Loader handles configuration loading from multiple sources
 type Loader struct {
 	configPaths []string
 	envPrefix   string
+
+	// migrationEnabled gates schema migration on load. Default true.
+	migrationEnabled bool
+	// secretResolver, when non-nil, resolves @{store:key} references in the
+	// raw config bytes. Default nil = secret references pass through verbatim
+	// (and parsing likely fails later with a clear error).
+	secretResolver SecretResolver
+	// logger receives migration / secret-resolution warnings.
+	logger *zap.Logger
 }
 
 // NewLoader creates a new configuration loader
@@ -44,7 +65,9 @@ func NewLoader() *Loader {
 			"/etc/tfo-agent",
 			"$HOME/.tfo-agent",
 		},
-		envPrefix: "TFOAGENT",
+		envPrefix:        "TFOAGENT",
+		migrationEnabled: true,
+		logger:           zap.NewNop(),
 	}
 }
 
@@ -57,6 +80,27 @@ func (l *Loader) WithConfigPaths(paths ...string) *Loader {
 // WithEnvPrefix sets the environment variable prefix
 func (l *Loader) WithEnvPrefix(prefix string) *Loader {
 	l.envPrefix = prefix
+	return l
+}
+
+// WithSecretResolver wires a secret resolver so @{store:key} references in
+// the YAML are expanded before parsing. Returns the loader for chaining.
+func (l *Loader) WithSecretResolver(r SecretResolver) *Loader {
+	l.secretResolver = r
+	return l
+}
+
+// WithLogger injects a zap logger for migration / resolution warnings.
+func (l *Loader) WithLogger(log *zap.Logger) *Loader {
+	if log != nil {
+		l.logger = log
+	}
+	return l
+}
+
+// WithMigrationEnabled toggles schema migration on load (default: true).
+func (l *Loader) WithMigrationEnabled(enabled bool) *Loader {
+	l.migrationEnabled = enabled
 	return l
 }
 
@@ -85,14 +129,19 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 	// Read config file with environment variable expansion.
 	// This resolves ${VAR} placeholders in config values (e.g., ${NODE_IP} in cAdvisor endpoint).
 	// Viper's ReadInConfig does NOT expand env vars in values — only AutomaticEnv overrides keys.
+	//
+	// M1 wiring: raw bytes now pass through three transforms before parsing:
+	//   1. migration.ApplyLatest — schema upgrades for older configs
+	//   2. os.ExpandEnv          — ${VAR} substitution
+	//   3. secret.Resolver       — @{store:key} substitution (if resolver wired)
 	configLoaded := false
 	if configFile != "" {
 		raw, err := os.ReadFile(configFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
 		}
-		expanded := os.ExpandEnv(string(raw))
-		if err := v.ReadConfig(bytes.NewBufferString(expanded)); err != nil {
+		transformed := l.preprocess(raw)
+		if err := v.ReadConfig(bytes.NewBufferString(transformed)); err != nil {
 			return nil, fmt.Errorf("failed to parse config file: %w", err)
 		}
 		configLoaded = true
@@ -104,13 +153,13 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 			}
 			// Config file not found is OK, we'll use defaults + env
 		} else {
-			// Re-read the found file with env expansion
+			// Re-read the found file with full preprocessing (migration + env + secret)
 			foundFile := v.ConfigFileUsed()
 			if foundFile != "" {
 				raw, err := os.ReadFile(foundFile)
 				if err == nil {
-					expanded := os.ExpandEnv(string(raw))
-					_ = v.ReadConfig(bytes.NewBufferString(expanded))
+					transformed := l.preprocess(raw)
+					_ = v.ReadConfig(bytes.NewBufferString(transformed))
 				}
 			}
 			configLoaded = true
@@ -164,12 +213,49 @@ func (l *Loader) Load(configFile string) (*Config, error) {
 	return cfg, nil
 }
 
+// preprocess runs the three-stage transform pipeline on raw config bytes
+// before they reach viper/YAML:
+//  1. migration.ApplyLatest — schema upgrades for older configs
+//  2. os.ExpandEnv          — ${VAR} substitution (always on)
+//  3. secret.Resolver       — @{store:key} substitution (when wired)
+//
+// Failures in (1) and (3) are logged but non-fatal — the config still parses
+// and surfaces the actual error from viper, which is more actionable.
+func (l *Loader) preprocess(raw []byte) string {
+	// Stage 1: schema migrations.
+	if l.migrationEnabled {
+		out, version, err := migration.ApplyLatest(raw)
+		if err != nil {
+			l.logger.Warn("config migration failed — using original bytes",
+				zap.Error(err))
+		} else if out != nil {
+			l.logger.Info("config migrated",
+				zap.String("to_version", version))
+			raw = out
+		}
+	}
+
+	// Stage 2: ${VAR} env-var interpolation (legacy behaviour preserved).
+	expanded := os.ExpandEnv(string(raw))
+
+	// Stage 3: @{store:key} secret resolution.
+	if l.secretResolver != nil {
+		out, err := l.secretResolver.Resolve(expanded)
+		if err != nil {
+			l.logger.Warn("secret resolution failed — using env-expanded bytes",
+				zap.Error(err))
+		} else {
+			expanded = out
+		}
+	}
+	return expanded
+}
+
 // migrateDeprecatedConfigKeys maps renamed config keys from their old names to
 // the current ones so pre-existing configs keep working. The TLS skip-verify
 // wording was unified to "skip_verify" across collectors; the old
 // *_insecure_skip_verify keys are still honored here (new key wins if both set).
-func migrateDeprecatedConfigKeys(v *viper.Viper) {
-	// Scalar 1:1 renames (old key -> new key).
+func migrateDeprecatedConfigKeys(v *viper.Viper) { // Scalar 1:1 renames (old key -> new key).
 	renames := map[string]string{
 		"collectors.cadvisor.insecure_skip_verify":           "collectors.cadvisor.tls_skip_verify",
 		"collectors.kubernetes.kubelet_insecure_skip_verify": "collectors.kubernetes.kubelet_skip_verify",
