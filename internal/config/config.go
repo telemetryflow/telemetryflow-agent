@@ -322,6 +322,9 @@ type CollectorConfig struct {
 	// Memcache contains Memcached cache monitoring collector settings
 	Memcache MemcacheCollectorConfig `mapstructure:"memcache"`
 
+	// Apache contains Apache HTTPD server-status monitoring collector settings
+	Apache ApacheCollectorConfig `mapstructure:"apache"`
+
 	// RabbitMQ contains RabbitMQ queueing monitoring collector settings (Management API)
 	RabbitMQ RabbitMQCollectorConfig `mapstructure:"rabbitmq"`
 
@@ -2947,6 +2950,11 @@ func DefaultConfig() *Config {
 				Enabled:       false,
 				StatsInterval: 15 * time.Second,
 				Instances:     []MemcacheInstanceConfig{},
+			},
+			Apache: ApacheCollectorConfig{
+				Enabled:   false,
+				Interval:  15 * time.Second,
+				Instances: []ApacheInstance{},
 			},
 			RabbitMQ: RabbitMQCollectorConfig{
 				Enabled:          false,

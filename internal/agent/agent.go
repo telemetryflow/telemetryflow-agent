@@ -32,6 +32,7 @@ import (
 	agentapi "github.com/telemetryflow/telemetryflow-agent/internal/api"
 	"github.com/telemetryflow/telemetryflow-agent/internal/buffer"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
+	apachecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/apache"
 	auroracollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/aurora"
 	cadvisorcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/cadvisor"
 	clickhousecollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/clickhouse"
@@ -298,6 +299,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		logger.Info("Memcache collector enabled",
 			zap.Int("instances", len(cfg.Collector.Memcache.Instances)),
 			zap.Duration("stats_interval", cfg.Collector.Memcache.StatsInterval),
+		)
+	}
+
+	// Add Apache HTTPD collector if enabled (server-status scrape)
+	if cfg.Collector.Apache.Enabled {
+		apacheCol := apachecollector.NewApacheCollector(cfg.Collector.Apache, logger)
+		collectors = append(collectors, apacheCol)
+		logger.Info("Apache collector enabled",
+			zap.Int("instances", len(cfg.Collector.Apache.Instances)),
+			zap.Duration("interval", cfg.Collector.Apache.Interval),
 		)
 	}
 
