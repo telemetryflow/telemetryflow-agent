@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/plugin"
 )
@@ -45,13 +46,12 @@ func DefaultConfig() Config { return Config{} }
 
 // Starlark is a StreamingProcessor.
 type Starlark struct {
-	cfg         Config
-	acc         plugin.Accumulator
-	thread      *starlark.Thread
-	predeclared starlark.StringDict
-	applyFn     *starlark.Function
-	mu          sync.Mutex
-	compiled    bool
+	cfg      Config
+	acc      plugin.Accumulator
+	thread   *starlark.Thread
+	applyFn  *starlark.Function
+	mu       sync.Mutex
+	compiled bool
 }
 
 // New returns the processor. The script is compiled lazily on Start so that
@@ -69,7 +69,7 @@ func (s *Starlark) Start(acc plugin.Accumulator) error {
 		return nil
 	}
 	s.thread = &starlark.Thread{Name: "tfo-starlark"}
-	globals, err := starlark.ExecFile(s.thread, "tfo_starlark.py", s.cfg.Script, predeclared())
+	globals, err := starlark.ExecFileOptions(syntax.LegacyFileOptions(), s.thread, "tfo_starlark.py", s.cfg.Script, predeclared())
 	if err != nil {
 		return fmt.Errorf("starlark compile: %w", err)
 	}

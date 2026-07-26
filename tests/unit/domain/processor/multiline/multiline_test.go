@@ -21,7 +21,7 @@ func TestMultiline_ContinuationAppended(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{Name: "log", Description: "ERROR something broke"}, nil)
 	_ = m.Add(plugin.Metric{Name: "log", Description: "  at foo.bar()"}, nil)
@@ -54,7 +54,7 @@ func TestMultiline_NewHeaderFlushes(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{Name: "log", Description: "INFO first"}, nil)
 	_ = m.Add(plugin.Metric{Name: "log", Description: "  more"}, nil)
@@ -88,7 +88,7 @@ func TestMultiline_TimeoutFlush(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{Name: "log", Description: "INFO hi"}, nil)
 	if len(acc.added) != 0 {
@@ -129,7 +129,7 @@ func TestMultiline_Negate(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{Name: "log", Description: "2026-07-25 line one"}, nil)
 	_ = m.Add(plugin.Metric{Name: "log", Description: "stack trace frame 1"}, nil)
@@ -156,7 +156,7 @@ func TestMultiline_StreamKeyGroupsIndependently(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{
 		Name:        "log",
@@ -203,7 +203,7 @@ func TestMultiline_StopFlushes(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{Name: "log", Description: "header only"}, nil)
 	if err := m.Stop(); err != nil {
@@ -237,7 +237,7 @@ func TestMultiline_DefaultTimeoutFlushes(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 	_ = m.Add(plugin.Metric{Name: "log", Description: "header"}, nil)
 	if err := m.Stop(); err != nil {
 		t.Fatalf("stop returned error: %v", err)
@@ -270,7 +270,7 @@ func TestMultiline_ConcurrentAdds(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	const streams = 8
 	const perStream = 20
@@ -324,7 +324,7 @@ func TestMultiline_HeaderPreservesLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	m.Start(acc)
+	_ = m.Start(acc)
 
 	_ = m.Add(plugin.Metric{
 		Name:        "log",

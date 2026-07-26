@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	syslog "github.com/leodido/go-syslog/v4"
-
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/syslog_listener"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
@@ -164,7 +162,7 @@ func TestParse_GarbageIncrementsParseError(t *testing.T) {
 	require.NoError(t, err)
 	msg, err := p.Parse([]byte(garbageLine))
 	require.Error(t, err)
-	var nilMsg syslog.Message = msg
+	var nilMsg = msg
 	if nilMsg != nil {
 		t.Fatalf("expected nil message on parse error, got valid=%v", nilMsg.Valid())
 	}

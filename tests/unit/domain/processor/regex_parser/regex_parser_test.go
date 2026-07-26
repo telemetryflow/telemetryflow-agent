@@ -17,7 +17,7 @@ func TestRegexParser_NamedCaptures(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -47,7 +47,7 @@ func TestRegexParser_NoMatch_ForwardsByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{Name: "log", Description: "not a match"}, nil)
 	if len(acc.added) != 1 {
@@ -67,7 +67,7 @@ func TestRegexParser_NoMatch_DropWhenNoMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{Name: "log", Description: "nope"}, nil)
 	_ = p.Add(plugin.Metric{Name: "log", Description: "INFO ok"}, nil)
@@ -88,7 +88,7 @@ func TestRegexParser_PreservesExistingLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -147,7 +147,7 @@ func TestRegexParser_TranslationTraceFriendly(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 	_ = p.Add(plugin.Metric{Name: "m", Description: "v"}, nil)
 	if !strings.Contains(acc.added[0].Description, "v") {
 		t.Errorf("description should be preserved, got %q", acc.added[0].Description)

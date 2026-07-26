@@ -151,7 +151,7 @@ func TestPgBouncerCollector_ConnectionFailureGraceful(t *testing.T) {
 	if err := coll.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	defer coll.Stop()
+	defer func() { _ = coll.Stop() }()
 
 	// Collect should not panic and should not return an error; the failed
 	// instance is logged and skipped. Zero metrics is acceptable.

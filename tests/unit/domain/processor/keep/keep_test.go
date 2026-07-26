@@ -14,7 +14,7 @@ func TestKeep_ForwardsOnlyMatching(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	k.Start(acc)
+	_ = k.Start(acc)
 	_ = k.Add(plugin.Metric{Name: "system.cpu"}, nil)
 	_ = k.Add(plugin.Metric{Name: "debug.log"}, nil)
 	_ = k.Add(plugin.Metric{Name: "system.mem"}, nil)
@@ -26,7 +26,7 @@ func TestKeep_ForwardsOnlyMatching(t *testing.T) {
 func TestKeep_NoPatterns_KeepsNothing(t *testing.T) {
 	k, _ := keep.New(keep.Config{})
 	acc := &captureAcc{}
-	k.Start(acc)
+	_ = k.Start(acc)
 	_ = k.Add(plugin.Metric{Name: "anything"}, nil)
 	if len(acc.added) != 0 {
 		t.Fatalf("expected nothing kept, got %d", len(acc.added))

@@ -11,7 +11,7 @@ import (
 func TestFilter_DefaultKeep_Forwards(t *testing.T) {
 	f := filter.New(filter.Config{DefaultAction: filter.ActionKeep})
 	acc := &captureAcc{}
-	f.Start(acc)
+	_ = f.Start(acc)
 
 	_ = f.Add(plugin.Metric{Name: "a"}, nil)
 	_ = f.Add(plugin.Metric{Name: "b"}, nil)
@@ -24,7 +24,7 @@ func TestFilter_DefaultKeep_Forwards(t *testing.T) {
 func TestFilter_DefaultDrop_DropsAll(t *testing.T) {
 	f := filter.New(filter.Config{DefaultAction: filter.ActionDrop})
 	acc := &captureAcc{}
-	f.Start(acc)
+	_ = f.Start(acc)
 
 	_ = f.Add(plugin.Metric{Name: "a"}, nil)
 
@@ -41,7 +41,7 @@ func TestFilter_RuleKeepByNameRegex(t *testing.T) {
 		},
 	})
 	acc := &captureAcc{}
-	f.Start(acc)
+	_ = f.Start(acc)
 
 	_ = f.Add(plugin.Metric{Name: "keep.this"}, nil)
 	_ = f.Add(plugin.Metric{Name: "drop.me"}, nil)
@@ -63,7 +63,7 @@ func TestFilter_RuleByTagPresence(t *testing.T) {
 		},
 	})
 	acc := &captureAcc{}
-	f.Start(acc)
+	_ = f.Start(acc)
 
 	_ = f.Add(plugin.Metric{Name: "a", Labels: map[string]string{"service": "x"}}, nil)
 	_ = f.Add(plugin.Metric{Name: "b", Labels: map[string]string{"other": "y"}}, nil)
@@ -84,7 +84,7 @@ func TestFilter_RuleByTagValueRegex(t *testing.T) {
 		},
 	})
 	acc := &captureAcc{}
-	f.Start(acc)
+	_ = f.Start(acc)
 
 	_ = f.Add(plugin.Metric{Name: "a", Labels: map[string]string{"env": "prod-us-east"}}, nil)
 	_ = f.Add(plugin.Metric{Name: "b", Labels: map[string]string{"env": "staging"}}, nil)
@@ -103,7 +103,7 @@ func TestFilter_FirstMatchingRuleWins(t *testing.T) {
 		},
 	})
 	acc := &captureAcc{}
-	f.Start(acc)
+	_ = f.Start(acc)
 
 	_ = f.Add(plugin.Metric{Name: "drop.this"}, nil)
 	if got := len(acc.added); got != 0 {

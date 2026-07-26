@@ -400,8 +400,8 @@ func (o *LokiOutput) flush() {
 		o.log.Error("loki: post", zap.Error(err))
 		return
 	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		o.log.Warn("loki: receiver returned non-success",

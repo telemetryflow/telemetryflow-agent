@@ -267,7 +267,7 @@ func tlsInfo(resp *http.Response) (daysRemaining float64, valid float64) {
 		return -1, 0
 	}
 	cert := resp.TLS.PeerCertificates[0]
-	days := cert.NotAfter.Sub(time.Now()).Hours() / 24
+	days := time.Until(cert.NotAfter).Hours() / 24
 	if days >= 0 {
 		valid = 1
 	}

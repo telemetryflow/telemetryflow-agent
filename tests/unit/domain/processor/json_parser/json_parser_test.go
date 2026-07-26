@@ -11,7 +11,7 @@ import (
 func TestJSONParser_AllTopLevelKeys(t *testing.T) {
 	p := json_parser.New(json_parser.Config{})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -38,7 +38,7 @@ func TestJSONParser_TagKeysSubset(t *testing.T) {
 		TagKeys: []string{"level", "missing"},
 	})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -62,7 +62,7 @@ func TestJSONParser_DottedPathTagKeys(t *testing.T) {
 		TagKeys: []string{"user.id", "user.name"},
 	})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -86,7 +86,7 @@ func TestJSONParser_DottedPathMissing(t *testing.T) {
 		TagKeys: []string{"a.b.c"},
 	})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -103,7 +103,7 @@ func TestJSONParser_ValueKeyOverride(t *testing.T) {
 		ValueKey: "duration_ms",
 	})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "latency",
@@ -121,7 +121,7 @@ func TestJSONParser_ValueKeyDottedPath(t *testing.T) {
 		ValueKey: "stats.count",
 	})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "counter",
@@ -136,7 +136,7 @@ func TestJSONParser_ValueKeyDottedPath(t *testing.T) {
 func TestJSONParser_InvalidJSON_Passthrough(t *testing.T) {
 	p := json_parser.New(json_parser.Config{})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -158,7 +158,7 @@ func TestJSONParser_InvalidJSON_Passthrough(t *testing.T) {
 func TestJSONParser_NonObjectJSON_ForwardedUnchanged(t *testing.T) {
 	p := json_parser.New(json_parser.Config{})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	// JSON array — not an object — should be forwarded unchanged.
 	_ = p.Add(plugin.Metric{
@@ -179,7 +179,7 @@ func TestJSONParser_ValueKeyStringValueCoerced(t *testing.T) {
 		ValueKey: "count",
 	})
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",

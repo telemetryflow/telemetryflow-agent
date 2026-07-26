@@ -64,9 +64,9 @@ func NewPgBouncerCollector(cfg config.PgBouncerCollectorConfig, logger *zap.Logg
 		applyInstanceDefaults(&cfg.Instances[i])
 	}
 	return &PgBouncerCollector{
-		cfg:       cfg,
-		logger:    logger.Named(collectorName),
-		stopChan:  make(chan struct{}),
+		cfg:      cfg,
+		logger:   logger.Named(collectorName),
+		stopChan: make(chan struct{}),
 	}
 }
 
@@ -231,22 +231,22 @@ func collectPools(ctx context.Context, q Querier, labels map[string]string) ([]c
 	var out []collector.Metric
 	for rows.Next() {
 		var (
-			database               string
-			user                   string
-			clActive               int64
-			clWaiting              int64
-			clActiveCancelReq      int64
-			clWaitingCancelReq     int64
-			svActive               int64
-			svActiveCancel         int64
-			svBeingCanceled        int64
-			svIdle                 int64
-			svUsed                 int64
-			svTested               int64
-			svLogin                int64
-			maxwait                int64
-			maxwaitUs              int64
-			poolMode               string
+			database           string
+			user               string
+			clActive           int64
+			clWaiting          int64
+			clActiveCancelReq  int64
+			clWaitingCancelReq int64
+			svActive           int64
+			svActiveCancel     int64
+			svBeingCanceled    int64
+			svIdle             int64
+			svUsed             int64
+			svTested           int64
+			svLogin            int64
+			maxwait            int64
+			maxwaitUs          int64
+			poolMode           string
 		)
 		if err := rows.Scan(
 			&database, &user,

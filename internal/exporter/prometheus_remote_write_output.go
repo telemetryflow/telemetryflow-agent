@@ -150,8 +150,8 @@ func (o *PromRemoteWriteOutput) Connect() error {
 	if err != nil {
 		return fmt.Errorf("prometheus_remote_write: connect probe failed: %w", err)
 	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	// 2xx (and 4xx for auth/tenant errors) all prove the endpoint is
 	// reachable; the caller decides whether to retry on 4xx.
@@ -213,8 +213,8 @@ func (o *PromRemoteWriteOutput) Write(metrics []plugin.Metric) error {
 			return fmt.Errorf("prometheus_remote_write: post: %w", err)
 		}
 		// Drain & close so the connection can be reused.
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return fmt.Errorf("prometheus_remote_write: receiver returned %s", resp.Status)
