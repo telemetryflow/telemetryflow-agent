@@ -66,7 +66,7 @@ func TestInternalStats_Collect_ReturnsPopulatedMetrics(t *testing.T) {
 
 	c := internalstats.NewInternalStatsCollector(config.InternalStatsCollectorConfig{Enabled: true}, zap.NewNop())
 	require.NoError(t, c.Start(context.Background()))
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	out, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestInternalStats_Collect_AfterReset_IsEmpty(t *testing.T) {
 
 	c := internalstats.NewInternalStatsCollector(config.InternalStatsCollectorConfig{Enabled: true}, zap.NewNop())
 	require.NoError(t, c.Start(context.Background()))
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	out, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestInternalStats_Collect_EmptyWhenNothingRegistered(t *testing.T) {
 
 	c := internalstats.NewInternalStatsCollector(config.InternalStatsCollectorConfig{Enabled: true}, zap.NewNop())
 	require.NoError(t, c.Start(context.Background()))
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	out, err := c.Collect(context.Background())
 	require.NoError(t, err)

@@ -35,4 +35,6 @@ tfo-agent.local.yaml
 logs/
 
 .claude
-.kiro
+.kiro*.out
+coverage*.out
+coverage*.html

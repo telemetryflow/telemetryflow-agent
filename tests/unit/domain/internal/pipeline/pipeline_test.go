@@ -20,7 +20,6 @@ import (
 type noopCollector struct {
 	name    string
 	running atomic.Bool
-	mu      sync.Mutex
 	count   atomic.Int64
 }
 
@@ -116,11 +115,6 @@ func TestPipeline_NoProcessors_EndToEnd(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	cancel()
 	<-done
-
-	if !col.running.Load() && col.count.Load() > 0 {
-		// Collector may or may not have fired depending on timing; only assert
-		// lifecycle was clean.
-	}
 }
 
 func TestPipeline_ProcessorChain(t *testing.T) {

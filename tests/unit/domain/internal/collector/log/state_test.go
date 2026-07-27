@@ -60,7 +60,7 @@ func inodeOf(t *testing.T, path string) uint64 {
 	if err != nil {
 		t.Fatalf("open for inode: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return logcol.FileInodeExported(f)
 }
 
@@ -304,7 +304,7 @@ func appendToFile(path, content string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = io.WriteString(f, content)
 	return err
 }

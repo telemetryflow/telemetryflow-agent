@@ -181,7 +181,7 @@ func (o *FileOutput) openFile() error {
 	}
 	info, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("file output: stat %q: %w", o.cfg.Path, err)
 	}
 	o.f = f

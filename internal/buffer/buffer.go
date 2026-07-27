@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -72,7 +73,7 @@ type Buffer struct {
 	mu      sync.RWMutex
 	entries []Entry
 	size    int64
-	closed  bool
+	closed  atomic.Bool
 
 	// clearGen is bumped whenever the buffer is cleared. flush() captures it
 	// before doing (unlocked) disk I/O and only writes back b.size if the
@@ -88,7 +89,9 @@ type Buffer struct {
 // New creates a new buffer
 func New(config Config) (*Buffer, error) {
 	if !config.Enabled {
-		return &Buffer{config: config, closed: true}, nil
+		b := &Buffer{config: config}
+		b.closed.Store(true)
+		return b, nil
 	}
 
 	// Create buffer directory
@@ -117,7 +120,7 @@ func New(config Config) (*Buffer, error) {
 
 // Push adds data to the buffer
 func (b *Buffer) Push(entryType string, data map[string]interface{}) error {
-	if !b.config.Enabled || b.closed {
+	if !b.config.Enabled || b.closed.Load() {
 		return nil
 	}
 
@@ -215,11 +218,11 @@ func (b *Buffer) Clear() {
 
 // Close stops the buffer and flushes remaining data
 func (b *Buffer) Close() error {
-	if b.closed {
+	if b.closed.Load() {
 		return nil
 	}
 
-	b.closed = true
+	b.closed.Store(true)
 	close(b.done)
 
 	// Final flush

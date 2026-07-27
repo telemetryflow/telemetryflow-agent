@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The `1.3.0` release is the first cut of the multi-milestone roadmap that
 closes the Telegraf capability gap documented in
 `telemetryflow-platform-monolith/docs/tfo-agent-roadmap/`. This dev tag
-tracks M1 (Foundation), M2 (Network Monitoring), and the in-progress M3
-(Logs & Self-Observability) milestones. All features are opt-in via the
+tracks M1 (Foundation), M2 (Network Monitoring), M3 (Logs &
+Self-Observation), M4 (Database & Application), and M5 (Multi-Output)
+milestones. All features are opt-in via the
 new `collectors.*` config keys — existing 1.2.x configurations continue
 to work unchanged.
 
@@ -197,7 +198,7 @@ Six new output plugins under `internal/exporter/`, all registered via
   `agent.go` exposes `AgentBufferSize` / `AgentBufferLimit` via a 30s
   ticker. Counters now reflect real activity instead of staying zero.
 
-### Added — M3 Logs & Self-Observability (in progress)
+### Added — M3 Logs & Self-Observability
 
 - **4 log parser processors** under `internal/processor/`:
   - `multiline` — aggregate continuation lines (stack traces) via
@@ -299,7 +300,7 @@ Six new output plugins under `internal/exporter/`, all registered via
 
 ### Changed
 
-- **Version bump**: 1.2.2 → 1.3.0-dev (M1 + M2 + M3-in-progress
+- **Version bump**: 1.2.2 → 1.3.0-dev (M1 + M2 + M3 + M4 + M5
   development tag).
 - **Dependency additions**: `go.starlark.net` (Starlark processor),
   `github.com/miekg/dns` (DNS collector), `github.com/gosnmp/gosnmp`

@@ -14,7 +14,7 @@ func TestDrop_NoPatterns_ForwardsAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	d.Start(acc)
+	_ = d.Start(acc)
 	_ = d.Add(plugin.Metric{Name: "a"}, nil)
 	_ = d.Add(plugin.Metric{Name: "b"}, nil)
 	if len(acc.added) != 2 {
@@ -28,7 +28,7 @@ func TestDrop_MatchDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	d.Start(acc)
+	_ = d.Start(acc)
 	_ = d.Add(plugin.Metric{Name: "debug.something"}, nil)
 	_ = d.Add(plugin.Metric{Name: "system.cpu"}, nil)
 	if len(acc.added) != 1 || acc.added[0].Name != "system.cpu" {

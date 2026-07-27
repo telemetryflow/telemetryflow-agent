@@ -14,7 +14,7 @@ func TestConverter_RoundAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	c.Start(acc)
+	_ = c.Start(acc)
 	_ = c.Add(plugin.Metric{Name: "m", Value: 1.23456}, nil)
 	if acc.added[0].Value != 1.23 {
 		t.Errorf("expected 1.23, got %f", acc.added[0].Value)
@@ -29,7 +29,7 @@ func TestConverter_RoundByRegex(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	c.Start(acc)
+	_ = c.Start(acc)
 	_ = c.Add(plugin.Metric{Name: "latency.http", Value: 12.7}, nil)
 	_ = c.Add(plugin.Metric{Name: "size.db", Value: 12.7}, nil)
 	if acc.added[0].Value != 13 {

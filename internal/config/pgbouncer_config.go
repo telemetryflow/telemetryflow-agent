@@ -17,13 +17,13 @@ type PgBouncerCollectorConfig struct {
 
 // PgBouncerInstance is a single PgBouncer admin endpoint to monitor.
 type PgBouncerInstance struct {
-	Name     string        `mapstructure:"name"`
-	Host     string        `mapstructure:"host"`
-	Port     int           `mapstructure:"port"`     // default 6432
-	Database string        `mapstructure:"database"` // usually "pgbouncer"
-	User     string        `mapstructure:"user"`
-	Password string        `mapstructure:"password"`
-	SSLMode  string        `mapstructure:"ssl_mode"` // disable, require, verify-ca, verify-full
-	Timeout  time.Duration `mapstructure:"timeout"`
+	Name     string            `mapstructure:"name"`
+	Host     string            `mapstructure:"host"`
+	Port     int               `mapstructure:"port"`     // default 6432
+	Database string            `mapstructure:"database"` // usually "pgbouncer"
+	User     string            `mapstructure:"user"`
+	Password string            `mapstructure:"password"`
+	SSLMode  string            `mapstructure:"ssl_mode"` // disable, require, verify-ca, verify-full
+	Timeout  time.Duration     `mapstructure:"timeout"`
 	Tags     map[string]string `mapstructure:"tags"`
 }

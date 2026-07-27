@@ -16,7 +16,7 @@ func TestGrokParser_Translate_TimestampLevelGreedy(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "app.log",
@@ -47,7 +47,7 @@ func TestGrokParser_UnlabelledPatternNonCapturing(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -76,7 +76,7 @@ func TestGrokParser_NoMatch_DropsByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -97,7 +97,7 @@ func TestGrokParser_NoMatch_KeepOriginal(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -121,7 +121,7 @@ func TestGrokParser_KeepOriginal_PreservesDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -141,7 +141,7 @@ func TestGrokParser_DefaultClearsDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "log",
@@ -162,7 +162,7 @@ func TestGrokParser_MetricNamePrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "input",
@@ -182,7 +182,7 @@ func TestGrokParser_NumberAndIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{
 		Name:        "http",
@@ -211,7 +211,7 @@ func TestGrokParser_TypeAnnotationIgnored(t *testing.T) {
 		t.Fatal(err)
 	}
 	acc := &captureAcc{}
-	p.Start(acc)
+	_ = p.Start(acc)
 
 	_ = p.Add(plugin.Metric{Name: "log", Description: "128"}, nil)
 	if acc.added[0].Labels["bytes"] != "128" {

@@ -130,15 +130,29 @@ func TestBufferRetrySink_InMemoryFallback(t *testing.T) {
 func TestBufferRetrySink_MaxRetriesDrops(t *testing.T) {
 	// Always-failing sink with MaxRetries=1 → entry dropped after 1 retry.
 	inner := &failingSink{failCount: 1_000_000}
+
+	// Manual buffer lifecycle (not t.Cleanup) to avoid a race between the
+	// retry goroutine's buf.Push/Pop and buf.Close.
+	cfg := buffer.Config{
+		Enabled:       true,
+		Path:          t.TempDir(),
+		MaxSizeMB:     10,
+		MaxAge:        time.Hour,
+		FlushInterval: 50 * time.Millisecond,
+	}
+	buf, err := buffer.New(cfg)
+	if err != nil {
+		t.Fatalf("buffer.New: %v", err)
+	}
+
 	sink := exporter.NewBufferRetrySink(inner, exporter.BufferRetryConfig{
 		Enabled:       true,
-		Buffer:        newTestBuffer(t),
+		Buffer:        buf,
 		RetryInterval: 30 * time.Millisecond,
 		MaxRetries:    1,
 		Logger:        zap.NewNop(),
 	})
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	sink.StartRetryLoop(ctx)
 
 	_ = sink.Export(ctx, []collector.Metric{{Name: "m"}}, nil)
@@ -150,4 +164,9 @@ func TestBufferRetrySink_MaxRetriesDrops(t *testing.T) {
 		t.Errorf("expected empty queue after max retries, got %d",
 			sink.Stats().InMemoryQueueDepth)
 	}
+
+	// Stop the retry goroutine FIRST, then close the buffer.
+	cancel()
+	time.Sleep(100 * time.Millisecond) // let the goroutine observe ctx.Done
+	_ = buf.Close()
 }

@@ -11,7 +11,7 @@ import (
 func TestDefaults_FillsMissing(t *testing.T) {
 	d := defaults.New(defaults.Config{Tags: map[string]string{"region": "us-east-1", "env": "prod"}})
 	acc := &captureAcc{}
-	d.Start(acc)
+	_ = d.Start(acc)
 	_ = d.Add(plugin.Metric{Name: "m", Labels: map[string]string{"env": "staging"}}, nil)
 
 	if acc.added[0].Labels["region"] != "us-east-1" {
@@ -25,7 +25,7 @@ func TestDefaults_FillsMissing(t *testing.T) {
 func TestDefaults_FillsWhenEmpty(t *testing.T) {
 	d := defaults.New(defaults.Config{Tags: map[string]string{"env": "prod"}})
 	acc := &captureAcc{}
-	d.Start(acc)
+	_ = d.Start(acc)
 	_ = d.Add(plugin.Metric{Name: "m", Labels: map[string]string{"env": ""}}, nil)
 	if acc.added[0].Labels["env"] != "prod" {
 		t.Errorf("empty value should be replaced with default, got %q", acc.added[0].Labels["env"])
@@ -35,7 +35,7 @@ func TestDefaults_FillsWhenEmpty(t *testing.T) {
 func TestDefaults_NilLabelsMap(t *testing.T) {
 	d := defaults.New(defaults.Config{Tags: map[string]string{"env": "prod"}})
 	acc := &captureAcc{}
-	d.Start(acc)
+	_ = d.Start(acc)
 	_ = d.Add(plugin.Metric{Name: "m"}, nil)
 	if acc.added[0].Labels["env"] != "prod" {
 		t.Errorf("default should be applied to nil labels, got %q", acc.added[0].Labels["env"])

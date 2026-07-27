@@ -362,9 +362,6 @@ func (b *OTLPLogBridge) post(ctx context.Context, records []logRecord) error {
 		return fmt.Errorf("marshal: %w", err)
 	}
 
-	var bodyReader io.Reader = bytes.NewReader(jsonBody)
-	bodyLen := len(jsonBody)
-
 	// gzip compress
 	var gzBuf bytes.Buffer
 	gw := gzip.NewWriter(&gzBuf)
@@ -374,8 +371,8 @@ func (b *OTLPLogBridge) post(ctx context.Context, records []logRecord) error {
 	if err := gw.Close(); err != nil {
 		return fmt.Errorf("gzip close: %w", err)
 	}
-	bodyReader = &gzBuf
-	bodyLen = gzBuf.Len()
+	bodyReader := &gzBuf
+	bodyLen := gzBuf.Len()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.url, bodyReader)
 	if err != nil {
@@ -395,8 +392,8 @@ func (b *OTLPLogBridge) post(ctx context.Context, records []logRecord) error {
 	if err != nil {
 		return fmt.Errorf("http post: %w", err)
 	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("otlp logs endpoint returned status %s", resp.Status)

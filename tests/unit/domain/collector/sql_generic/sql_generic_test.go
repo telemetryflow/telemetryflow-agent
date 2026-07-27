@@ -175,7 +175,7 @@ func TestCollect_MultiRow(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestCollect_EmptyResult(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -247,7 +247,7 @@ func TestCollect_BadSQLOthersContinue(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ func TestCollect_ConnectionFailure_ClosedDB(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	// Inject a closed pool: sql.Open succeeds but the pool is already closed,
 	// so QueryContext fails with "sql: database is closed".
@@ -306,7 +306,7 @@ func TestCollect_ConnectionFailure_BadPath(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -337,7 +337,7 @@ func TestCollect_SetDBFactory_InjectsDB(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	// Re-open via the factory to prove the seam overrides the constructor's pool.
 	c.SetDBFactory(func(_, dsn string) (*sql.DB, error) {
@@ -379,7 +379,7 @@ func TestCollect_MultipleInstances(t *testing.T) {
 		},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
@@ -411,7 +411,7 @@ func TestCollect_UnitPropagated(t *testing.T) {
 		}},
 	}, zap.NewNop())
 	require.NoError(t, err)
-	defer c.Stop()
+	defer func() { _ = c.Stop() }()
 
 	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)

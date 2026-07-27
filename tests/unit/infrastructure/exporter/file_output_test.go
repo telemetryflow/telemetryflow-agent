@@ -74,7 +74,7 @@ func TestFileOutput_JSONHappyPath(t *testing.T) {
 
 	f, err := os.Open(path)
 	require.NoError(t, err)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	var parsed []map[string]any
@@ -324,7 +324,7 @@ func TestFileOutput_CompressProducesGzipBackup(t *testing.T) {
 	compressed := path + ".1.gz"
 	f, err := os.Open(compressed)
 	require.NoErrorf(t, err, "expected compressed backup at %s", compressed)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	gz, err := gzip.NewReader(f)
 	require.NoError(t, err)

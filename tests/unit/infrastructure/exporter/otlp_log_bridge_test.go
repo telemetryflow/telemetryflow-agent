@@ -64,7 +64,7 @@ func newCapturingServer(t *testing.T) (*httptest.Server, *atomic.Int64, *[]captu
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			defer gz.Close()
+			defer func() { _ = gz.Close() }()
 			reader = gz
 		}
 		decoded, derr := io.ReadAll(reader)
