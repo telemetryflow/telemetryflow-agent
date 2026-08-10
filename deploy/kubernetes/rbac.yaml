@@ -85,6 +85,16 @@ rules:
     resources:
       - endpointslices
     verbs: ["get", "list", "watch"]
+  # Gateway API (NGINX Gateway Fabric / any GatewayClass) — optional CRDs
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - httproutes
+      - grpcroutes
+      - tlsroutes
+      - gatewayclasses
+      - referencegrants
+    verbs: ["get", "list", "watch"]
 
   # Storage classes
   - apiGroups: ["storage.k8s.io"]
