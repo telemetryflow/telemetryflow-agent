@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	gatewayv "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
@@ -46,6 +47,7 @@ type KubernetesCollector struct {
 
 	clientset     kubernetes.Interface
 	metricsClient metricsv.Interface
+	gatewayClient gatewayv.Interface
 
 	mu       sync.RWMutex
 	running  bool
@@ -85,6 +87,13 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 		}
 	}
 
+	// Gateway API (gateway.networking.k8s.io) client. CRDs are optional; the
+	// collector graceful-degrades to empty slices when the group is absent.
+	gc, err := newGatewayClientset(conf.Kubeconfig, conf.Context)
+	if err != nil {
+		logger.Warn("Failed to create gateway-api client, Gateway/HTTPRoute state will be unavailable", zap.Error(err))
+	}
+
 	// Auto-detect cluster name if not configured
 	clusterName := conf.ClusterName
 	if clusterName == "" {
@@ -102,6 +111,7 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 		logger:          logger.Named(collectorName),
 		clientset:       cs,
 		metricsClient:   mc,
+		gatewayClient:   gc,
 		kubeletFetcher:  newKubeletStatsFetcher(cs),
 		cadvisorFetcher: newCAdvisorProxyFetcher(cs),
 	}, nil
@@ -260,6 +270,16 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		} else {
 			allMetrics = append(allMetrics, ingMetrics...)
 			state.Ingresses = ings
+		}
+
+		// Gateway API (NGINX Gateway Fabric / any GatewayClass). Optional CRDs;
+		// collectGatewayAPI never returns an error for a missing group/version.
+		gws, routes, err := collectGatewayAPI(ctx, k.gatewayClient, k.cfg, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect Gateway API state", zap.Error(err))
+		} else {
+			state.Gateways = gws
+			state.HTTPRoutes = routes
 		}
 	}
 

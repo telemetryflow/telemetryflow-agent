@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	gatewayv "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
 )
 
 // newClientset creates a Kubernetes clientset from config.
@@ -55,6 +56,22 @@ func newMetricsClientset(kubeconfig, context string) (metricsv.Interface, error)
 		return nil, fmt.Errorf("create metrics clientset: %w", err)
 	}
 	return mc, nil
+}
+
+// newGatewayClientset creates a Gateway API (gateway.networking.k8s.io)
+// versioned clientset from the same REST config as the core clientset.
+// The Gateway API CRDs are optional; callers must graceful-degrade when the
+// group/version is absent from the target cluster.
+func newGatewayClientset(kubeconfig, context string) (gatewayv.Interface, error) {
+	cfg, err := buildRESTConfig(kubeconfig, context)
+	if err != nil {
+		return nil, fmt.Errorf("build REST config: %w", err)
+	}
+	gc, err := gatewayv.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create gateway-api clientset: %w", err)
+	}
+	return gc, nil
 }
 
 // buildRESTConfig returns a *rest.Config using in-cluster or kubeconfig.

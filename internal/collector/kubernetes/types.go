@@ -124,6 +124,8 @@ type ClusterState struct {
 	Services         []ServiceState          `json:"services,omitempty"`
 	Endpoints        []EndpointState         `json:"endpoints,omitempty"`
 	Ingresses        []IngressState          `json:"ingresses,omitempty"`
+	Gateways         []GatewayState          `json:"gateways"`
+	HTTPRoutes       []HTTPRouteState        `json:"httpRoutes"`
 	NetworkPolicies  []NetworkPolicyState    `json:"network_policies,omitempty"`
 	PVs              []PVState               `json:"pvs,omitempty"`
 	PVCs             []PVCState              `json:"pvcs,omitempty"`
@@ -503,6 +505,70 @@ type IngressPath struct {
 type IngressTLS struct {
 	Hosts      []string `json:"hosts,omitempty"`
 	SecretName string   `json:"secret_name,omitempty"`
+}
+
+// GatewayState represents a Gateway API Gateway (gateway.networking.k8s.io).
+type GatewayState struct {
+	Name              string            `json:"name"`
+	Namespace         string            `json:"namespace"`
+	GatewayClassName  string            `json:"gatewayClassName"`
+	Listeners         []GatewayListener `json:"listeners"`
+	Addresses         []GatewayAddress  `json:"addresses"`
+	AttachedRoutes    int32             `json:"attachedRoutes"`
+	Status            string            `json:"status"` // Programmed|Accepted|NotProgrammed|Unknown
+	CreationTimestamp string            `json:"creationTimestamp"`
+}
+
+// GatewayListener represents a Gateway listener.
+type GatewayListener struct {
+	Name     string `json:"name"`
+	Protocol string `json:"protocol"`
+	Port     int32  `json:"port"`
+	TLSMode  string `json:"tlsMode"` // "" if no TLS
+}
+
+// GatewayAddress represents a Gateway status address.
+type GatewayAddress struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+// HTTPRouteState represents a Gateway API HTTPRoute.
+type HTTPRouteState struct {
+	Name              string           `json:"name"`
+	Namespace         string           `json:"namespace"`
+	ParentRefs        []RouteParentRef `json:"parentRefs"`
+	Hostnames         []string         `json:"hostnames"`
+	Rules             []HTTPRouteRule  `json:"rules"`
+	CreationTimestamp string           `json:"creationTimestamp"`
+}
+
+// RouteParentRef references the Gateway (or section) a route attaches to.
+type RouteParentRef struct {
+	Name        string `json:"name"`
+	Namespace   string `json:"namespace"`
+	SectionName string `json:"sectionName"`
+}
+
+// HTTPRouteRule represents a single HTTPRoute rule.
+type HTTPRouteRule struct {
+	Matches     []HTTPRouteMatch  `json:"matches"`
+	BackendRefs []RouteBackendRef `json:"backendRefs"`
+}
+
+// HTTPRouteMatch represents a match condition within an HTTPRoute rule.
+type HTTPRouteMatch struct {
+	PathType  string `json:"pathType"`
+	PathValue string `json:"pathValue"`
+	Method    string `json:"method"`
+}
+
+// RouteBackendRef represents a backend target of an HTTPRoute rule.
+type RouteBackendRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Port      int32  `json:"port"`
+	Weight    int32  `json:"weight"`
 }
 
 // PVClaimRef identifies the PVC bound to a PV.

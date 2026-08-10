@@ -188,6 +188,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 	go.starlark.net v0.0.0-20260708150628-5395d018f003
 	modernc.org/sqlite v1.23.1
+	sigs.k8s.io/gateway-api v1.6.1
 )
 
 require (
