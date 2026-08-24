@@ -1418,79 +1418,52 @@ func detectCloudMetadata() (provider, instanceID, instanceType, region, zone str
 		return
 	}
 
-	// ---- AWS detection + IMDS ----
-	isAWS := false
-	if hostStat("/sys/hypervisor/uuid") {
-		if data, err := os.ReadFile("/sys/hypervisor/uuid"); err == nil {
-			if strings.HasPrefix(strings.ToLower(string(data)), "ec2") {
-				isAWS = true
+	// readDMI reads a DMI attribute, preferring the hostRoot-prefixed path
+	// when TELEMETRYFLOW_HOST_ROOT is set (DaemonSet: the mounted host fs is
+	// authoritative) and falling back to the direct path. Returns ("", false)
+	// when neither is readable. Preferring hostRoot keeps detection
+	// deterministic when the container's own /sys reports a vendor the mounted
+	// host root does not (e.g. CI runners hosted on Azure).
+	readDMI := func(rel string) (string, bool) {
+		if hostRoot != "" {
+			if data, err := os.ReadFile(hostRoot + rel); err == nil {
+				return string(data), true
 			}
 		}
+		data, err := os.ReadFile(rel)
+		if err != nil {
+			return "", false
+		}
+		return string(data), true
 	}
+
+	// dmiContains reports whether the given DMI attribute contains vendor (case-insensitive).
+	dmiContains := func(rel, vendor string) bool {
+		data, ok := readDMI(rel)
+		if !ok {
+			return false
+		}
+		return strings.Contains(strings.ToLower(data), vendor)
+	}
+
+	// ---- Explicit environment configuration beats DMI heuristics ----
+	// A deliberately set provider env var is authoritative even when the
+	// underlying hardware reports a different vendor (CI hosted on Azure,
+	// nested virtualization, migrated VMs). Ordered like the DMI pass below.
 	if os.Getenv("AWS_REGION") != "" {
-		isAWS = true
-	}
-	if isAWS {
 		provider = "aws"
 		instanceID, instanceType, region, zone = fetchAWSIMDS()
-		// Fallback region from env if IMDS didn't return one
 		if region == "" {
 			region = os.Getenv("AWS_REGION")
 		}
 		return
 	}
-
-	// ---- GCP detection + IMDS ----
-	isGCP := false
-	for _, p := range []string{"/sys/class/dmi/id/product_name", hostRoot + "/sys/class/dmi/id/product_name"} {
-		if data, err := os.ReadFile(p); err == nil {
-			if strings.Contains(strings.ToLower(string(data)), "google") {
-				isGCP = true
-			}
-			break
-		}
-	}
 	if os.Getenv("GOOGLE_CLOUD_PROJECT") != "" {
-		isGCP = true
-	}
-	if isGCP {
 		provider = "gcp"
 		instanceID, instanceType, region, zone = fetchGCPIMDS()
 		return
 	}
-
-	// ---- Azure detection + IMDS ----
-	isAzure := false
-	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
-		if data, err := os.ReadFile(p); err == nil {
-			if strings.Contains(strings.ToLower(string(data)), "microsoft") {
-				isAzure = true
-			}
-			break
-		}
-	}
-	if isAzure {
-		provider = "azure"
-		instanceID, instanceType, region, zone = fetchAzureIMDS()
-		return
-	}
-
-	// ---- Alibaba Cloud (Aliyun) detection + IMDS ----
-	// Alibaba ECS uses a unique IMDS IP: 100.100.100.200.
-	// DMI product_name contains "Alibaba" on ECS instances.
-	isAlibaba := false
-	for _, p := range []string{"/sys/class/dmi/id/product_name", hostRoot + "/sys/class/dmi/id/product_name"} {
-		if data, err := os.ReadFile(p); err == nil {
-			if strings.Contains(strings.ToLower(string(data)), "alibaba") {
-				isAlibaba = true
-			}
-			break
-		}
-	}
 	if os.Getenv("ALIBABA_CLOUD_REGION_ID") != "" || os.Getenv("ALICLOUD_REGION") != "" {
-		isAlibaba = true
-	}
-	if isAlibaba {
 		provider = "alibaba"
 		instanceID, instanceType, region, zone = fetchAlibabaIMDS()
 		if region == "" {
@@ -1501,22 +1474,7 @@ func detectCloudMetadata() (provider, instanceID, instanceType, region, zone str
 		}
 		return
 	}
-
-	// ---- Huawei Cloud detection + IMDS ----
-	// Huawei ECS sys_vendor contains "HUAWEI".
-	isHuawei := false
-	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
-		if data, err := os.ReadFile(p); err == nil {
-			if strings.Contains(strings.ToLower(string(data)), "huawei") {
-				isHuawei = true
-			}
-			break
-		}
-	}
 	if os.Getenv("HUAWEICLOUD_REGION") != "" {
-		isHuawei = true
-	}
-	if isHuawei {
 		provider = "huawei"
 		instanceID, instanceType, region, zone = fetchHuaweiIMDS()
 		if region == "" {
@@ -1524,22 +1482,54 @@ func detectCloudMetadata() (provider, instanceID, instanceType, region, zone str
 		}
 		return
 	}
+	if os.Getenv("DIGITALOCEAN_TOKEN") != "" || os.Getenv("DO_REGION") != "" {
+		provider = "digitalocean"
+		instanceID, instanceType, region, zone = fetchDigitalOceanIMDS()
+		return
+	}
+
+	// ---- AWS detection + IMDS ----
+	if data, ok := readDMI("/sys/hypervisor/uuid"); ok &&
+		strings.HasPrefix(strings.ToLower(data), "ec2") {
+		provider = "aws"
+		instanceID, instanceType, region, zone = fetchAWSIMDS()
+		return
+	}
+
+	// ---- GCP detection + IMDS ----
+	if dmiContains("/sys/class/dmi/id/product_name", "google") {
+		provider = "gcp"
+		instanceID, instanceType, region, zone = fetchGCPIMDS()
+		return
+	}
+
+	// ---- Azure detection + IMDS ----
+	if dmiContains("/sys/class/dmi/id/sys_vendor", "microsoft") {
+		provider = "azure"
+		instanceID, instanceType, region, zone = fetchAzureIMDS()
+		return
+	}
+
+	// ---- Alibaba Cloud (Aliyun) detection + IMDS ----
+	// Alibaba ECS uses a unique IMDS IP: 100.100.100.200.
+	// DMI product_name contains "Alibaba" on ECS instances.
+	if dmiContains("/sys/class/dmi/id/product_name", "alibaba") {
+		provider = "alibaba"
+		instanceID, instanceType, region, zone = fetchAlibabaIMDS()
+		return
+	}
+
+	// ---- Huawei Cloud detection + IMDS ----
+	// Huawei ECS sys_vendor contains "HUAWEI".
+	if dmiContains("/sys/class/dmi/id/sys_vendor", "huawei") {
+		provider = "huawei"
+		instanceID, instanceType, region, zone = fetchHuaweiIMDS()
+		return
+	}
 
 	// ---- DigitalOcean detection + IMDS ----
 	// DO Droplets have sys_vendor "DigitalOcean".
-	isDO := false
-	for _, p := range []string{"/sys/class/dmi/id/sys_vendor", hostRoot + "/sys/class/dmi/id/sys_vendor"} {
-		if data, err := os.ReadFile(p); err == nil {
-			if strings.Contains(strings.ToLower(string(data)), "digitalocean") {
-				isDO = true
-			}
-			break
-		}
-	}
-	if os.Getenv("DIGITALOCEAN_TOKEN") != "" || os.Getenv("DO_REGION") != "" {
-		isDO = true
-	}
-	if isDO {
+	if dmiContains("/sys/class/dmi/id/sys_vendor", "digitalocean") {
 		provider = "digitalocean"
 		instanceID, instanceType, region, zone = fetchDigitalOceanIMDS()
 		return

@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -41,7 +42,14 @@ type JournaldCollector struct {
 	cfg    config.JournaldConfig
 	logger *zap.Logger
 	lines  chan LogEntry
-	cancel context.CancelFunc
+
+	// mu guards cancel/stopped: Start runs on its own goroutine while Stop is
+	// called from the agent lifecycle goroutine, so the handoff of the cancel
+	// func must be synchronized (race detector: context.WithCancel writes and
+	// the concurrent cancel() call would otherwise race).
+	mu      sync.Mutex
+	cancel  context.CancelFunc
+	stopped bool
 }
 
 // LogEntry is a structured log line from journald.
@@ -65,7 +73,17 @@ func (j *JournaldCollector) Lines() <-chan LogEntry { return j.lines }
 
 // Start begins following the journal. Blocks until context is cancelled.
 func (j *JournaldCollector) Start(ctx context.Context) error {
-	ctx, j.cancel = context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+
+	j.mu.Lock()
+	if j.stopped {
+		// Stop() was called before Start(): self-cancel and bail out.
+		j.mu.Unlock()
+		cancel()
+		return ctx.Err()
+	}
+	j.cancel = cancel
+	j.mu.Unlock()
 
 	args := []string{"--follow", "--output=json", "--no-pager", "--boot=0"}
 
@@ -133,8 +151,12 @@ func (j *JournaldCollector) Start(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// Stop cancels the journald follower.
+// Stop cancels the journald follower. Safe to call before or while Start is
+// running, and idempotent.
 func (j *JournaldCollector) Stop() {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.stopped = true
 	if j.cancel != nil {
 		j.cancel()
 	}
