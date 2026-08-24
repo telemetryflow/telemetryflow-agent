@@ -29,7 +29,7 @@
 #     -v /etc:/host/etc:ro \
 #     -v /var:/host/var:ro \
 #     -v /run:/host/run:ro \
-#     telemetryflow/telemetryflow-agent:1.3.0-dev \
+#     telemetryflow/telemetryflow-agent:1.3.1 \
 #     --config /etc/tfo-agent/tfo-agent.yaml
 # =============================================================================
 

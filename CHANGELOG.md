@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.2.2-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.1-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.43.0-blueviolet)](https://opentelemetry.io/)
@@ -24,6 +24,62 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.3.1] - 2026-08-24
+
+Security-patch release on top of `1.3.0`. No feature or configuration
+changes — existing 1.3.0 configurations and deployments work unchanged;
+only the container image contents change.
+
+### Security
+
+- **Runtime image minimization — 2026-08 Trivy alert batch cleared**
+  (Docker Hub alerts #332–#354). Debian trixie shipped no fixed
+  packages for this batch (`fix_deferred` / no DSA), so a rebuild alone
+  could not clear the findings. Dependency analysis (ELF `DT_NEEDED` of
+  `fluent-bit`, `apt-cache rdepends`, dpkg force-remove simulation)
+  proved the runtime only ever executes `tfo-agent`, `fluent-bit`, and
+  optionally `journalctl` — so the following packages are now removed
+  from the image after all package operations complete:
+  - `perl-base` + `apt` (and the sqv / debian-archive-keyring /
+    libapt-pkg7.0 / liblz4-1 / libseccomp2 / libxxhash0 chain), purged
+    with `--allow-remove-essential --auto-remove` — clears HIGH
+    **CVE-2026-57433** (Storable DoS) plus the perl-module CVE family
+    previously mitigated by stripping module files by hand
+    (alerts #351, #352 and predecessors).
+  - `openssl` CLI + `openssl-provider-legacy`, force-removed after
+    `ca-certificates` hashes are generated — clears the CLI/provider
+    instances of openssl **CVE-2026-14456** (QUIC server unbounded
+    memory growth) reported in alerts #341/#347/#349.
+  - `tar`, force-removed as the final dpkg operation — clears
+    **CVE-2026-18477** (TOCTOU in incremental dumpdir rename) and
+    **CVE-2026-18508** (`--one-top-level` hardlink path escape)
+    (alerts #353, #354).
+  - `libstdc++6` is marked manual before the purge — Fluent Bit links
+    it and apt's auto-remove would otherwise remove it and break
+    Fluent Bit (exit status 127).
+- **CVEs without an upstream fix** (hard dependency chains, cannot be
+  removed from the image) are now documented in `.trivyignore` with
+  reachability analysis: libssl3t64 CVE-2026-14456 (QUIC *server* API
+  never used), libssh2 CVE-2026-58050/58051/66032/66033/66034/66035
+  (SCP/SFTP only; agent and Fluent Bit use HTTP/TLS exclusively),
+  glibc CVE-2026-6368/6791 (wordexp/tilde-expansion paths never
+  invoked), libsystemd0/libudev1 CVE-2026-15059/16742 (systemd-homed
+  and PID 1 components not shipped; non-root UID 10001 + nologin),
+  libp11-kit0 CVE-2026-18938 (32-bit-only overflow; images are
+  amd64/arm64 only), libcurl CVE-2026-8458, libsqlite3-0
+  CVE-2026-50812/50813 (no SQLite driver in the Go build).
+  `trivy image --ignorefile .trivyignore` is now clean (0 findings).
+- Removed a never-expanding `krb5-{lib,multidev}` brace-glob line from
+  the runtime stage (dash `/bin/sh` does not support brace expansion);
+  the full `dist-upgrade` already covers those packages.
+
+### Removed
+
+- `apt`, `dpkg` metadata archives, and `tar` are no longer available
+  inside the running container. WARNING: derived images can no longer
+  run `apt-get` on top of this base — install extra packages in a
+  separate earlier layer or use a custom Dockerfile stage.
 
 ## [1.3.0-dev] - 2026-07-25
 
@@ -1108,6 +1164,8 @@ Six new output plugins under `internal/exporter/`, all registered via
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.3.1   | 2026-08-24 | v1.47.0  | Security patch: runtime image minimization (perl-base, apt, tar, openssl CLI purged) clearing the 2026-08 Trivy alert batch; unfixable CVEs documented in .trivyignore with reachability analysis                                                                                                                                                                                     |
+| 1.3.0   | 2026-08-24 | v1.47.0  | Plugin system + pipeline engine (M1), network monitoring collectors (M2), logs & self-observability (M3), database & app collectors (M4), multi-output (M5); SNMP IF-MIB interface monitoring; Gateway API collector tests; coverage integration update                                                                                                                              |
 | 1.2.0   | 2026-05-14 | v1.47.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes                                                                                                                                                                                                                          |
 | 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration                                                                              |
 | 1.1.9   | 2026-03-20 | v1.47.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |

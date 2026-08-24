@@ -1,6 +1,6 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.3.0-dev
+- **Version:** 1.3.1
 - **Last Updated:** July 2026
 
 ---
@@ -9,7 +9,7 @@
 
 TelemetryFlow Agent provides a Cobra-based CLI with multiple commands for different operations. This document describes all available commands and their options.
 
-> **1.3.0-dev note.** `config validate` and `config show` now run the
+> **1.3.1 note.** `config validate` and `config show` now run the
 > migration framework on the raw config bytes and apply `${VAR}` env
 > expansion plus `@{store:key}` secret resolution before parsing. The
 > `plugins` and `test` commands listed in the roadmap below are planned for

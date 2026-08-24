@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.0--dev-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.1-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
@@ -60,8 +60,8 @@ graph LR
 
 | Component         | Version     | OTEL Base          | Description                 |
 | ----------------- | ----------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.3.0-dev  | SDK v1.47.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.3.0-dev  | SDK v1.47.0        | Go instrumentation SDK      |
+| **TFO-Agent**     | v1.3.1      | SDK v1.47.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.2.0      | SDK v1.47.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.2.0      | Collector v0.151.0 | Central telemetry collector |
 
 ## Features
@@ -98,7 +98,7 @@ graph LR
 - **Cross-Platform**: Linux, macOS, and Windows support
 - **LEGO Building Blocks**: Modular architecture for easy extensibility
 
-## Roadmap Status (1.3.0-dev)
+## Roadmap Status (1.3.x)
 
 The `1.3.0` line is a multi-milestone rollout that closes the Telegraf capability gap. All features are opt-in via the new `collectors.*` / `pipeline.*` / `outputs.*` config keys — existing 1.2.x configurations continue to work unchanged.
 
@@ -156,11 +156,11 @@ docker-compose down
 ```bash
 # Build image
 docker build \
-  --build-arg VERSION=1.3.0-dev \
+  --build-arg VERSION=1.3.1 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.3.0-dev .
+  -t telemetryflow/telemetryflow-agent:1.3.1 .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -170,7 +170,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.3.0-dev
+  telemetryflow/telemetryflow-agent:1.3.1
 ```
 
 ### OTEL Collector Ports

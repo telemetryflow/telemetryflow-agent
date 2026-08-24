@@ -68,7 +68,7 @@ const (
 // Build-time variables (set via ldflags)
 var (
 	// Version is the semantic version of the agent
-	Version = "1.3.0-dev"
+	Version = "1.3.1"
 
 	// GitCommit is the git commit hash
 	GitCommit = "unknown"

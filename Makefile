@@ -1,6 +1,6 @@
 # TelemetryFlow Agent - Makefile
 #
-# TelemetryFlow Agent v1.3.0-dev (Based on OpenTelemetry SDK 1.47.0)
+# TelemetryFlow Agent v1.3.1 (Based on OpenTelemetry SDK 1.47.0)
 # AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
@@ -11,7 +11,7 @@
 # =============================================================================
 PRODUCT_NAME := TelemetryFlow Agent
 BINARY_NAME := tfo-agent
-VERSION ?= 1.3.0-dev
+VERSION ?= 1.3.1
 OTEL_SDK_VERSION := 1.47.0
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")

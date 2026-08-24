@@ -1,6 +1,6 @@
 # TelemetryFlow Agent Configuration Reference
 
-- **Version:** 1.3.0-dev
+- **Version:** 1.3.1
 - **OTEL SDK Version:** 1.47.0
 - **Last Updated:** July 2026
 
@@ -90,7 +90,7 @@ When connecting to TFO-Collector, the agent automatically sends these headers:
 # =============================================================================
 # TelemetryFlow Agent Configuration
 # =============================================================================
-# Version: 1.3.0-dev
+# Version: 1.3.1
 # Format: Custom YAML (not standard OTEL format)
 # =============================================================================
 
