@@ -1,0 +1,55 @@
+# TelemetryFlow Agent - SNMP IF-MIB Interface Metrics Collector
+#
+# Polls RFC 2863 IF-MIB interface counters (ifHCInOctets/ifHCOutOctets with
+# 32-bit ifInOctets/ifOutOctets fallback, errors, discards, ifSpeed/ifHighSpeed,
+# ifOperStatus), computes per-interface in/out bandwidth utilization from
+# consecutive counter deltas (with 32/64-bit wrap handling), and POSTs samples to
+# the TFO Platform network-map ingestion endpoint:
+#
+#   POST {backend_endpoint}/api/v2/monitoring/network-map/snmp/interface-metrics
+#   permission: monitoring:network-map:write   (returns 204)
+
+snmp_interface:
+  enabled: false
+
+  # Poll interval (default: 60s). Utilization is computed from the delta between
+  # consecutive polls, so the first cycle for each interface reports 0%.
+  interval: 60s
+
+  # TFO Platform backend base URL (no trailing path).
+  backend_endpoint: "${TFO_BACKEND_ENDPOINT}"   # e.g. https://api.telemetryflow.id
+
+  # Platform auth. Prefer the agent API-key headers; set bearer_token to use a
+  # JWT instead (Authorization: Bearer ...). Never hardcode secrets — use env vars.
+  api_key_id: "${TFO_API_KEY_ID}"
+  api_key_secret: "${TFO_API_KEY_SECRET}"
+  # bearer_token: "${TFO_BEARER_TOKEN}"
+
+  batch_size: 500          # max samples per POST (default 500)
+  timeout: 30s             # per-request HTTP timeout (default 30s)
+  max_retry_attempts: 3    # push retries with exponential backoff (default 3)
+
+  # Devices to poll. device_id MUST match the platform's network-map device UUID
+  # so samples correlate to the correct node.
+  devices:
+    - device_id: "00000000-0000-0000-0000-000000000001"
+      device_name: "core-sw"
+      host: "10.0.0.2"
+      community: "${SNMP_COMMUNITY_RO}"   # v1/v2c community string
+      version: "2c"                       # "1", "2c" (default), or "3"
+      port: 161                           # default 161
+      timeout: 10s                        # default 10s
+      retries: 3                          # default 3
+
+    - device_id: "00000000-0000-0000-0000-000000000002"
+      device_name: "edge-router-01"
+      host: "10.0.0.1"
+      version: "3"
+      port: 161
+      auth:
+        username: "${SNMPV3_USER}"
+        auth_protocol: "SHA"              # MD5, SHA, SHA256, SHA512
+        auth_password: "${SNMPV3_AUTH_PASS}"
+        priv_protocol: "AES"              # DES, AES, AES256, AES192C, AES256C
+        priv_password: "${SNMPV3_PRIV_PASS}"
+        security_level: "authPriv"        # noAuthNoPriv, authNoPriv, authPriv (default)

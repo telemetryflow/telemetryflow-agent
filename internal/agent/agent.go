@@ -69,6 +69,7 @@ import (
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector/scraper"
 	sflowcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sflow"
 	snmpcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/snmp"
+	snmpifmibcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/snmp/ifmib"
 	sqlgenericcollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sql_generic"
 	sqlite3collector "github.com/telemetryflow/telemetryflow-agent/internal/collector/sqlite3"
 	sysloglistenercollector "github.com/telemetryflow/telemetryflow-agent/internal/collector/syslog_listener"
@@ -532,6 +533,16 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			zap.Int("fields", len(cfg.Collector.SNMP.Fields)),
 			zap.Int("tables", len(cfg.Collector.SNMP.Tables)),
 			zap.Duration("interval", cfg.Collector.SNMP.Interval),
+		)
+	}
+
+	// Add SNMP IF-MIB interface-metrics collector if enabled
+	if cfg.Collector.SNMPInterface.Enabled {
+		snmpIfCol := snmpifmibcollector.NewCollector(cfg.Collector.SNMPInterface, logger)
+		collectors = append(collectors, snmpIfCol)
+		logger.Info("SNMP interface (IF-MIB) collector enabled",
+			zap.Int("devices", len(cfg.Collector.SNMPInterface.Devices)),
+			zap.Duration("interval", cfg.Collector.SNMPInterface.Interval),
 		)
 	}
 

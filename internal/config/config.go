@@ -369,6 +369,9 @@ type CollectorConfig struct {
 	// SNMP contains SNMP polling settings.
 	SNMP SNMPCollectorConfig `mapstructure:"snmp"`
 
+	// SNMPInterface contains IF-MIB interface-metrics polling settings.
+	SNMPInterface SNMPInterfaceCollectorConfig `mapstructure:"snmp_interface"`
+
 	// Netflow contains NetFlow v5/v9/IPFIX listener settings.
 	Netflow NetflowCollectorConfig `mapstructure:"netflow"`
 
