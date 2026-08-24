@@ -2,32 +2,74 @@
 # https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
 #
 # All suppressed CVEs have been evaluated and fall into one of these categories:
-#   1. Perl modules stripped from image at build time (tracked by perl-base package version)
+#   1. Packages removed from the image at build time (no longer present — see
+#      Dockerfile "MINIMAL RUNTIME STRIP": perl-base, apt, tar, openssl CLI)
 #   2. Transitive dependencies not directly used by TFO Agent
-#   3. Packages that cannot be purged (required by apt/dpkg/base system)
+#   3. Packages that cannot be purged (hard dependency chains / base system)
 #   4. Patches pending from Debian trixie-security (not yet available upstream)
 
 # =============================================================================
-# perl-base: Cannot be purged (required by apt/dpkg). Vulnerable Perl modules
-# (Archive::Tar, IO::Compress, IO::Uncompress, Compress::Raw, HTTP::Tiny, Socket)
-# have been removed from the image at build time — no runtime impact.
+# perl-base: REMOVED from the image entirely (purged together with apt at the
+# end of the runtime stage — see Dockerfile "MINIMAL RUNTIME STRIP"). The
+# former perl-module CVEs (Archive::Tar, IO::Compress, HTTP::Tiny, Socket,
+# Storable CVE-2026-57433, regex CVE-2026-13221) are obsolete: the interpreter
+# is no longer present. No suppression entries needed.
 # =============================================================================
-CVE-2026-42496
-CVE-2026-42497
-CVE-2026-8376
-CVE-2026-9538
-CVE-2026-52287
-CVE-2026-52286
-CVE-2026-48959
-CVE-2026-48962
-CVE-2026-48961
-CVE-2025-15649
-# HTTP::Tiny < 0.093: CRLF in HTTP response headers (GHSA alert #226).
-# Module stripped from image — no runtime impact.
-CVE-2026-7010
-# perl-Socket: Information Disclosure due to Out-of-Bounds Read (GHSA #233).
-# Module stripped from image — no runtime impact.
-CVE-2026-12087
+
+# =============================================================================
+# tar: REMOVED from the image entirely (force-removed as the final dpkg
+# operation — see Dockerfile "MINIMAL RUNTIME STRIP"). CVE-2026-5704 and the
+# 2026-08 batch (CVE-2026-18477 TOCTOU, CVE-2026-18508 --one-top-level) are
+# obsolete: the binary is no longer present. No suppression entries needed.
+# =============================================================================
+
+# =============================================================================
+# openssl / libssl3t64: CVE-2026-14456 — Denial of Service via unbounded
+# memory growth in QUIC server (HIGH). Marked fix_deferred by Debian, no fixed
+# version in trixie. libssl3t64 cannot be removed (Fluent Bit and libcurl4t64
+# link it); the openssl CLI and openssl-provider-legacy ARE removed at build
+# time. The QUIC *server* API is never used: OTLP runs gRPC/HTTP and Fluent
+# Bit outputs over HTTP/TLS.
+# =============================================================================
+CVE-2026-14456
+
+# =============================================================================
+# libssh2-1t64: required by libcurl4t64 (SCP/SFTP support). No fixed version
+# in trixie. CVE-2026-58050 (HIGH, heap overflow via integer overflow in
+# publickey attribute allocation), CVE-2026-58051 (malformed SSH publickey
+# response), CVE-2026-66032 (SFTP double-free), CVE-2026-66033 (AES-GCM
+# integer underflow), CVE-2026-66034/66035 (SSH negotiation overflows) are
+# all only reachable through SCP/SFTP transfers. The agent and Fluent Bit use
+# HTTP/TLS outputs exclusively — no scp:/sftp: URL is ever requested.
+# =============================================================================
+CVE-2026-58050
+CVE-2026-58051
+CVE-2026-66032
+CVE-2026-66033
+CVE-2026-66034
+CVE-2026-66035
+CVE-2026-7598
+
+# =============================================================================
+# libsystemd0 / libudev1: CVE-2026-16742 (systemd-homed local privilege
+# escalation) and CVE-2026-15059 (local users can terminate arbitrary
+# processes). Both libraries stay: Fluent Bit links libsystemd.so.0 (sd_notify
+# only) and util-linux links libudev. The vulnerable components (systemd-homed
+# daemon, PID 1 shutdown paths) are not shipped and no systemd daemon runs in
+# the container — the agent runs as non-root (UID 10001, nologin) under the
+# container runtime's init. No fixed version in trixie.
+# =============================================================================
+CVE-2026-15059
+CVE-2026-16742
+
+# =============================================================================
+# libp11-kit0: CVE-2026-18938 — integer overflow in RPC attribute-array
+# length calculation that under-allocates "on 32 bit systems" only. TFO Agent
+# publishes linux/amd64 and linux/arm64 images exclusively — the vulnerable
+# 32-bit code path does not exist in shipped builds. Cannot be purged:
+# libcurl4t64 -> librtmp1 -> libgnutls30t64 -> libp11-kit0 is a hard chain.
+# =============================================================================
+CVE-2026-18938
 
 # =============================================================================
 # linux-pam (libpam-modules, libpam-modules-bin, libpam-runtime, libpam0g):
@@ -47,18 +89,27 @@ CVE-2026-54411
 CVE-2026-11850
 
 # =============================================================================
-# libc6 / libc-bin: glibc — cannot be purged (required by every binary).
-# Patches pending from Debian trixie-security.
+# glibc (libc6 / libc-bin): cannot be purged (required by every binary).
+# Patches pending from Debian trixie-security. The 2026-08 batch —
+# CVE-2026-6368 (process abort via invalid memory in wordexp) and
+# CVE-2026-6791 (stack exhaustion during tilde expansion) — requires
+# wordexp()/shell tilde expansion on attacker-controlled strings; nothing in
+# the agent calls wordexp, and no untrusted input reaches a shell.
 # =============================================================================
 CVE-2026-5435
 CVE-2026-5450
 CVE-2026-5928
 CVE-2026-6238
+CVE-2026-6368
+CVE-2026-6791
 
 # =============================================================================
 # libcurl4t64 / curl: Connection reuse and credential leak CVEs.
 # TFO Agent uses libcurl only for Fluent Bit output and health checks —
 # no proxy authentication, no SMB, no Negotiate auth in production.
+# CVE-2026-8458 (unauthorized connection reuse due to logical error,
+# 2026-08 batch, no fix in trixie): the agent performs no concurrent
+# authenticated requests over shared connections that could be cross-used.
 # =============================================================================
 CVE-2026-5773
 CVE-2026-6276
@@ -71,6 +122,7 @@ CVE-2026-5545
 CVE-2026-6253
 CVE-2026-6429
 CVE-2026-7168
+CVE-2026-8458
 # Fluent Bit 5.0.9 base (curl 8.14.1): no upstream fix available yet. Not
 # reachable from the agent's usage — SFTP/SCP host verification (CVE-2026-12064),
 # proxy auth disclosure (CVE-2026-8927/9079), mTLS reuse bypass (CVE-2026-8932),
@@ -84,12 +136,6 @@ CVE-2026-8932
 CVE-2026-9079
 CVE-2026-9080
 CVE-2026-9545
-
-# =============================================================================
-# libssh2-1t64: Integer overflow via large username/password.
-# Required by libcurl4t64 for SCP/SFTP. Patched via dist-upgrade where possible.
-# =============================================================================
-CVE-2026-7598
 
 # =============================================================================
 # util-linux / bsdutils / mount / login / libblkid1 / libmount1 / libsmartcols1
@@ -117,12 +163,6 @@ CVE-2022-0563
 CVE-2025-69720
 
 # =============================================================================
-# tar: Cannot be purged (required by dpkg). CVE-2026-5704: hidden file
-# injection via crafted archives — agent does not extract untrusted archives.
-# =============================================================================
-CVE-2026-5704
-
-# =============================================================================
 # zlib1g: Transitive dependency. CVE-2026-27171: DoS via CRC32 — agent
 # does not process untrusted compressed input.
 # =============================================================================
@@ -145,10 +185,14 @@ CVE-2026-34743
 # prevents removal (another package depends on it), these CVEs are inert.
 # CVE-2026-11822: memory corruption in SQLite before 3.53.2 (GHSA alert #227).
 # CVE-2026-11824: heap-based buffer overflow in SQLite before 3.53.2 (GHSA #228).
+# CVE-2026-50812 / CVE-2026-50813 (2026-08 batch): Session Extension changeset
+# DoS / information disclosure — the agent never enables SQLite sessions.
 # No fixed version available in Debian trixie at time of writing.
 # =============================================================================
 CVE-2026-11822
 CVE-2026-11824
+CVE-2026-50812
+CVE-2026-50813
 
 # =============================================================================
 # Newly surfaced in the Fluent Bit 5.0.9 image scan (debian trixie 13.6).
@@ -156,12 +200,10 @@ CVE-2026-11824
 # (UID 10001, nologin) and does not exercise the vulnerable code paths. No
 # fixed version is available from Debian trixie-security at time of writing.
 # =============================================================================
-# perl-base: cannot be purged (required by apt/dpkg). The agent never executes
-# Perl. CVE-2026-13221 (silently incorrect regex) and CVE-2026-57432 (integer
-# overflow in S_measure_struct) are in the Perl interpreter core and are not
-# reachable — no Perl scripts run at runtime.
-CVE-2026-13221
-CVE-2026-57432
+# perl-base: REMOVED from the image — the 2026-08 interpreter-core findings
+# (CVE-2026-13221 silently incorrect regex, CVE-2026-57432 S_measure_struct
+# integer overflow, CVE-2026-57433 Storable DoS) are obsolete: no Perl
+# interpreter ships in the image. No suppression entries needed.
 # util-linux / libblkid1 / bsdutils / libmount1 / libsmartcols1 / libuuid1:
 # CVE-2026-53615 — heap use-after-free in libblkid nested partition probing.
 # Core system utilities; the agent does not probe block devices or partitions.

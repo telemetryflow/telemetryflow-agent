@@ -100,18 +100,35 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 # Install runtime dependencies and security patches
 # Fluent Bit 5.x requires: libyaml, openssl3, libcurl, libsasl2, libpq
 # SECURITY: dist-upgrade ensures all base packages are patched against known CVEs
-# (glibc CVE-2026-5435/CVE-2026-6238, gnutls CVE-2026-42010/CVE-2026-33845,
-# libssh2 CVE-2026-7598, curl CVE-2026-6276, etc.)
+# (glibc, gnutls, krb5, curl, etc.). It also supersedes the old per-package
+# krb5 upgrade line (which never expanded under dash /bin/sh).
 # NOTE: Do NOT remove libssh2-1t64 — libcurl4t64 depends on it for SCP/SFTP.
-# dist-upgrade already patches libssh2; removing it cascades to libcurl removal which breaks Fluent Bit (exit status 127).
-# NOTE: perl-base is required by apt/dpkg and cannot be purged. To eliminate
-# CVE-2026-42496/CVE-2026-8376/CVE-2026-42497/CVE-2026-9538 (Archive::Tar),
-# CVE-2026-52287 (IO::Compress), CVE-2026-52286 (IO::Uncompress::Unzip),
-# CVE-2026-48961 (IO::Compress zipdetails DoS),
-# CVE-2026-12087 (Socket out-of-bounds read),
-# CVE-2025-4270 (HTTP::Tiny CRLF), we strip the vulnerable Perl modules after
-# install — they are not needed at runtime.
-# ncurses-base, ncurses-bin, tar also cannot be purged — patches from dist-upgrade.
+# The librtmp1 -> libgnutls30t64 -> libp11-kit0 chain is likewise a hard
+# dependency of libcurl4t64; removing it breaks Fluent Bit (exit status 127).
+#
+# MINIMAL RUNTIME STRIP:
+# The agent only ever execs tfo-agent, fluent-bit and (optionally) journalctl.
+# It never invokes perl, tar, or the openssl CLI, so after all package
+# operations the image removes them outright:
+#   - perl-base + apt (+ sqv, debian-archive-keyring, libapt-pkg7.0, ...):
+#     package manager and interpreter purged with --allow-remove-essential.
+#     Clears perl CVE-2026-57433 (HIGH), CVE-2026-13221 and the whole
+#     perl-module CVE family that was previously mitigated by stripping
+#     module files by hand.
+#   - openssl CLI + openssl-provider-legacy: only needed to (re)generate CA
+#     certificate hashes; /etc/ssl/certs is already populated. Removed with
+#     --force-depends (ca-certificates declares the dependency) — clears the
+#     CLI/provider instances of openssl CVE-2026-14456.
+#   - tar: required by dpkg only; force-removed as the final dpkg operation.
+#     Clears tar CVE-2026-18477 and CVE-2026-18508.
+# libstdc++6 is marked manual before the purge — Fluent Bit links it and
+# apt's auto-remove would otherwise take it along with apt.
+# Remaining unfixable CVEs (libssl3t64 QUIC CVE-2026-14456, libssh2
+# CVE-2026-58050 et al., glibc CVE-2026-6368/CVE-2026-6791, libsystemd0/
+# libudev1 CVE-2026-15059/CVE-2026-16742, libp11-kit0 CVE-2026-18938 [32-bit
+# only], libcurl CVE-2026-8458) have no fixed version in trixie and cannot be
+# removed — evaluated and documented in .trivyignore.
+# WARNING: apt/dpkg/tar are NOT available in derived images at runtime.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -121,21 +138,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && 
     libcurl4t64 \
     libsasl2-2 \
     libpq5 \
-    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y krb5-{lib,multidev} libkrb5-3 libgssapi-krb5-2 2>/dev/null || true \
-    && rm -rf /usr/share/perl5/Archive/Tar* \
-              /usr/share/perl5/IO/Compress* \
-              /usr/share/perl5/IO/Uncompress* \
-              /usr/share/perl5/Compress/Zlib.pm \
-              /usr/share/perl5/Compress/Raw* \
-              /usr/share/perl5/HTTP/Tiny* \
-              /usr/share/perl/5.*/HTTP/Tiny* \
-              /usr/share/perl/5.*/IO/Compress* \
-              /usr/share/perl/5.*/IO/Uncompress* \
-              /usr/lib/*/perl/5.*/auto/Socket \
-              /usr/share/perl/5.*/Socket* \
     && DEBIAN_FRONTEND=noninteractive apt-get purge -y libsqlite3-0 2>/dev/null || true \
-    && apt-get autoremove -y --purge \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-mark manual libstdc++6 \
+    && DEBIAN_FRONTEND=noninteractive apt-get purge -y --allow-remove-essential --auto-remove perl-base apt \
+    && dpkg --remove --force-depends openssl openssl-provider-legacy \
+    && dpkg --remove --force-all tar \
+    && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log* /etc/apt/sources.list.d
 
 # Create non-root user and group
 RUN groupadd -g 10001 telemetryflow && \
