@@ -25,22 +25,37 @@
 
 # =============================================================================
 # openssl / libssl3t64: CVE-2026-14456 — Denial of Service via unbounded
-# memory growth in QUIC server (HIGH). Marked fix_deferred by Debian, no fixed
-# version in trixie. libssl3t64 cannot be removed (Fluent Bit and libcurl4t64
-# link it); the openssl CLI and openssl-provider-legacy ARE removed at build
-# time. The QUIC *server* API is never used: OTLP runs gRPC/HTTP and Fluent
-# Bit outputs over HTTP/TLS.
+# # memory growth in QUIC server (HIGH). Debian tracker status: trixie
+# <postponed> ("Minor issue, fix along with future update"); upstream fix
+# exists (pending-connection limit, default 256) but is not packaged for
+# trixie. libssl3t64 cannot be removed (Fluent Bit and libcurl4t64 link it);
+# the openssl CLI and openssl-provider-legacy ARE removed at build time. The
+# QUIC *server* (Listener SSL object) API is never used: OTLP runs gRPC/HTTP
+# and Fluent Bit outputs over HTTP/TLS — the agent never calls SSL_accept on
+# a QUIC listener, so no channel objects can be queued.
 # =============================================================================
 CVE-2026-14456
 
 # =============================================================================
-# libssh2-1t64: required by libcurl4t64 (SCP/SFTP support). No fixed version
-# in trixie. CVE-2026-58050 (HIGH, heap overflow via integer overflow in
-# publickey attribute allocation), CVE-2026-58051 (malformed SSH publickey
-# response), CVE-2026-66032 (SFTP double-free), CVE-2026-66033 (AES-GCM
-# integer underflow), CVE-2026-66034/66035 (SSH negotiation overflows) are
-# all only reachable through SCP/SFTP transfers. The agent and Fluent Bit use
-# HTTP/TLS outputs exclusively — no scp:/sftp: URL is ever requested.
+# libssh2-1t64: the runtime image pins libssh2-1t64=1.11.1-6 from Debian sid
+# (see Dockerfile "TEMPORARY SID PIN"). That revision carries the upstream
+# fixes for CVE-2026-58050, CVE-2026-58051, CVE-2026-66032, CVE-2026-66033,
+# CVE-2026-66034, CVE-2026-66035 (security-tracker marks all "fixed" at
+# 1.11.1-6 for sid).
+#
+# WHY SUPPRESSED ANYWAY: Trivy (and Docker Hub's scanner) evaluate packages
+# against the image's release (trixie), where these CVEs have
+# FixedVersion=None ("no-dsa, can be fixed via point release") — so ANY
+# installed version is flagged, including the actually-fixed 1.11.1-6, until
+# trixie ships the point release and the advisory data propagates. These
+# entries become obsolete the day trixie ships >= 1.11.1-6; remove them (and
+# the sid pin) then.
+#
+# Defense-in-depth context: CVE-2026-58050 is 32-bit-only per the advisory
+# ("on 32-bit platforms the multiplication overflows") and images are
+# amd64/arm64 only; the remaining CVEs require SCP/SFTP sessions — libssh2 is
+# a hard dep of libcurl4t64, but the agent and Fluent Bit use HTTP/TLS
+# outputs exclusively (no scp:/sftp: URL is ever requested).
 # =============================================================================
 CVE-2026-58050
 CVE-2026-58051
@@ -48,26 +63,29 @@ CVE-2026-66032
 CVE-2026-66033
 CVE-2026-66034
 CVE-2026-66035
-CVE-2026-7598
 
 # =============================================================================
 # libsystemd0 / libudev1: CVE-2026-16742 (systemd-homed local privilege
 # escalation) and CVE-2026-15059 (local users can terminate arbitrary
-# processes). Both libraries stay: Fluent Bit links libsystemd.so.0 (sd_notify
-# only) and util-linux links libudev. The vulnerable components (systemd-homed
-# daemon, PID 1 shutdown paths) are not shipped and no systemd daemon runs in
-# the container — the agent runs as non-root (UID 10001, nologin) under the
-# container runtime's init. No fixed version in trixie.
+# processes). Debian tracker status: trixie <no-dsa> (minor); fix only in
+# sid's systemd 261 — not backportable without a major-version jump. Both
+# libraries stay: Fluent Bit links libsystemd.so.0 (sd_notify only) and
+# util-linux links libudev. The vulnerable components (systemd-homed daemon,
+# PID 1 shutdown paths) are not shipped and no systemd daemon runs in the
+# container — the agent runs as non-root (UID 10001, nologin) under the
+# container runtime's init.
 # =============================================================================
 CVE-2026-15059
 CVE-2026-16742
 
 # =============================================================================
 # libp11-kit0: CVE-2026-18938 — integer overflow in RPC attribute-array
-# length calculation that under-allocates "on 32 bit systems" only. TFO Agent
-# publishes linux/amd64 and linux/arm64 images exclusively — the vulnerable
-# 32-bit code path does not exist in shipped builds. Cannot be purged:
-# libcurl4t64 -> librtmp1 -> libgnutls30t64 -> libp11-kit0 is a hard chain.
+# length calculation. Debian's own advisory text: "This vulnerability is only
+# exploitable on 32 bit systems." TFO Agent publishes linux/amd64 and
+# linux/arm64 images exclusively — the vulnerable code path does not exist in
+# shipped builds. Debian tracker: trixie <no-dsa>; fix (0.26.5) only in sid.
+# Cannot be purged: libcurl4t64 -> librtmp1 -> libgnutls30t64 -> libp11-kit0
+# is a hard chain.
 # =============================================================================
 CVE-2026-18938
 
@@ -90,11 +108,12 @@ CVE-2026-11850
 
 # =============================================================================
 # glibc (libc6 / libc-bin): cannot be purged (required by every binary).
-# Patches pending from Debian trixie-security. The 2026-08 batch —
-# CVE-2026-6368 (process abort via invalid memory in wordexp) and
-# CVE-2026-6791 (stack exhaustion during tilde expansion) — requires
-# wordexp()/shell tilde expansion on attacker-controlled strings; nothing in
-# the agent calls wordexp, and no untrusted input reaches a shell.
+# Debian tracker status: trixie <no-dsa> (minor); fixes only in sid's glibc
+# 2.43 — not backportable. The 2026-08 batch — CVE-2026-6368 (process abort
+# via invalid memory in wordexp with WRDE_APPEND) and CVE-2026-6791 (stack
+# exhaustion during tilde expansion) — requires wordexp()/shell tilde
+# expansion on attacker-controlled strings; nothing in the agent calls
+# wordexp, and no untrusted input reaches a shell.
 # =============================================================================
 CVE-2026-5435
 CVE-2026-5450

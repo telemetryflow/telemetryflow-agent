@@ -123,11 +123,19 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 #     Clears tar CVE-2026-18477 and CVE-2026-18508.
 # libstdc++6 is marked manual before the purge — Fluent Bit links it and
 # apt's auto-remove would otherwise take it along with apt.
-# Remaining unfixable CVEs (libssl3t64 QUIC CVE-2026-14456, libssh2
-# CVE-2026-58050 et al., glibc CVE-2026-6368/CVE-2026-6791, libsystemd0/
-# libudev1 CVE-2026-15059/CVE-2026-16742, libp11-kit0 CVE-2026-18938 [32-bit
-# only], libcurl CVE-2026-8458) have no fixed version in trixie and cannot be
+# Remaining unfixable CVEs (libssl3t64 QUIC CVE-2026-14456 [Debian: postponed],
+# glibc CVE-2026-6368/CVE-2026-6791, libsystemd0/libudev1
+# CVE-2026-15059/CVE-2026-16742, libp11-kit0 CVE-2026-18938 [32-bit only],
+# libcurl CVE-2026-8458) have no fixed version in trixie and cannot be
 # removed — evaluated and documented in .trivyignore.
+# TEMPORARY SID PIN — libssh2-1t64=1.11.1-6: carries the upstream fixes for
+# CVE-2026-58050/58051/66032/66033/66034/66035, which Debian trixie has not
+# shipped yet (tracker: "no-dsa, can be fixed via point release"). Pulled from
+# sid with an explicit version pin so nothing else is dragged in (verified:
+# 0 side-effect upgrades; deps libc6/libgcrypt20/zlib1g all satisfied by
+# trixie). REMOVE this pin once trixie ships >= 1.11.1-6 via point release —
+# the explicit =1.11.1-6 will then match no candidate and fail the build
+# loudly, forcing cleanup.
 # WARNING: apt/dpkg/tar are NOT available in derived images at runtime.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -138,6 +146,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && 
     libcurl4t64 \
     libsasl2-2 \
     libpq5 \
+    && printf 'deb http://deb.debian.org/debian sid main\n' > /etc/apt/sources.list.d/sid.list \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libssh2-1t64=1.11.1-6 \
+    && rm -f /etc/apt/sources.list.d/sid.list \
     && DEBIAN_FRONTEND=noninteractive apt-get purge -y libsqlite3-0 2>/dev/null || true \
     && apt-mark manual libstdc++6 \
     && DEBIAN_FRONTEND=noninteractive apt-get purge -y --allow-remove-essential --auto-remove perl-base apt \
