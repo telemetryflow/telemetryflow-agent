@@ -43,7 +43,7 @@ This project adheres to the [Contributor Covenant Code of Conduct](https://www.c
 
 ### Prerequisites
 
-- **Go 1.25** or later
+- **Go 1.26** or later
 - **Git**
 - **Make**
 - **Docker** (optional, for container builds)
