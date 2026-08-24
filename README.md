@@ -58,11 +58,11 @@ graph LR
     style COLLECTOR fill:#FFB74D,stroke:#F57C00
 ```
 
-| Component         | Version     | OTEL Base          | Description                 |
-| ----------------- | ----------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.3.1      | SDK v1.47.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.2.0      | SDK v1.47.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.2.0      | Collector v0.151.0 | Central telemetry collector |
+| Component         | Version | OTEL Base          | Description                 |
+| ----------------- | ------- | ------------------ | --------------------------- |
+| **TFO-Agent**     | v1.3.1  | SDK v1.47.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.3.0  | SDK v1.47.0        | Go instrumentation SDK      |
+| **TFO-Collector** | v1.3.0  | Collector v0.151.0 | Central telemetry collector |
 
 ## Features
 
@@ -87,6 +87,15 @@ graph LR
 - **Process Monitoring**: Track running processes
 - **Resource Detection**: Auto-detect host, OS, and container info
 
+### Network Monitoring
+
+- **Synthetic Probes**: ICMP ping, DNS query, TCP/UDP port, and HTTP(S) checks with latency, loss, and certificate-expiry metrics
+- **Device Polling**: SNMP v1/v2c/v3 with industry-standard IF-MIB interface defaults (64-bit HC counters, errors, discards, oper status)
+- **Flow Analysis**: NetFlow v5/v9/IPFIX and sFlow v5 passive listeners for traffic visibility from routers and switches
+- **Syslog Ingest**: RFC 3164 / RFC 5424 / Cisco syslog receiver over UDP, TCP, and Unix sockets
+- **Management APIs**: Cisco DNA Center and Meraki device/health metrics
+- **Pipeline Processing**: Filter, rename, or script network metrics (Starlark) before export
+
 ### Reliability
 
 - **Disk-Backed Buffer**: Resilient retry buffer for offline scenarios
@@ -97,20 +106,6 @@ graph LR
 
 - **Cross-Platform**: Linux, macOS, and Windows support
 - **LEGO Building Blocks**: Modular architecture for easy extensibility
-
-## Roadmap Status (1.3.x)
-
-The `1.3.0` line is a multi-milestone rollout that closes the Telegraf capability gap. All features are opt-in via the new `collectors.*` / `pipeline.*` / `outputs.*` config keys — existing 1.2.x configurations continue to work unchanged.
-
-| Milestone                              | Status | Scope                                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------- | :----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **M1 Foundation**                      |   ✅   | Plugin system (`internal/plugin/`), disk-backed retry buffer wired into the OTLP sink, channel-based processor pipeline engine (`internal/pipeline/`), `@{store:key}` SecretStore (env / file / Vault), atomic plugin state persister (`internal/persister/`), self-observability layer (`internal/selfstat/`), config migration framework |
-| **M2 Network Monitoring**              |   ✅   | `ping` (ICMP), `dns` (miekg/dns), `tcp_probe`, `http_probe`, `snmp` (v1/v2c/v3 via gosnmp), `netflow` (v5/v9/IPFIX listener), `syslog_listener` (RFC 3164/5424/Cisco), `sflow` v5 listener                                                                                                                                           |
-| **M3 Logs & Self-Observation**         |   ✅   | OTLP log bridge wired (`LogCollector` → OTLP `/v1/logs`), 4 log parser processors (`multiline`, `grok_parser`, `json_parser`, `regex_parser`), `tail_sampling` probabilistic + policy sampler, `log_to_metric` extractor, `internalstats` selfstat internal collector, selfstat counters wired into `MetricForwarder` + `BufferRetrySink`, tail offset persistence via `StatefulPlugin`, Grafana self-observability dashboard |
-| **M4 Database & Application**          |   ✅   | `nginx` (stub_status), `apache` (server-status), `haproxy` (CSV stats), `influxdb` (/debug/vars), `elasticsearch` (cluster + node stats), `opensearch` (ES fork), `couchbase` (pools/default), `vault` (Prometheus metrics), `sql_generic` (user-defined SQL via database/sql), `pgbouncer` (SHOW STATS / POOLS). Redis + Valkey enhanced with cluster + latency + version metrics. |
-| **M5 Multi-Output**                    |   ✅   | `prometheus_remote_write` (proper protobuf + snappy — P0 fix), OTLP gRPC exporter (`protocol: grpc`), `file` output (JSON / Influx LP / Prom text + rotation), `kafka` producer (JSON / OTLP protobuf / Prom remote write), `loki` logs output (stream grouping + label templates), `cloudwatch` (AWS SDK v2 PutMetricData), `datadog` (Metrics v2 API) |
-
-**All 5 milestones shipped.** 34 native collectors, 12 processors, 7 output plugins, 48 config files. See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ## Quick Start
 
@@ -440,6 +435,170 @@ The cAdvisor collector scrapes Prometheus metrics from a running cAdvisor instan
 - Supports counter, gauge, histogram, summary, and untyped metric types
 - Optional metric name allowlist for selective collection
 
+### Network Monitoring
+
+The agent ships a complete network observability toolkit — active synthetic probes, SNMP device polling, and passive flow/syslog listeners, all opt-in under `collectors:`. Everything flows through the same processor pipeline and OTLP exporter as the rest of the agent.
+
+```text
+                    ┌─────────────────────────────────────────────┐
+   ACTIVE PROBES    │  ping (ICMP)   dns   tcp_probe   http_probe │──▶ latency / loss /
+   (agent-initiated)│                                             │    availability / TLS
+                    └─────────────────────────────────────────────┘
+                    ┌─────────────────────────────────────────────┐
+   DEVICE POLLING   │  snmp v1/v2c/v3 — IF-MIB interface tables,  │──▶ per-interface util,
+   (agent-initiated)│  sysDescr/UpTime, UCD CPU & memory          │    errors, discards, status
+                    └─────────────────────────────────────────────┘
+                    ┌─────────────────────────────────────────────┐
+   PASSIVE LISTENERS│  netflow (v5/v9/IPFIX)   sflow (v5)         │──▶ traffic volumes,
+   (device-exported)│  syslog_listener (RFC3164/5424/Cisco)       │    flow counts, log ingest
+                    └─────────────────────────────────────────────┘
+```
+
+#### Synthetic Probes (Active Checks)
+
+Measure reachability, latency, and correctness of network endpoints from the agent's vantage point:
+
+| Collector       | Protocol      | Key Metrics                                                                                       | Typical Use                        |
+| --------------- | ------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **ping**        | ICMP          | `network.ping.{rtt_min,rtt_avg,rtt_max,rtt_stddev}_ms`, `loss_percent`, `packets_{sent,received}`, `ttl`, `state` | Latency & packet loss to any host  |
+| **dns**         | DNS           | `network.dns.query_time_ms`, `result_code`, `records_returned`, `state`                           | Resolver health & record validation|
+| **tcp_probe**   | TCP/UDP       | `network.tcp.connect_time_ms`, `response_time_ms`, `state`, `string_found`                        | Port availability, banner checks   |
+| **http_probe**  | HTTP(S)       | `network.http.{response_time_ms,status_code,content_length,redirect_count}`, `tls_valid`, `tls_days_remaining`, `state` | Uptime, content & certificate checks |
+
+> ICMP supports privileged (raw socket) and unprivileged (UDP) modes with automatic fallback. HTTP probes verify response bodies via regex and track certificate expiry — wire cert-expiry alerts directly off `tls_days_remaining`.
+
+```yaml
+collectors:
+  ping:
+    enabled: true
+    interval: 30s
+    targets:
+      - host: 10.0.0.1
+        name: core-router
+      - host: 8.8.8.8
+        name: dns-google
+  http_probe:
+    enabled: true
+    interval: 60s
+    targets:
+      - url: https://api.telemetryflow.id/healthz
+        name: api-health
+        expected_status: [200, 204]
+```
+
+#### SNMP Device Polling
+
+Poll switches, routers, and any SNMP-enabled device — v1, v2c, and v3 (authPriv with SHA/AES) are supported. Two surfaces cover different needs:
+
+**Generic OID polling (`collectors.snmp`)** — scalar GET + table WALK with ASN.1 → gauge/counter conversion. Output metrics are named after your configured fields:
+
+| Metric                        | Type    | Description                            |
+| ----------------------------- | ------- | -------------------------------------- |
+| `network.snmp.<field_name>`   | varies  | One metric per configured field/table |
+| `network.snmp.state`          | gauge   | Target reachability (0/1)              |
+
+**IF-MIB interface utilization (`collector.snmp_interface`)** — walks `ifTable`/`ifXTable` and computes per-interface in/out utilization against link capacity, pushing samples straight into the platform's Interface Utilization view:
+
+| Sample field        | Source (IF-MIB)   | Description                       |
+| ------------------- | ----------------- | --------------------------------- |
+| in/out octets       | ifHCIn/OutOctets  | 64-bit counters (32-bit fallback) |
+| in/out utilization  | computed          | % of ifHighSpeed link capacity    |
+| in/out errors       | ifIn/OutErrors    | Interface error counters          |
+| in/out discards     | ifIn/OutDiscards  | Interface discard counters        |
+| oper status         | ifOperStatus      | up / down / testing / …           |
+
+- **64-bit HC counters** are preferred — 32-bit octet counters wrap in seconds on ≥1 Gbps links
+- Every interface row is keyed by `ifIndex` and labeled with `ifName`
+- Health checks issue a real SNMP GET — a device counts as up only if it answers
+
+```yaml
+collectors:
+  snmp:
+    enabled: true
+    interval: 60s
+    agents:
+      - host: 10.0.0.1
+        name: edge-switch
+        community: public
+      - host: 10.0.0.2
+        name: core-router
+        version: "3"
+        auth:
+          username: ro-user
+          auth_protocol: SHA
+          auth_password: "${SNMP_AUTH_PASS}"
+          priv_protocol: AES
+          priv_password: "${SNMP_PRIV_PASS}"
+          security_level: authPriv
+    fields:
+      - name: sysUpTime
+        oid: 1.3.6.1.2.1.1.3.0
+        unit: ticks
+    tables:
+      - name: ifTable
+        oid: 1.3.6.1.2.1.2.2
+        index_as_tag: true
+```
+
+#### Flow & Syslog Listeners (Passive Ingest)
+
+Receive telemetry that network devices export — no polling involved:
+
+| Collector          | Listens On             | Key Metrics                                                                                        | Notes                                    |
+| ------------------ | ---------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **netflow**        | UDP 2055 (configurable)| `network.netflow.{packets,flows,bytes}_received_total`, `parse_errors_total`, `packets_by_version` | NetFlow v5 parsed fully; v9/IPFIX headers |
+| **sflow**          | UDP 6343 (IANA)        | `network.sflow.{packets,samples,bytes}_received_total`, `parse_errors_total`, `samples_by_format`  | sFlow v5 sample envelopes                 |
+| **syslog_listener**| UDP 514 / TCP 601 / Unix | `network.syslog.{messages,bytes}_received_total`, `messages_by_{severity,facility}`, `parse_errors_total` | RFC 3164 / RFC 5424 / Cisco formats |
+
+- All listeners emit **aggregate counters** on a flush cadence — no per-flow metric explosion
+- Dedicated parser worker pools with bounded socket buffers absorb traffic bursts
+- Syslog feeds the same pipeline as log collectors, so processors (grok, regex, JSON parsing) apply to network device logs too
+
+```yaml
+collectors:
+  netflow:
+    enabled: true
+    port: 2055
+    workers: 4
+    flush_interval: 30s
+    tags:
+      site: dc1
+  syslog_listener:
+    enabled: true
+    listeners:
+      - protocol: udp
+        port: 514
+      - protocol: tcp
+        port: 601
+        format: rfc5424
+```
+
+#### Network Management APIs
+
+Beyond protocols, the agent pulls device inventories and health scores from controller-based fleets:
+
+- **Cisco DNA Center** — device reachability, uptime, network/client/application health scores (0-100)
+- **Cisco Meraki** — device online status, cellular failover, organization device counts
+
+See the [Network Integrations Guide](docs/integrations/NETWORK.md) for configuration of both.
+
+#### Combining It With the Pipeline
+
+Network metrics are ordinary pipeline citizens — filter to a single site, rename OIDs to friendly names, or compute custom derivations with Starlark before export:
+
+```yaml
+pipeline:
+  processors:
+    post_aggregator:
+      - type: filter
+        rules:
+          - action: drop
+            metric_name: 'network\.netflow\.parse_errors_total'
+        default_action: keep
+```
+
+> Full configuration reference for every network collector: [docs/CONFIGURATION.md — Network Monitoring Collectors](docs/CONFIGURATION.md)
+
 ### Database Monitoring
 
 The agent provides native collectors for popular databases via direct connection or cloud SDK:
@@ -608,85 +767,85 @@ TelemetryFlow Agent supports **47+ integrations** across 34 native collectors an
 
 ### Integration Categories
 
-| Category                   | Integrations                                                                                              | Count |
-| -------------------------- | --------------------------------------------------------------------------------------------------------- | ----- |
-| **Cloud Providers**        | GCP, Azure, Alibaba Cloud, AWS CloudWatch                                                                 | 4     |
-| **Infrastructure**         | Proxmox, VMware vSphere, Nutanix, Azure Arc                                                               | 4     |
-| **Network Monitoring (M2)**| ICMP Ping, DNS Query, TCP/UDP Probe, HTTP Probe, SNMP v1/v2c/v3, NetFlow v5/v9/IPFIX, sFlow v5, Syslog    | 8     |
-| **Network & IoT**          | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3 (legacy wiring), MQTT                                           | 3     |
-| **Kernel/System**          | eBPF (syscalls, network, file I/O, scheduler), Cilium Hubble                                              | 2     |
-| **APM Platforms**          | Dynatrace, IBM Instana, Datadog, New Relic                                                                | 4     |
-| **OSS Observability**      | SigNoz, Coroot, HyperDX, OpenObserve, Netdata                                                             | 5     |
-| **Observability**          | Prometheus, Splunk, Elasticsearch                                                                         | 3     |
-| **Streaming & Logs**       | Kafka, Loki, InfluxDB                                                                                     | 3     |
-| **Tracing**                | Jaeger, Zipkin                                                                                            | 2     |
-| **Monitoring Tools**       | Telegraf, Grafana Alloy, Percona PMM, Blackbox, ManageEngine                                              | 5     |
-| **Cache (enhanced)**       | Redis (cluster + latency + version), Valkey (cluster + latency + version)                                 | 2     |
-| **Pipeline (M1+M3)**       | filter / drop / keep / rename / converter / enum / defaults / starlark / multiline / grok / json / regex / tail_sampling | 13 |
-| **Foundation (M1)**        | Disk-backed retry buffer, Secret management (env/file/vault), Plugin state persister, Config migration    | 4     |
-| **Custom**                 | Webhook                                                                                                   | 1     |
+| Category                    | Integrations                                                                                                             | Count |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----- |
+| **Cloud Providers**         | GCP, Azure, Alibaba Cloud, AWS CloudWatch                                                                                | 4     |
+| **Infrastructure**          | Proxmox, VMware vSphere, Nutanix, Azure Arc                                                                              | 4     |
+| **Network Monitoring (M2)** | ICMP Ping, DNS Query, TCP/UDP Probe, HTTP Probe, SNMP v1/v2c/v3, NetFlow v5/v9/IPFIX, sFlow v5, Syslog                   | 8     |
+| **Network & IoT**           | Cisco (DNA Center/Meraki), SNMP v1/v2c/v3 (legacy wiring), MQTT                                                          | 3     |
+| **Kernel/System**           | eBPF (syscalls, network, file I/O, scheduler), Cilium Hubble                                                             | 2     |
+| **APM Platforms**           | Dynatrace, IBM Instana, Datadog, New Relic                                                                               | 4     |
+| **OSS Observability**       | SigNoz, Coroot, HyperDX, OpenObserve, Netdata                                                                            | 5     |
+| **Observability**           | Prometheus, Splunk, Elasticsearch                                                                                        | 3     |
+| **Streaming & Logs**        | Kafka, Loki, InfluxDB                                                                                                    | 3     |
+| **Tracing**                 | Jaeger, Zipkin                                                                                                           | 2     |
+| **Monitoring Tools**        | Telegraf, Grafana Alloy, Percona PMM, Blackbox, ManageEngine                                                             | 5     |
+| **Cache (enhanced)**        | Redis (cluster + latency + version), Valkey (cluster + latency + version)                                                | 2     |
+| **Pipeline (M1+M3)**        | filter / drop / keep / rename / converter / enum / defaults / starlark / multiline / grok / json / regex / tail_sampling | 13    |
+| **Foundation (M1)**         | Disk-backed retry buffer, Secret management (env/file/vault), Plugin state persister, Config migration                   | 4     |
+| **Custom**                  | Webhook                                                                                                                  | 1     |
 
 ### Data Type Support Matrix
 
-| Integration        | Metrics | Logs | Traces | Protocol       |
-| ------------------ | :-----: | :--: | :----: | -------------- |
-| **Cloud**          |         |      |        |                |
-| GCP                |   ✅    |  ✅  |   ✅   | gRPC/REST      |
-| Azure              |   ✅    |  ✅  |   ✅   | REST           |
-| Alibaba Cloud      |   ✅    |  ✅  |   ✅   | REST           |
-| AWS CloudWatch     |   ✅    |  ✅  |   ❌   | REST           |
-| **Infrastructure** |         |      |        |                |
-| Proxmox            |   ✅    |  ❌  |   ❌   | REST           |
-| VMware vSphere     |   ✅    |  ❌  |   ❌   | REST/SOAP      |
-| Nutanix            |   ✅    |  ❌  |   ❌   | REST           |
-| Azure Arc          |   ✅    |  ❌  |   ❌   | REST           |
-| **Network**        |         |      |        |                |
-| Cisco              |   ✅    |  ❌  |   ❌   | REST           |
-| SNMP               |   ✅    |  ❌  |   ❌   | SNMP v1/v2c/v3 |
-| MQTT               |   ✅    |  ✅  |   ✅   | MQTT           |
-| **Network Mon. (M2)** |      |      |        |                |
-| ICMP Ping          |   ✅    |  ❌  |   ❌   | ICMP           |
-| DNS Query          |   ✅    |  ❌  |   ❌   | DNS            |
-| TCP/UDP Probe      |   ✅    |  ❌  |   ❌   | TCP/UDP        |
-| HTTP Probe         |   ✅    |  ❌  |   ❌   | HTTP(S)        |
-| NetFlow            |   ✅    |  ❌  |   ❌   | NetFlow v5/v9  |
-| sFlow              |   ✅    |  ❌  |   ❌   | sFlow v5       |
-| Syslog Receiver    |   ❌    |  ✅  |   ❌   | UDP/TCP/Unix   |
-| **Cache (enhanced)** |       |      |        |                |
-| Redis              |   ✅    |  ❌  |   ❌   | RESP           |
-| Valkey             |   ✅    |  ❌  |   ❌   | RESP           |
-| **System**         |         |      |        |                |
-| eBPF               |   ✅    |  ❌  |   ❌   | Kernel         |
-| Cilium Hubble      |   ✅    |  ❌  |   ✅   | gRPC           |
-| **APM Platforms**  |         |      |        |                |
-| Dynatrace          |   ✅    |  ✅  |   ✅   | REST/OTLP      |
-| IBM Instana        |   ✅    |  ✅  |   ✅   | REST           |
-| Datadog            |   ✅    |  ✅  |   ✅   | REST           |
-| New Relic          |   ✅    |  ✅  |   ✅   | REST           |
-| **OSS Observ.**    |         |      |        |                |
-| SigNoz             |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
-| Coroot             |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
-| HyperDX            |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
-| OpenObserve        |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
-| Netdata            |   ✅    |  ❌  |   ❌   | REST           |
-| **Observability**  |         |      |        |                |
-| Prometheus         |   ✅    |  ❌  |   ❌   | Remote Write   |
-| Splunk             |   ✅    |  ✅  |   ❌   | HEC            |
-| Elasticsearch      |   ✅    |  ✅  |   ❌   | REST           |
-| ManageEngine       |   ✅    |  ✅  |   ❌   | REST           |
-| **Streaming**      |         |      |        |                |
-| Kafka              |   ✅    |  ✅  |   ✅   | Kafka Protocol |
-| Loki               |   ❌    |  ✅  |   ❌   | REST           |
-| InfluxDB           |   ✅    |  ❌  |   ❌   | Line Protocol  |
-| **Tracing**        |         |      |        |                |
-| Jaeger             |   ❌    |  ❌  |   ✅   | gRPC/Thrift    |
-| Zipkin             |   ❌    |  ❌  |   ✅   | REST           |
-| **Tools**          |         |      |        |                |
-| Telegraf           |   ✅    |  ❌  |   ❌   | InfluxDB LP    |
-| Grafana Alloy      |   ✅    |  ✅  |   ✅   | OTLP           |
-| Percona PMM        |   ✅    |  ❌  |   ❌   | REST           |
-| Blackbox           |   ✅    |  ❌  |   ❌   | HTTP Probe     |
-| Webhook            |   ✅    |  ✅  |   ✅   | HTTP/HTTPS     |
+| Integration           | Metrics | Logs | Traces | Protocol       |
+| --------------------- | :-----: | :--: | :----: | -------------- |
+| **Cloud**             |         |      |        |                |
+| GCP                   |   ✅    |  ✅  |   ✅   | gRPC/REST      |
+| Azure                 |   ✅    |  ✅  |   ✅   | REST           |
+| Alibaba Cloud         |   ✅    |  ✅  |   ✅   | REST           |
+| AWS CloudWatch        |   ✅    |  ✅  |   ❌   | REST           |
+| **Infrastructure**    |         |      |        |                |
+| Proxmox               |   ✅    |  ❌  |   ❌   | REST           |
+| VMware vSphere        |   ✅    |  ❌  |   ❌   | REST/SOAP      |
+| Nutanix               |   ✅    |  ❌  |   ❌   | REST           |
+| Azure Arc             |   ✅    |  ❌  |   ❌   | REST           |
+| **Network**           |         |      |        |                |
+| Cisco                 |   ✅    |  ❌  |   ❌   | REST           |
+| SNMP                  |   ✅    |  ❌  |   ❌   | SNMP v1/v2c/v3 |
+| MQTT                  |   ✅    |  ✅  |   ✅   | MQTT           |
+| **Network Mon. (M2)** |         |      |        |                |
+| ICMP Ping             |   ✅    |  ❌  |   ❌   | ICMP           |
+| DNS Query             |   ✅    |  ❌  |   ❌   | DNS            |
+| TCP/UDP Probe         |   ✅    |  ❌  |   ❌   | TCP/UDP        |
+| HTTP Probe            |   ✅    |  ❌  |   ❌   | HTTP(S)        |
+| NetFlow               |   ✅    |  ❌  |   ❌   | NetFlow v5/v9  |
+| sFlow                 |   ✅    |  ❌  |   ❌   | sFlow v5       |
+| Syslog Receiver       |   ❌    |  ✅  |   ❌   | UDP/TCP/Unix   |
+| **Cache (enhanced)**  |         |      |        |                |
+| Redis                 |   ✅    |  ❌  |   ❌   | RESP           |
+| Valkey                |   ✅    |  ❌  |   ❌   | RESP           |
+| **System**            |         |      |        |                |
+| eBPF                  |   ✅    |  ❌  |   ❌   | Kernel         |
+| Cilium Hubble         |   ✅    |  ❌  |   ✅   | gRPC           |
+| **APM Platforms**     |         |      |        |                |
+| Dynatrace             |   ✅    |  ✅  |   ✅   | REST/OTLP      |
+| IBM Instana           |   ✅    |  ✅  |   ✅   | REST           |
+| Datadog               |   ✅    |  ✅  |   ✅   | REST           |
+| New Relic             |   ✅    |  ✅  |   ✅   | REST           |
+| **OSS Observ.**       |         |      |        |                |
+| SigNoz                |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
+| Coroot                |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
+| HyperDX               |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
+| OpenObserve           |   ✅    |  ✅  |   ✅   | OTLP/HTTP      |
+| Netdata               |   ✅    |  ❌  |   ❌   | REST           |
+| **Observability**     |         |      |        |                |
+| Prometheus            |   ✅    |  ❌  |   ❌   | Remote Write   |
+| Splunk                |   ✅    |  ✅  |   ❌   | HEC            |
+| Elasticsearch         |   ✅    |  ✅  |   ❌   | REST           |
+| ManageEngine          |   ✅    |  ✅  |   ❌   | REST           |
+| **Streaming**         |         |      |        |                |
+| Kafka                 |   ✅    |  ✅  |   ✅   | Kafka Protocol |
+| Loki                  |   ❌    |  ✅  |   ❌   | REST           |
+| InfluxDB              |   ✅    |  ❌  |   ❌   | Line Protocol  |
+| **Tracing**           |         |      |        |                |
+| Jaeger                |   ❌    |  ❌  |   ✅   | gRPC/Thrift    |
+| Zipkin                |   ❌    |  ❌  |   ✅   | REST           |
+| **Tools**             |         |      |        |                |
+| Telegraf              |   ✅    |  ❌  |   ❌   | InfluxDB LP    |
+| Grafana Alloy         |   ✅    |  ✅  |   ✅   | OTLP           |
+| Percona PMM           |   ✅    |  ❌  |   ❌   | REST           |
+| Blackbox              |   ✅    |  ❌  |   ❌   | HTTP Probe     |
+| Webhook               |   ✅    |  ✅  |   ✅   | HTTP/HTTPS     |
 
 ### Integration Capabilities Comparison
 
