@@ -124,7 +124,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
                        \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    TelemetryFlow Agent v1.2.2
+    TelemetryFlow Agent v1.3.1
     AI-Powered Observability & Incident Response Management (IRM) Platform
   ══════════════════════════════════════════════════════════════════════════════
     Platform     darwin/arm64
@@ -188,7 +188,7 @@ Displays version and build information.
 **Output (Default):**
 
 ```
-TelemetryFlow Agent v1.2.2
+TelemetryFlow Agent v1.3.1
 
   Build Information
   ─────────────────────────────────────────────

@@ -615,12 +615,12 @@ refactor: extract TLS config to helper function
 
 ```bash
 # Update version in internal/version/version.go
-const Version = "1.1.2"
+const Version = "1.3.1"
 
 # Update CHANGELOG.md
 # Create git tag
-git tag -a v1.1.2 -m "Release v1.1.2"
-git push origin v1.1.2
+git tag -a v1.3.1 -m "Release v1.3.1"
+git push origin v1.3.1
 ```
 
 ### Creating Release
