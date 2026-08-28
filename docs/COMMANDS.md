@@ -1,6 +1,6 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.3.1
+- **Version:** 1.3.2
 - **Last Updated:** July 2026
 
 ---
@@ -124,7 +124,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
                        \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    TelemetryFlow Agent v1.3.1
+    TelemetryFlow Agent v1.3.2
     AI-Powered Observability & Incident Response Management (IRM) Platform
   ══════════════════════════════════════════════════════════════════════════════
     Platform     darwin/arm64
@@ -188,7 +188,7 @@ Displays version and build information.
 **Output (Default):**
 
 ```
-TelemetryFlow Agent v1.3.1
+TelemetryFlow Agent v1.3.2
 
   Build Information
   ─────────────────────────────────────────────

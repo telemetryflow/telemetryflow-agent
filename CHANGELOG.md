@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.1-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
@@ -25,7 +25,11 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.2] - 2026-08-29
+
+Stability release fixing the retry-buffer memory leak and CPU saturation
+introduced in 1.3.1 (RCA-20260828-001 — node agents OOM-crash-looped
+under backend errors). No feature changes.
 
 ### Fixed
 
@@ -1193,6 +1197,7 @@ Six new output plugins under `internal/exporter/`, all registered via
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.3.2   | 2026-08-29 | v1.47.0  | Stability fix (RCA-20260828-001): retry-buffer memory leak + CPU busy-loop — buffer.max_entries memory bound, stop-on-first-failure retry backoff, effective MaxRetries on disk path, in-memory queue metrics budget; new buffer.max_entries / max_retries / retry_interval knobs; Helm chart 1.0.0                                                                                |
 | 1.3.1   | 2026-08-24 | v1.47.0  | Security patch: runtime image minimization (perl-base, apt, tar, openssl CLI purged) clearing the 2026-08 Trivy alert batch; unfixable CVEs documented in .trivyignore with reachability analysis                                                                                                                                                                                     |
 | 1.3.0   | 2026-08-24 | v1.47.0  | Plugin system + pipeline engine (M1), network monitoring collectors (M2), logs & self-observability (M3), database & app collectors (M4), multi-output (M5); SNMP IF-MIB interface monitoring; Gateway API collector tests; coverage integration update                                                                                                                              |
 | 1.2.0   | 2026-05-14 | v1.47.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes                                                                                                                                                                                                                          |

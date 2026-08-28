@@ -2,7 +2,7 @@
 # TelemetryFlow Agent - Dockerfile
 # =============================================================================
 #
-# TelemetryFlow Agent v1.3.1 (Based on OpenTelemetry SDK 1.47.0)
+# TelemetryFlow Agent v1.3.2 (Based on OpenTelemetry SDK 1.47.0)
 # AI-Powered Observability & Incident Response Management (IRM) Platform
 # Copyright (c) 2024-2026 Telemetri Data Indonesia. All rights reserved.
 #
@@ -35,7 +35,7 @@ FROM fluent/fluent-bit:5.0.9 AS fluent-bit
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 # Build arguments
-ARG VERSION=1.3.1
+ARG VERSION=1.3.2
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG BUILD_TIME=unknown
@@ -76,7 +76,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
 # NOTE: Fluent Bit 5.x requires GLIBC >= 2.38 — bookworm (2.36) is too old.
 FROM debian:trixie-slim
 
-ARG VERSION=1.3.1
+ARG VERSION=1.3.2
 
 # =============================================================================
 # TelemetryFlow Metadata Labels (OCI Image Spec)
@@ -223,16 +223,16 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 # =============================================================================
 # Build with:
 #   docker build \
-#     --build-arg VERSION=1.3.1 \
+#     --build-arg VERSION=1.3.2 \
 #     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
 #     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
 #     --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-#     -t telemetryflow/telemetryflow-agent:1.3.1 .
+#     -t telemetryflow/telemetryflow-agent:1.3.2 .
 #
 # Multi-arch build:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     --build-arg VERSION=1.3.1 \
-#     -t telemetryflow/telemetryflow-agent:1.3.1 .
+#     --build-arg VERSION=1.3.2 \
+#     -t telemetryflow/telemetryflow-agent:1.3.2 .
 #
 # Run with:
 #   docker run -d \
@@ -243,5 +243,5 @@ CMD ["start", "--config", "/etc/tfo-agent/tfo-agent.yaml"]
 #     -p 13133:13133 \
 #     -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
 #     -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-#     telemetryflow/telemetryflow-agent:1.3.1
+#     telemetryflow/telemetryflow-agent:1.3.2
 # =============================================================================

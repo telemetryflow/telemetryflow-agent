@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.1-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.2-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
@@ -60,7 +60,7 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.3.1  | SDK v1.47.0        | Telemetry collection agent  |
+| **TFO-Agent**     | v1.3.2  | SDK v1.47.0        | Telemetry collection agent  |
 | **TFO-Go-SDK**    | v1.3.0  | SDK v1.47.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.3.0  | Collector v0.151.0 | Central telemetry collector |
 
@@ -151,11 +151,11 @@ docker-compose down
 ```bash
 # Build image
 docker build \
-  --build-arg VERSION=1.3.1 \
+  --build-arg VERSION=1.3.2 \
   --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) \
   --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   --build-arg BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -t telemetryflow/telemetryflow-agent:1.3.1 .
+  -t telemetryflow/telemetryflow-agent:1.3.2 .
 
 # Run container
 docker run -d --name tfo-agent \
@@ -165,7 +165,7 @@ docker run -d --name tfo-agent \
   -p 13133:13133 \
   -v /path/to/config.yaml:/etc/tfo-agent/tfo-agent.yaml:ro \
   -v /var/lib/tfo-agent:/var/lib/tfo-agent \
-  telemetryflow/telemetryflow-agent:1.3.1
+  telemetryflow/telemetryflow-agent:1.3.2
 ```
 
 ### OTEL Collector Ports

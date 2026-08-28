@@ -315,7 +315,7 @@ spec:
       hostPID: true
       containers:
         - name: tfo-agent
-          image: telemetryflow/telemetryflow-agent:1.3.1
+          image: telemetryflow/telemetryflow-agent:1.3.2
           securityContext:
             privileged: true # Required for eBPF
           env:

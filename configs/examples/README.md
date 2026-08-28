@@ -59,7 +59,7 @@ docker run -d \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc:/host/etc:ro \
-  telemetryflow/telemetryflow-agent:1.3.1
+  telemetryflow/telemetryflow-agent:1.3.2
 ```
 
 ## Environment Variables
