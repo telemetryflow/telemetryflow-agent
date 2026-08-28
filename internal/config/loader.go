@@ -434,6 +434,9 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("buffer.max_size_mb", defaults.Buffer.MaxSizeMB)
 	v.SetDefault("buffer.path", defaults.Buffer.Path)
 	v.SetDefault("buffer.flush_interval", defaults.Buffer.FlushInterval)
+	v.SetDefault("buffer.max_entries", defaults.Buffer.MaxEntries)
+	v.SetDefault("buffer.max_retries", defaults.Buffer.MaxRetries)
+	v.SetDefault("buffer.retry_interval", defaults.Buffer.RetryInterval)
 
 	// Logging
 	v.SetDefault("logging.level", defaults.Logging.Level)

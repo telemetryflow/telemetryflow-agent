@@ -45,7 +45,16 @@ type Config struct {
 
 	// FlushInterval is how often to flush to disk
 	FlushInterval time.Duration `yaml:"flush_interval" json:"flush_interval"`
+
+	// MaxEntries caps how many entries are retained in memory. When the cap
+	// is exceeded the oldest entries are dropped. This bounds memory even
+	// when flush() persistently fails (e.g. read-only filesystem), which is
+	// what caused the OOM loop in RCA-20260828-001. 0 = default (100).
+	MaxEntries int `yaml:"max_entries" json:"max_entries"`
 }
+
+// defaultMaxEntries is the in-memory entry cap applied when MaxEntries is 0.
+const defaultMaxEntries = 100
 
 // DefaultConfig returns default buffer configuration
 func DefaultConfig() Config {
@@ -55,6 +64,7 @@ func DefaultConfig() Config {
 		MaxSizeMB:     100,
 		MaxAge:        24 * time.Hour,
 		FlushInterval: 5 * time.Second,
+		MaxEntries:    defaultMaxEntries,
 	}
 }
 
@@ -88,6 +98,10 @@ type Buffer struct {
 
 // New creates a new buffer
 func New(config Config) (*Buffer, error) {
+	if config.MaxEntries <= 0 {
+		config.MaxEntries = defaultMaxEntries
+	}
+
 	if !config.Enabled {
 		b := &Buffer{config: config}
 		b.closed.Store(true)
@@ -116,6 +130,18 @@ func New(config Config) (*Buffer, error) {
 	go b.flushLoop()
 
 	return b, nil
+}
+
+// capEntriesLocked enforces the in-memory entry cap by discarding the
+// oldest entries. It must be called with b.mu held. Entries are held in
+// memory as raw Go structs (much larger than their JSON form), so without
+// this cap a persistently failing flush (read-only filesystem) grows
+// b.entries without bound — the OOM driver in RCA-20260828-001.
+func (b *Buffer) capEntriesLocked() {
+	if b.config.MaxEntries <= 0 || len(b.entries) <= b.config.MaxEntries {
+		return
+	}
+	b.entries = b.entries[len(b.entries)-b.config.MaxEntries:]
 }
 
 // Push adds data to the buffer
@@ -190,6 +216,7 @@ func (b *Buffer) Retry(entries []Entry) {
 
 	// Prepend to front of queue for retry
 	b.entries = append(entries, b.entries...)
+	b.capEntriesLocked()
 }
 
 // Len returns the number of buffered entries
@@ -239,6 +266,7 @@ func (b *Buffer) flushLoop() {
 		case entry := <-b.incoming:
 			b.mu.Lock()
 			b.entries = append(b.entries, entry)
+			b.capEntriesLocked()
 			b.mu.Unlock()
 
 		case <-ticker.C:
@@ -254,6 +282,7 @@ func (b *Buffer) flushLoop() {
 				case entry := <-b.incoming:
 					b.mu.Lock()
 					b.entries = append(b.entries, entry)
+					b.capEntriesLocked()
 					b.mu.Unlock()
 				default:
 					return
@@ -320,6 +349,7 @@ func (b *Buffer) load() error {
 	b.mu.Lock()
 	b.entries = entries
 	b.size = int64(len(data))
+	b.capEntriesLocked()
 	b.mu.Unlock()
 
 	return nil
@@ -341,6 +371,11 @@ func (b *Buffer) cleanup() {
 		}
 	}
 	b.entries = filtered
+
+	// Enforce the entry cap. b.size is only refreshed by a successful
+	// flush(), so when the disk write persistently fails the byte-based
+	// limit below never triggers — the entry cap is the real memory bound.
+	b.capEntriesLocked()
 
 	// Enforce size limit (remove oldest if over limit)
 	maxBytes := b.config.MaxSizeMB * 1024 * 1024

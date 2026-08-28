@@ -1739,6 +1739,20 @@ type BufferConfig struct {
 
 	// FlushInterval is the buffer flush interval
 	FlushInterval time.Duration `mapstructure:"flush_interval"`
+
+	// MaxEntries caps in-memory buffered entries when the disk flush
+	// persistently fails (oldest dropped first). Bounds memory so a
+	// read-only filesystem cannot cause an OOM loop (RCA-20260828-001).
+	// Default 100.
+	MaxEntries int `mapstructure:"max_entries"`
+
+	// MaxRetries caps retry attempts per buffered entry before it is
+	// dropped. 0 = unlimited (entries still expire via MaxAge).
+	MaxRetries int `mapstructure:"max_retries"`
+
+	// RetryInterval is how often buffered entries are retried against the
+	// backend. Default 5s.
+	RetryInterval time.Duration `mapstructure:"retry_interval"`
 }
 
 // LoggingConfig contains logging settings
@@ -3064,6 +3078,9 @@ func DefaultConfig() *Config {
 			Path:          "/var/lib/tfo-agent/buffer",
 			MaxAge:        24 * time.Hour,
 			FlushInterval: 5 * time.Second,
+			MaxEntries:    100,
+			MaxRetries:    0,
+			RetryInterval: 5 * time.Second,
 		},
 		Logging: LoggingConfig{
 			Level:              "info",

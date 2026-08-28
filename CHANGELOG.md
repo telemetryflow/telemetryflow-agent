@@ -25,6 +25,35 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Retry-buffer memory leak + CPU saturation (RCA-20260828-001)** — the
+  disk-backed retry buffer introduced in 1.3.1 caused node agents to
+  OOM-crash-loop (heap 280→472 MiB climbing, CPU pinned at its limit) when
+  the OTLP backend returned errors:
+  - `internal/buffer`: `MaxSizeMB` was only ever computed from a
+    *successful* disk flush, so a persistently failing flush (read-only
+    filesystem) grew the in-memory entry list without bound. A new
+    `max_entries` cap (default 100) bounds retention regardless of flush
+    outcome, and is also applied to entries loaded from a legacy
+    `buffer.json` on startup.
+  - `buffer_retry_sink` drain loop: failed entries were re-persisted and
+    immediately re-popped in a tight `for { Pop(50) }` loop with zero
+    backoff. The drain now exports at most one failed entry per retry
+    tick (stop-on-first-failure circuit breaker) and re-persists it once
+    at the back of the queue.
+  - `MaxRetries` was never effective on the disk path because the retry
+    counter was read from `buffer.Entry.Retries`, which `Push` always
+    zeroes — the counter now lives in (and is read from) the entry
+    payload, so over-limit entries are dropped.
+  - In-memory fallback queue is now bounded by total buffered metrics
+    (25,000) in addition to the 100-entry cap (previously ~100 entries ×
+    ~5k metrics ≈ 250 MiB of retention was possible).
+  - New config knobs: `buffer.max_entries`, `buffer.max_retries`,
+    `buffer.retry_interval`.
+
 ## [1.3.1] - 2026-08-24
 
 Security-patch release on top of `1.3.0`. No feature or configuration

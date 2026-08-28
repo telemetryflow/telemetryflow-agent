@@ -19,6 +19,8 @@
 package buffer_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -527,4 +529,75 @@ func TestBufferPopLessThanCount(t *testing.T) {
 		entries := b.Pop(10)
 		assert.Len(t, entries, 2)
 	})
+}
+
+// TestBuffer_MaxEntriesCapsMemoryWhenFlushFails is a regression test for
+// RCA-20260828-001: when the disk flush persistently failed (read-only
+// filesystem), buffered entries accumulated in memory without bound because
+// the MaxSizeMB cap was only ever computed from a *successful* flush.
+// MaxEntries must bound in-memory retention regardless of flush outcome.
+func TestBuffer_MaxEntriesCapsMemoryWhenFlushFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := buffer.Config{
+		Enabled:       true,
+		Path:          tmpDir,
+		MaxSizeMB:     10,
+		MaxAge:        time.Hour,
+		FlushInterval: 50 * time.Millisecond,
+		MaxEntries:    10,
+	}
+
+	b, err := buffer.New(cfg)
+	require.NoError(t, err)
+
+	// Make the buffer directory read-only so every flush() fails — this is
+	// the exact 1.3.1 staging failure mode.
+	require.NoError(t, os.Chmod(tmpDir, 0o500))
+	defer func() {
+		_ = os.Chmod(tmpDir, 0o700)
+		_ = b.Close()
+	}()
+
+	for i := 0; i < 50; i++ {
+		require.NoError(t, b.Push("metrics", map[string]interface{}{"i": i}))
+	}
+
+	// Let the flush loop drain the incoming channel and run failing
+	// flushes + cleanups.
+	time.Sleep(300 * time.Millisecond)
+
+	assert.LessOrEqual(t, b.Len(), 10,
+		"MaxEntries must bound in-memory retention when flush persistently fails")
+}
+
+// TestBuffer_MaxEntriesCapsLoad ensures a huge historical buffer.json is not
+// fully resurrected into memory on startup.
+func TestBuffer_MaxEntriesCapsLoad(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	entries := make([]buffer.Entry, 0, 30)
+	for i := 0; i < 30; i++ {
+		entries = append(entries, buffer.Entry{
+			ID:        fmt.Sprintf("%d-metrics", i),
+			Timestamp: time.Now(),
+			Type:      "metrics",
+			Data:      map[string]interface{}{"i": i},
+		})
+	}
+	data, err := json.Marshal(entries)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "buffer.json"), data, 0o600))
+
+	b, err := buffer.New(buffer.Config{
+		Enabled:       true,
+		Path:          tmpDir,
+		MaxSizeMB:     10,
+		MaxAge:        time.Hour,
+		FlushInterval: 50 * time.Millisecond,
+		MaxEntries:    10,
+	})
+	require.NoError(t, err)
+	defer func() { _ = b.Close() }()
+
+	assert.LessOrEqual(t, b.Len(), 10, "startup load must respect MaxEntries")
 }

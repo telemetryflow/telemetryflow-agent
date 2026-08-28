@@ -954,6 +954,7 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			MaxSizeMB:     cfg.Buffer.MaxSizeMB,
 			MaxAge:        cfg.Buffer.MaxAge,
 			FlushInterval: cfg.Buffer.FlushInterval,
+			MaxEntries:    cfg.Buffer.MaxEntries,
 		})
 		if err != nil {
 			logger.Warn("Failed to initialise disk buffer — metrics will be lost on backend outage",
@@ -964,9 +965,11 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 			diskBuf = buf
 			selfstat.AgentBufferLimit.Set(cfg.Buffer.MaxSizeMB * 1024 * 1024)
 			bufferRetry = exporter.NewBufferRetrySink(otlpSink, exporter.BufferRetryConfig{
-				Enabled: true,
-				Buffer:  buf,
-				Logger:  logger,
+				Enabled:       true,
+				Buffer:        buf,
+				RetryInterval: cfg.Buffer.RetryInterval,
+				MaxRetries:    cfg.Buffer.MaxRetries,
+				Logger:        logger,
 			})
 			otlpSink = bufferRetry
 			logger.Info("Disk-backed retry buffer wired",
