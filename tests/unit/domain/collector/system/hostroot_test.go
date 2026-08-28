@@ -99,6 +99,21 @@ func TestDetectK8sProviderHostRoot(t *testing.T) {
 // detectCloudMetadata via TELEMETRYFLOW_HOST_ROOT fixtures, with a mock IMDS
 // client so the follow-on metadata fetches stay fully offline.
 func TestDetectCloudMetadataHostRoot(t *testing.T) {
+	// writeNeutralDMI stubs EVERY DMI attribute detectCloudMetadata reads
+	// with non-matching content. readDMI falls back to the direct path when
+	// the hostRoot-prefixed file is missing, so a fixture that only stubs
+	// the case-specific attribute lets the runner's real /sys leak into the
+	// decision: on Azure-hosted CI runners (GitHub ubuntu = Azure VMs) the
+	// real sys_vendor contains "Microsoft Corporation", the azure branch
+	// fires before alibaba, and the alibaba subtest fails. Neutral defaults
+	// for all attributes keep every subtest hermetic on any runner.
+	writeNeutralDMI := func(t *testing.T, root string) {
+		t.Helper()
+		writeHostFile(t, root, "sys/hypervisor/uuid", "00000000-0000-0000-0000-000000000000\n")
+		writeHostFile(t, root, "sys/class/dmi/id/product_name", "Generic Test VM\n")
+		writeHostFile(t, root, "sys/class/dmi/id/sys_vendor", "Test Vendor\n")
+	}
+
 	tests := []struct {
 		name     string
 		relpath  string
@@ -119,6 +134,7 @@ func TestDetectCloudMetadataHostRoot(t *testing.T) {
 				t.Setenv(v, "")
 			}
 			root := t.TempDir()
+			writeNeutralDMI(t, root)
 			writeHostFile(t, root, tc.relpath, tc.content)
 			t.Setenv("TELEMETRYFLOW_HOST_ROOT", root)
 
@@ -128,6 +144,24 @@ func TestDetectCloudMetadataHostRoot(t *testing.T) {
 			}
 		})
 	}
+
+	// With only neutral markers no provider must be detected — this locks
+	// in hermeticity: a failure here means the runner's real /sys (e.g.
+	// Azure "Microsoft Corporation" sys_vendor on GitHub-hosted runners)
+	// leaked through the direct-path fallback.
+	t.Run("none", func(t *testing.T) {
+		for _, v := range cloudEnvVars {
+			t.Setenv(v, "")
+		}
+		root := t.TempDir()
+		writeNeutralDMI(t, root)
+		t.Setenv("TELEMETRYFLOW_HOST_ROOT", root)
+
+		prov, _, _, _, _ := system.DetectCloudMetadataExported()
+		if prov != "" {
+			t.Errorf("provider = %q, want \"\" (neutral fixture must mask the host DMI)", prov)
+		}
+	})
 }
 
 // TestDetectCloudMetadataRancherHostRoot covers the k3s/rke2/rancher marker
