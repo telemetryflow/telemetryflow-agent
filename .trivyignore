@@ -263,3 +263,41 @@ CVE-2026-54371
 # libnghttp2-14: CVE-2026-58055 — nghttpx Upgrade request forwarding. Agent
 # does not run the nghttpx proxy.
 CVE-2026-58055
+
+# =============================================================================
+# glibc: 2026-08-29 Docker Hub alert batch (#355–#362, alerts duplicated
+# across the `main` and `1.3.2` image tags). Four findings against
+# libc6/libc-bin 2.41-12+deb13u3 — which is the NEWEST glibc trixie ships:
+# Debian tracker marks all of them vulnerable in trixie AND sid (2.43-4,
+# unfixed upstream), so neither a rebuild nor a sid pin can clear them.
+# Reachability: the agent binary is Go (no strfmon/iconv/fopen in its call
+# graph); Fluent Bit processes UTF-8 configuration and log payloads only —
+# it performs no locale monetary formatting (strfmon), no SHIFT_JISX0213
+# charset conversion, and never opens files with attacker-controlled
+# `,ccs=` locale strings.
+# =============================================================================
+# CVE-2026-77117 / CVE-2026-19499 (Debian bugs 1145880/1145891, sourceware
+# 34556/34510) — the two Medium findings in this batch (strfmon
+# right-justification padding buffer overflow; iconv SHIFT_JISX0213
+# non-progress DoS). Unfixed in any Debian release; not reachable per above.
+CVE-2026-77117
+CVE-2026-19499
+# CVE-2026-18374 — Note: passing an effectively empty string to the `,ccs=`
+# syntax extension of fopen. Requires an attacker-controlled locale string
+# in a C fopen() call; not reachable.
+CVE-2026-18374
+# CVE-2026-80489 — Note: severity UNKNOWN, no advisory details published
+# yet; glibc-wide per the tracker (vulnerable in bullseye..sid). Re-evaluate
+# when Debian publishes the description.
+CVE-2026-80489
+
+# =============================================================================
+# gobinary: GO-2026-5932 — the x/crypto/openpgp package is archived upstream
+# (unmaintained, advisory with NO fixed version; every x/crypto release
+# carries it). The agent does not import openpgp (verified: `go list -deps
+# ./cmd/tfo-agent` contains no x/crypto/openpgp) — the module-wide advisory
+# attaches to the x/crypto requirement in the embedded buildinfo metadata.
+# =============================================================================
+GO-2026-5932
+
+

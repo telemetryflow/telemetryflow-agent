@@ -121,6 +121,15 @@ LABEL org.opencontainers.image.title="TelemetryFlow Agent" \
 #     CLI/provider instances of openssl CVE-2026-14456.
 #   - tar: required by dpkg only; force-removed as the final dpkg operation.
 #     Clears tar CVE-2026-18477 and CVE-2026-18508.
+#   - libsqlite3-0 + liblastlog2-2: newer debian:trixie-slim point releases
+#     ship liblastlog2-2 (util-linux lastlog2), which hard-depends on
+#     libsqlite3-0 — apt-get purge refuses (util-linux is essential), and
+#     the old `|| true` purge line silently did nothing, leaving SQLite
+#     3.46.1 in the image for Trivy to flag. Both are force-removed with
+#     dpkg after all apt operations are done (apt refuses to run with the
+#     deliberately-broken package state this leaves) but BEFORE the tar
+#     removal — dpkg itself needs tar. lastlog2 serves PAM login/lastlog
+#     tooling that never runs in this container.
 # libstdc++6 is marked manual before the purge — Fluent Bit links it and
 # apt's auto-remove would otherwise take it along with apt.
 # Remaining unfixable CVEs (libssl3t64 QUIC CVE-2026-14456 [Debian: postponed],
@@ -150,10 +159,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && 
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libssh2-1t64=1.11.1-6 \
     && rm -f /etc/apt/sources.list.d/sid.list \
-    && DEBIAN_FRONTEND=noninteractive apt-get purge -y libsqlite3-0 2>/dev/null || true \
     && apt-mark manual libstdc++6 \
     && DEBIAN_FRONTEND=noninteractive apt-get purge -y --allow-remove-essential --auto-remove perl-base apt \
     && dpkg --remove --force-depends openssl openssl-provider-legacy \
+    && dpkg --remove --force-depends liblastlog2-2 libsqlite3-0 \
     && dpkg --remove --force-all tar \
     && rm -rf /var/lib/apt/lists/* /var/log/apt /var/log/dpkg.log* /etc/apt/sources.list.d
 

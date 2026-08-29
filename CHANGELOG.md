@@ -58,6 +58,33 @@ under backend errors). No feature changes.
   - New config knobs: `buffer.max_entries`, `buffer.max_retries`,
     `buffer.retry_interval`.
 
+### Security
+
+- **2026-08-29 Trivy alert batch cleared** (Docker Hub alerts #355–#364,
+  duplicated across the `main` and `1.3.2` image tags):
+  - **Removed `libsqlite3-0` + `liblastlog2-2` from the runtime image** —
+    clears the SQLite 3.46.1 source-snapshot buffer-overflow finding.
+    Newer `debian:trixie-slim` point releases ship `liblastlog2-2`, which
+    hard-depends on `libsqlite3-0`; the old silent-fail purge line never
+    removed it. Both are now force-removed via dpkg (lastlog2 only serves
+    PAM login tooling that never runs in this container).
+  - `golang.org/x/crypto` v0.54.0 → **v0.55.0** — clears GO-2026-6303
+    (source-address critical option not enforced for non-public-key auth
+    callbacks in `x/crypto/ssh`). Test-only dependency (verified via
+    `go list -deps`: not linked into the production binary — flagged via
+    embedded buildinfo metadata).
+  - `modernc.org/sqlite` v1.23.1 → **v1.57.0** (SQLite 3.41-era snapshot →
+    3.53.3) — test-only dependency of the `sql_generic` unit tests, bumped
+    as hygiene so no SQLite advisory appears via any channel.
+  - glibc findings against `libc6` 2.41-12+deb13u3 (strfmon
+    right-justification padding overflow, SHIFT_JISX0213 non-progress DoS,
+    `,ccs=` empty string, CVE-2026-80489): no fixed version exists in any
+    Debian release (trixie's deb13u3 is the newest; sid 2.43-4 still
+    vulnerable) and glibc cannot be pinned or purged — suppressed in
+    `.trivyignore` with reachability analysis (the Go agent never calls
+    `strfmon`/`iconv`/`fopen(ccs=)`; Fluent Bit is UTF-8 only, no locale
+    monetary formatting).
+
 ## [1.3.1] - 2026-08-24
 
 Security-patch release on top of `1.3.0`. No feature or configuration
