@@ -19,10 +19,14 @@
 package api_test
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -704,4 +708,62 @@ func TestSystemInfoPayload(t *testing.T) {
 		assert.Equal(t, 8, payload.CPUCores)
 		assert.Equal(t, 50.0, payload.MemoryUsage)
 	})
+}
+
+// TestRequestWithGzip_RetryResendsFullBody is a regression test for the
+// Kubernetes-sync retry failure observed in staging: RequestWithGzip built a
+// single *http.Request outside its retry loop, so after the first attempt
+// failed every retry re-sent an already-drained body and net/http aborted
+// with "http: ContentLength=N with Body length 0" — the retry loop could
+// never succeed even against a recovered backend.
+func TestRequestWithGzip_RetryResendsFullBody(t *testing.T) {
+	type syncPayload struct {
+		ClusterName string `json:"cluster_name"`
+		Filler      string `json:"filler"`
+	}
+	payload := syncPayload{ClusterName: "staging", Filler: strings.Repeat("x", 4096)}
+
+	var attempts atomic.Int32
+	var lastBody []byte
+	var lastEncoding string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		body, _ := io.ReadAll(r.Body)
+		lastBody = body
+		lastEncoding = r.Header.Get("Content-Encoding")
+		if n == 1 {
+			// First attempt fails — forces the retry path.
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"simulated transient failure"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(api.ClientConfig{
+		BaseURL:       server.URL,
+		Timeout:       5 * time.Second,
+		RetryAttempts: 2,
+		RetryDelay:    1 * time.Millisecond,
+	})
+
+	resp, err := client.RequestWithGzip(context.Background(), http.MethodPost, "/monitoring/kubernetes/clusters/test/sync", payload)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.True(t, resp.IsSuccess())
+	assert.EqualValues(t, 2, attempts.Load(), "retry must succeed on the second attempt")
+	assert.Equal(t, "gzip", lastEncoding)
+
+	// The retried request must carry the FULL compressed payload, not the
+	// drained (zero-byte) body the old implementation sent.
+	require.NotEmpty(t, lastBody)
+	zr, err := gzip.NewReader(bytes.NewReader(lastBody))
+	require.NoError(t, err)
+	decoded, err := io.ReadAll(zr)
+	require.NoError(t, err)
+	var received syncPayload
+	require.NoError(t, json.Unmarshal(decoded, &received))
+	assert.Equal(t, payload, received)
 }

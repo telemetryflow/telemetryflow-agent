@@ -25,6 +25,20 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Kubernetes sync retry sent an empty request body** —
+  `pkg/api.RequestWithGzip` built a single `*http.Request` outside its
+  retry loop, so after the first attempt failed every retry re-sent an
+  already-drained body and net/http aborted with
+  `http: ContentLength=N with Body length 0` (observed in staging when
+  the backend was overloaded). The retry loop could never succeed even
+  after the backend recovered. Each attempt now builds a fresh request
+  from the compressed payload; response bodies are also closed
+  per-attempt instead of accumulating defers inside the loop.
+
 ## [1.3.2] - 2026-08-29
 
 Stability release fixing the retry-buffer memory leak and CPU saturation

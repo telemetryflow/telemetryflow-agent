@@ -235,7 +235,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 func (c *Client) RequestWithGzip(ctx context.Context, method, path string, body interface{}) (*Response, error) {
 	url := c.baseURL + path
 
-	var bodyReader io.Reader
+	// Marshal + compress once; every attempt re-sends the same bytes.
+	var gzipped []byte
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
@@ -250,34 +251,7 @@ func (c *Client) RequestWithGzip(ctx context.Context, method, path string, body 
 		if err := gzipWriter.Close(); err != nil {
 			return nil, fmt.Errorf("failed to close gzip writer: %w", err)
 		}
-		bodyReader = &buf
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", version.UserAgent())
-	req.Header.Set("X-Agent-Version", version.Short())
-	req.Header.Set("X-Agent-Product", version.ProductName)
-
-	// Set auth headers
-	if c.config.APIKeyID != "" && c.config.APIKeySecret != "" {
-		req.Header.Set("X-API-Key-ID", c.config.APIKeyID)
-		req.Header.Set("X-API-Key-Secret", c.config.APIKeySecret)
-	}
-
-	if c.config.WorkspaceID != "" {
-		req.Header.Set("X-Workspace-ID", c.config.WorkspaceID)
-	}
-
-	if c.config.TenantID != "" {
-		req.Header.Set("X-Tenant-ID", c.config.TenantID)
+		gzipped = buf.Bytes()
 	}
 
 	// Execute with retry
@@ -292,16 +266,59 @@ func (c *Client) RequestWithGzip(ctx context.Context, method, path string, body 
 			}
 		}
 
+		// Build a FRESH request per attempt from the compressed bytes.
+		// Re-using a single *http.Request re-sends an already-drained
+		// body: after the first attempt fails, every retry sends zero
+		// bytes against the ContentLength captured at construction —
+		// "http: ContentLength=N with Body length 0" — so the retry loop
+		// could never succeed even against a healthy backend.
+		var bodyReader io.Reader
+		if gzipped != nil {
+			bodyReader = bytes.NewReader(gzipped)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		// Set headers
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", version.UserAgent())
+		req.Header.Set("X-Agent-Version", version.Short())
+		req.Header.Set("X-Agent-Product", version.ProductName)
+
+		// Set auth headers
+		if c.config.APIKeyID != "" && c.config.APIKeySecret != "" {
+			req.Header.Set("X-API-Key-ID", c.config.APIKeyID)
+			req.Header.Set("X-API-Key-Secret", c.config.APIKeySecret)
+		}
+
+		if c.config.WorkspaceID != "" {
+			req.Header.Set("X-Workspace-ID", c.config.WorkspaceID)
+		}
+
+		if c.config.TenantID != "" {
+			req.Header.Set("X-Tenant-ID", c.config.TenantID)
+		}
+
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = err
+			c.logger.Debug("gzip request failed",
+				zap.String("method", method),
+				zap.String("path", path),
+				zap.Int("attempt", attempt),
+				zap.Error(err),
+			)
 			continue
 		}
-		defer func() { _ = resp.Body.Close() }()
 
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			lastErr = err
+		respBody, readErr := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
 			continue
 		}
 
@@ -312,7 +329,7 @@ func (c *Client) RequestWithGzip(ctx context.Context, method, path string, body 
 		}
 
 		if resp.StatusCode >= 400 {
-			lastErr = fmt.Errorf("request failed with status %d", resp.StatusCode)
+			lastErr = fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(respBody))
 			continue
 		}
 
