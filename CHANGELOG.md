@@ -25,7 +25,12 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+
+## [1.3.2] - 2026-08-29
+
+Stability release fixing the retry-buffer memory leak and CPU saturation
+introduced in 1.3.1 (RCA-20260828-001 — node agents OOM-crash-looped
+under backend errors). No feature changes.
 
 ### Fixed
 
@@ -38,14 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after the backend recovered. Each attempt now builds a fresh request
   from the compressed payload; response bodies are also closed
   per-attempt instead of accumulating defers inside the loop.
-
-## [1.3.2] - 2026-08-29
-
-Stability release fixing the retry-buffer memory leak and CPU saturation
-introduced in 1.3.1 (RCA-20260828-001 — node agents OOM-crash-looped
-under backend errors). No feature changes.
-
-### Fixed
 
 - **Retry-buffer memory leak + CPU saturation (RCA-20260828-001)** — the
   disk-backed retry buffer introduced in 1.3.1 caused node agents to
