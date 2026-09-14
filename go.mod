@@ -78,7 +78,7 @@ require (
 	// Logging & gRPC
 	// -------------------------------------------------------------------------
 	go.uber.org/zap v1.28.0 // Structured logging
-	google.golang.org/grpc v1.82.1 // gRPC support
+	google.golang.org/grpc v1.83.1 // gRPC support
 	gopkg.in/yaml.v3 v3.0.1 // YAML parsing
 
 	// -------------------------------------------------------------------------
