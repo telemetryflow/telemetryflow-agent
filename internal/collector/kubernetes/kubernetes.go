@@ -294,6 +294,17 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		}
 	}
 
+	// --- Helm Releases ---
+	{
+		helmMetrics, releases, err := collectHelmReleases(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		if err != nil {
+			k.logger.Warn("Failed to collect helm release state", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, helmMetrics...)
+			state.HelmReleases = releases
+		}
+	}
+
 	// --- Events ---
 	if k.cfg.Events {
 		metrics, events, err := collectEvents(ctx, k.clientset, k.cfg, k.cfg.ClusterName)

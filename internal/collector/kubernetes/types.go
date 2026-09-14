@@ -127,6 +127,7 @@ type ClusterState struct {
 	Gateways         []GatewayState          `json:"gateways"`
 	HTTPRoutes       []HTTPRouteState        `json:"httpRoutes"`
 	NetworkPolicies  []NetworkPolicyState    `json:"network_policies,omitempty"`
+	HelmReleases     []HelmReleaseState      `json:"helm_releases,omitempty"`
 	PVs              []PVState               `json:"pvs,omitempty"`
 	PVCs             []PVCState              `json:"pvcs,omitempty"`
 	Events           []EventState            `json:"events,omitempty"`
@@ -644,6 +645,20 @@ type NetworkPolicyState struct {
 	EgressRules      []NetworkPolicyRule `json:"egress_rules,omitempty"`
 	Labels           map[string]string   `json:"labels,omitempty"`
 	CreatedAt        int64               `json:"created_at,omitempty"` // Unix millis
+}
+
+// HelmReleaseState represents one Helm release (latest revision) discovered
+// from the cluster's helm.sh/release.v1 secrets.
+type HelmReleaseState struct {
+	Name       string `json:"name"`
+	Namespace  string `json:"namespace"`
+	Chart      string `json:"chart"`
+	Version    string `json:"version"`               // chart version
+	AppVersion string `json:"app_version,omitempty"` // app version
+	Status     string `json:"status,omitempty"`      // deployed | failed | pending | superseded | uninstalling
+	Revision   int    `json:"revision,omitempty"`
+	Updated    int64  `json:"updated,omitempty"` // Unix millis (info.last_deployed)
+	Notes      string `json:"notes,omitempty"`
 }
 
 // NetworkPolicyRule represents a single ingress or egress rule.
