@@ -78,7 +78,7 @@ require (
 	// Logging & gRPC
 	// -------------------------------------------------------------------------
 	go.uber.org/zap v1.28.0 // Structured logging
-	google.golang.org/grpc v1.83.1 // gRPC support
+	google.golang.org/grpc v1.83.2 // gRPC support
 	gopkg.in/yaml.v3 v3.0.1 // YAML parsing
 
 	// -------------------------------------------------------------------------
@@ -151,7 +151,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.57.0
+	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
