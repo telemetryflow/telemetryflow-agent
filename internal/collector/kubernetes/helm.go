@@ -164,7 +164,7 @@ func gunzipJSON(b []byte) (*helmReleasePayload, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer zr.Close()
+	defer func() { _ = zr.Close() }()
 	out, err := io.ReadAll(zr)
 	if err != nil {
 		return nil, err
