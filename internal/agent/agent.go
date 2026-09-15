@@ -102,14 +102,20 @@ type Agent struct {
 	logger *zap.Logger
 
 	// Components
-	client           *api.Client
-	heartbeat        *exporter.Heartbeat
-	k8sSync          *exporter.KubernetesSync
-	k8sCollector     *kubernetes.KubernetesCollector // kept for registration retry
-	collectors       []collector.Collector
-	collectorManager *collector.Manager
-	prometheusServer *exporter.PrometheusServer
-	agentAPIServer   *agentapi.Server
+	client       *api.Client
+	heartbeat    *exporter.Heartbeat
+	k8sSync      *exporter.KubernetesSync
+	k8sCollector *kubernetes.KubernetesCollector // kept for registration retry
+
+	// networkFlowExporter + networkFlowSub form the Cilium/Hubble K8s
+	// network-flow export path. Both are nil unless the Cilium flow-export
+	// feature flag is enabled and a cluster ID + endpoint + API key resolve.
+	networkFlowExporter *exporter.NetworkFlowExporter
+	networkFlowSub      *ebpfcollector.NetworkFlowSubscriber
+	collectors          []collector.Collector
+	collectorManager    *collector.Manager
+	prometheusServer    *exporter.PrometheusServer
+	agentAPIServer      *agentapi.Server
 	// otlpBridge holds whichever metric bridge was constructed (HTTP or gRPC).
 	// Both implementations satisfy MetricSink + Shutdown so the run/shutdown
 	// paths do not need to care about the transport.
@@ -683,6 +689,46 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		}
 	}
 
+	// Cilium/Hubble Kubernetes network-flow export (feature-flagged, default OFF).
+	// Only wired when collectors.ebpf.cilium.enabled AND .flow_export are both
+	// true and a cluster ID + platform endpoint + API key are resolvable. When
+	// the flag is off (default) neither the exporter nor the subscriber exist.
+	var networkFlowExporter *exporter.NetworkFlowExporter
+	var networkFlowSub *ebpfcollector.NetworkFlowSubscriber
+	ciliumCfg := cfg.Collector.EBPF.Cilium
+	if ciliumCfg.Enabled && ciliumCfg.FlowExport {
+		flowClusterID := cfg.Collector.Kubernetes.ClusterID
+		flowEndpoint := cfg.GetBackendEndpoint()
+		flowKeyID := cfg.GetEffectiveAPIKeyID()
+		flowKeySecret := cfg.GetEffectiveAPIKeySecret()
+		switch {
+		case flowClusterID == "":
+			logger.Warn("Cilium flow export enabled but no cluster ID resolved, skipping network-flow export")
+		case flowEndpoint == "":
+			logger.Warn("Cilium flow export enabled but no platform endpoint configured, skipping network-flow export")
+		case flowKeyID == "" || flowKeySecret == "":
+			logger.Warn("Cilium flow export enabled but no API key configured, skipping network-flow export")
+		default:
+			networkFlowExporter = exporter.NewNetworkFlowExporter(exporter.NetworkFlowExporterConfig{
+				ClusterID:    flowClusterID,
+				Endpoint:     flowEndpoint,
+				APIKeyID:     flowKeyID,
+				APIKeySecret: flowKeySecret,
+				Logger:       logger,
+			})
+			exp := networkFlowExporter
+			networkFlowSub = ebpfcollector.NewNetworkFlowSubscriber(
+				ciliumCfg,
+				func(recs []exporter.NetworkFlowRecord) { exp.RecordMany(recs) },
+				logger,
+			)
+			logger.Info("Cilium/Hubble network-flow export enabled",
+				zap.String("clusterID", flowClusterID),
+				zap.String("hubble_address", ciliumCfg.HubbleAddress),
+			)
+		}
+	}
+
 	// Add Node Exporter collector if enabled
 	if cfg.Collector.NodeExporter.Enabled {
 		neCollector := nodeexporter.NewNodeExporterCollector(cfg.Collector.NodeExporter, logger)
@@ -1198,27 +1244,29 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 	}
 
 	ag := &Agent{
-		id:               agentID,
-		config:           cfg,
-		logger:           logger,
-		client:           client,
-		heartbeat:        heartbeat,
-		k8sSync:          k8sSync,
-		k8sCollector:     k8sCollector,
-		collectors:       collectors,
-		collectorManager: newCollectorManager(cfg, collectors, logger),
-		prometheusServer: promServer,
-		agentAPIServer:   apiServer,
-		otlpBridge:       otlpBridge,
-		logBridge:        logBridge,
-		logCollector:     nativeLogCol,
-		metricForwarder:  forwarder,
-		bufferRetry:      bufferRetry,
-		diskBuffer:       diskBuf,
-		persister:        agentPersister,
-		qanForwarder:     qanFwd,
-		qanExporter:      qanExp,
-		configFile:       configFile,
+		id:                  agentID,
+		config:              cfg,
+		logger:              logger,
+		client:              client,
+		heartbeat:           heartbeat,
+		k8sSync:             k8sSync,
+		k8sCollector:        k8sCollector,
+		networkFlowExporter: networkFlowExporter,
+		networkFlowSub:      networkFlowSub,
+		collectors:          collectors,
+		collectorManager:    newCollectorManager(cfg, collectors, logger),
+		prometheusServer:    promServer,
+		agentAPIServer:      apiServer,
+		otlpBridge:          otlpBridge,
+		logBridge:           logBridge,
+		logCollector:        nativeLogCol,
+		metricForwarder:     forwarder,
+		bufferRetry:         bufferRetry,
+		diskBuffer:          diskBuf,
+		persister:           agentPersister,
+		qanForwarder:        qanFwd,
+		qanExporter:         qanExp,
+		configFile:          configFile,
 	}
 
 	if ag.collectorManager != nil && cfg.Supervisor.StatusReport {
@@ -1364,6 +1412,12 @@ func (a *Agent) Run(ctx context.Context) error {
 				return
 			}
 		}()
+	}
+
+	// Start Cilium/Hubble network-flow export path (nil unless feature-flagged).
+	if a.networkFlowExporter != nil && a.networkFlowSub != nil {
+		a.networkFlowExporter.Start()
+		go a.networkFlowSub.Run(ctx)
 	}
 
 	// Start metric forwarder (bridges collectors → OTLP + Prometheus)
@@ -1527,6 +1581,16 @@ func (a *Agent) shutdown() error {
 				errs = append(errs, fmt.Errorf("kubernetes sync stop: %w", err))
 				errMu.Unlock()
 			}
+		}()
+	}
+
+	// Stop Cilium/Hubble network-flow exporter (final flush). The subscriber
+	// goroutine stops via run-context cancellation.
+	if a.networkFlowExporter != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			a.networkFlowExporter.Stop()
 		}()
 	}
 

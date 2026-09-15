@@ -1251,6 +1251,13 @@ type CiliumCollectorConfig struct {
 	// Enabled enables Cilium Hubble integration
 	Enabled bool `mapstructure:"enabled"`
 
+	// FlowExport gates the Kubernetes network-flow export path: when true (and
+	// Enabled is also true, a cluster ID + platform endpoint + API key are
+	// configured), the agent subscribes to Hubble Relay flow events and forwards
+	// per-flow records to the TFO Platform's /k8s/flows endpoint. Default: false
+	// (no subscription, no exporter — existing behavior unchanged).
+	FlowExport bool `mapstructure:"flow_export"`
+
 	// HubbleAddress is the Hubble Relay gRPC address
 	HubbleAddress string `mapstructure:"hubble_address"`
 
@@ -2790,6 +2797,7 @@ func DefaultConfig() *Config {
 				PinPath:          "/sys/fs/bpf/tfo-agent",
 				Cilium: CiliumCollectorConfig{
 					Enabled:         false,
+					FlowExport:      false,
 					HubbleAddress:   "localhost:4245",
 					CollectFlows:    true,
 					CollectL7Flows:  false,

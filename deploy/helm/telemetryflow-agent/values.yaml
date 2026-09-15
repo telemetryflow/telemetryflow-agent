@@ -373,6 +373,19 @@ kubernetes:
         workload_generations: false
         kubelet_skip_verify: false
 
+      # eBPF / Cilium-Hubble Kubernetes network-flow export (feature-flagged, OFF by default).
+      # When cilium.enabled AND cilium.flow_export are BOTH true and a Hubble Relay
+      # is reachable, the agent subscribes to the Hubble flow stream and forwards
+      # per-flow records to /api/v2/monitoring/network-map/k8s/flows using the same
+      # cluster ID, backend endpoint and API key as the cluster-state sync.
+      ebpf:
+        enabled: false
+        cilium:
+          enabled: false
+          flow_export: false
+          hubble_address: "hubble-relay.kube-system.svc.cluster.local:80"
+          hubble_tls_enabled: false
+
     prometheus_server:
       enabled: true
       port: 8888

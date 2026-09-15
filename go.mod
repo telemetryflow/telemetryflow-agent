@@ -84,9 +84,9 @@ require (
 	// -------------------------------------------------------------------------
 	// Kubernetes Monitoring
 	// -------------------------------------------------------------------------
-	k8s.io/api v0.36.2 // Kubernetes API types
-	k8s.io/apimachinery v0.36.2 // Kubernetes API machinery
-	k8s.io/client-go v0.36.2 // Kubernetes client
+	k8s.io/api v0.36.3 // Kubernetes API types
+	k8s.io/apimachinery v0.36.3 // Kubernetes API machinery
+	k8s.io/client-go v0.36.3 // Kubernetes client
 	k8s.io/metrics v0.36.2 // Kubernetes metrics API
 )
 
@@ -175,6 +175,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/IBM/sarama v1.48.0
 	github.com/aws/smithy-go v1.27.4
+	github.com/cilium/cilium v1.20.1
 	github.com/golang/snappy v1.0.0
 	github.com/gosnmp/gosnmp v1.44.0
 	github.com/jackc/pgx/v5 v5.10.0

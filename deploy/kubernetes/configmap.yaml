@@ -168,6 +168,15 @@ data:
 
       ebpf:
         enabled: false
+        cilium:
+          # Cilium/Hubble Kubernetes network-flow export (feature-flagged, OFF by default).
+          # Requires a Cilium CNI + Hubble Relay reachable at hubble_address.
+          # Both enabled AND flow_export must be true to subscribe to flows and
+          # forward them to the platform's /api/v2/monitoring/network-map/k8s/flows.
+          enabled: false
+          flow_export: false
+          hubble_address: "hubble-relay.kube-system.svc.cluster.local:80"
+          hubble_tls_enabled: false
 
     prometheus_server:
       enabled: true

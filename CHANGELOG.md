@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.2-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.3-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
@@ -25,6 +25,40 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.3.3] - 2026-09-15
+
+Kubernetes observability release: Helm release discovery and opt-in
+Cilium/Hubble pod-to-pod network-flow ingestion. No breaking changes; new
+behavior is off by default.
+
+### Added
+
+- **Helm release collector** — discovers Helm v3 releases from
+  `helm.sh/release.v1` secrets (base64→gzip→JSON decode, newest revision per
+  release) and ships them in the cluster-sync payload as `helm_releases`
+  (name, namespace, chart, version, app version, status, revision, updated,
+  notes). Emits `k8s.helm.release.count` per namespace. Feeds the platform's
+  Helm Releases page (`k8s_helm_releases`).
+- **Kubernetes network-flow ingestion (Cilium/Hubble)** —
+  `NetworkFlowSubscriber` subscribes to the Hubble Relay `Observer.GetFlows`
+  stream, maps each flow to a pod-to-pod `NetworkFlowRecord`
+  (source/dest namespace/pod/labels/IP, L4 protocol/ports, verdict, L7
+  HTTP status / DNS query, direction) and exports batches to the platform's
+  `POST /api/v2/monitoring/network-map/k8s/flows`. This powers the Service
+  Traffic Map and Traffic Analysis pages.
+  - **Feature-flagged, OFF by default**: gated by
+    `collectors.ebpf.cilium.enabled` **and** the new
+    `collectors.ebpf.cilium.flow_export` (both must be true). Requires Cilium
+    with Hubble Relay on the cluster. When disabled, no exporter or
+    subscription is created — behavior is unchanged.
+  - Adds `github.com/cilium/cilium` (observer/flow gRPC API). Non-Linux builds
+    use a no-op stub so all platforms still compile.
+
+### Changed
+
+- Helm chart bumped to `1.1.0` (new `ebpf.cilium` values block); `appVersion`
+  `1.3.3`.
 
 ## [1.3.2] - 2026-08-29
 
