@@ -36,7 +36,7 @@ helm install tfo-agent ./deploy/helm/telemetryflow-agent \
 | `clusterName`                                               | Cluster name injected as env var                                             | `""`                                             |
 | `environment`                                               | Environment tag                                                              | `production`                                     |
 | `oneForAll.enabled`                                         | Enable all four new capabilities                                             | `false`                                          |
-| `image.repository`                                          | Container image repository                                                   | `ghcr.io/telemetryflow/tfo-agent`                |
+| `image.repository`                                          | Container image repository                                                   | `telemetryflow/telemetryflow-agent`                |
 | `image.pullPolicy`                                          | Image pull policy                                                            | `IfNotPresent`                                   |
 | `image.tag`                                                 | Image tag (defaults to Chart.appVersion)                                     | `""`                                             |
 | `imagePullSecrets`                                          | Image pull secrets                                                           | `[]`                                             |

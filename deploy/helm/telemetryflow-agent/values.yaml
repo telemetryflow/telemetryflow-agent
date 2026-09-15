@@ -23,7 +23,7 @@ environment: production
 
 # -- Container image settings
 image:
-  repository: ghcr.io/telemetryflow/tfo-agent
+  repository: telemetryflow/telemetryflow-agent
   pullPolicy: IfNotPresent
   tag: "" # Defaults to Chart.appVersion
 
