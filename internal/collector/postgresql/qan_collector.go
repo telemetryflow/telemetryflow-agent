@@ -62,6 +62,7 @@ type qanPgInstance struct {
 	pool         *pgxpool.Pool
 	prevSnapshot map[string]*pgStatStatementsSnapshot // keyed by queryid
 	prevTime     time.Time
+	version      int // server_version_num, detected lazily (0 until known)
 }
 
 // pgStatStatementsSnapshot captures raw counter values for delta calculation.
@@ -221,16 +222,25 @@ func (c *QANPostgreSQLCollector) collectQANBuckets(ctx context.Context, pool Pgx
 		candidatePool = limit
 	}
 
+	// Detect server version once so we select version-correct pg_stat_statements
+	// columns (PG15+ split blk_read_time/blk_write_time). Cached on the instance.
+	if inst.version == 0 {
+		var verNum int
+		if err := pool.QueryRow(ctx2, "SELECT current_setting('server_version_num')::int").Scan(&verNum); err == nil {
+			inst.version = verNum
+		}
+	}
+
 	// Filter to the current database's dbid so queries from other databases
 	// connected through this monitoring user are not mis-attributed.
-	query := `
+	query := fmt.Sprintf(`
 		SELECT queryid, query, calls, total_exec_time, min_exec_time, max_exec_time,
 		       rows, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written,
-		       temp_blks_read, temp_blks_written, blk_read_time, blk_write_time
+		       temp_blks_read, temp_blks_written, %s
 		FROM pg_stat_statements
 		WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
 		ORDER BY total_exec_time DESC
-		LIMIT $1`
+		LIMIT $1`, blkTimeColumns(inst.version))
 
 	rows, err := pool.Query(ctx2, query, candidatePool)
 	if err != nil {

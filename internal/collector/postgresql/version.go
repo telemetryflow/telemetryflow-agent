@@ -65,3 +65,22 @@ func hasPgStatWal(inst *pgInstance) bool {
 func hasExecTimeColumns(inst *pgInstance) bool {
 	return inst.version >= 130000
 }
+
+// PG15+ (pg_stat_statements 1.10) removed blk_read_time / blk_write_time and
+// split them into shared_/local_/temp_blk_*_time. Querying the old names raises
+// SQLSTATE 42703 ("column does not exist"), which broke QAN collection entirely
+// on PG15+ (e.g. PG18). Detect the version so callers can select the right cols.
+func hasSplitBlkTimeColumns(versionNum int) bool {
+	return versionNum >= 150000
+}
+
+// blkTimeColumns returns the pg_stat_statements block-I/O timing columns aliased
+// as blk_read_time / blk_write_time so downstream scanning is version-agnostic.
+// Old blk_read_time == shared + local block read time (temp is tracked separately).
+func blkTimeColumns(versionNum int) string {
+	if hasSplitBlkTimeColumns(versionNum) {
+		return "(shared_blk_read_time + local_blk_read_time) AS blk_read_time, " +
+			"(shared_blk_write_time + local_blk_write_time) AS blk_write_time"
+	}
+	return "blk_read_time, blk_write_time"
+}

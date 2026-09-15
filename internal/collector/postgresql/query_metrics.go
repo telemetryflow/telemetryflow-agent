@@ -101,23 +101,25 @@ func collectQueryAnalytics(ctx context.Context, pool PgxQuerier, inst *pgInstanc
 	// Choose columns based on version (PG13+ renamed total_time to total_exec_time).
 	useExecCols := hasExecTimeColumns(inst)
 
+	blkCols := blkTimeColumns(inst.version)
+
 	var query string
 	if useExecCols {
-		query = `
+		query = fmt.Sprintf(`
 			SELECT queryid, query, calls, total_exec_time, mean_exec_time, min_exec_time, max_exec_time,
 			       rows, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written,
-			       temp_blks_read, temp_blks_written, blk_read_time, blk_write_time
+			       temp_blks_read, temp_blks_written, %s
 			FROM pg_stat_statements
 			ORDER BY total_exec_time DESC
-			LIMIT $1`
+			LIMIT $1`, blkCols)
 	} else {
-		query = `
+		query = fmt.Sprintf(`
 			SELECT queryid, query, calls, total_time, mean_time, min_time, max_time,
 			       rows, shared_blks_hit, shared_blks_read, shared_blks_dirtied, shared_blks_written,
-			       temp_blks_read, temp_blks_written, blk_read_time, blk_write_time
+			       temp_blks_read, temp_blks_written, %s
 			FROM pg_stat_statements
 			ORDER BY total_time DESC
-			LIMIT $1`
+			LIMIT $1`, blkCols)
 	}
 
 	rows, err := pool.Query(ctx2, query, limit)
