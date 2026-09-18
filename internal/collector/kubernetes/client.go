@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -103,4 +104,17 @@ func buildRESTConfig(kubeconfig, context string) (*rest.Config, error) {
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{CurrentContext: context},
 	).ClientConfig()
+}
+
+// newDynamicClientset creates a dynamic clientset for accessing CRD-based resources.
+func newDynamicClientset(kubeconfig, context string) (dynamic.Interface, error) {
+	cfg, err := buildRESTConfig(kubeconfig, context)
+	if err != nil {
+		return nil, fmt.Errorf("build REST config: %w", err)
+	}
+	dc, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create dynamic clientset: %w", err)
+	}
+	return dc, nil
 }

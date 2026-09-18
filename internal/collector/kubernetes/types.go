@@ -134,6 +134,7 @@ type ClusterState struct {
 	ResourceCounts   *ResourceCounts         `json:"resource_counts,omitempty"`
 	NetworkStats     []NamespaceNetworkStats `json:"network_stats,omitempty"`
 	HPAs             []HPAState              `json:"hpas,omitempty"`
+	VPAs             []VPAState              `json:"vpas,omitempty"`
 	PDBs             []PDBState              `json:"pdbs,omitempty"`
 	PodLogs          []PodLogEntry           `json:"pod_logs,omitempty"`
 	NodeLogs         []NodeLogEntry          `json:"node_logs,omitempty"`
@@ -798,4 +799,26 @@ type KubeletFSStats struct {
 	CapacityBytes  *uint64 `json:"capacityBytes,omitempty"`
 	UsedBytes      *uint64 `json:"usedBytes,omitempty"`
 	AvailableBytes *uint64 `json:"availableBytes,omitempty"`
+}
+
+// VPAContainerRecommendation holds VPA resource recommendations for one container.
+type VPAContainerRecommendation struct {
+	ContainerName string `json:"container_name"`
+	TargetCPU     string `json:"target_cpu,omitempty"`
+	TargetMemory  string `json:"target_memory,omitempty"`
+	LowerCPU      string `json:"lower_cpu,omitempty"`
+	LowerMemory   string `json:"lower_memory,omitempty"`
+	UpperCPU      string `json:"upper_cpu,omitempty"`
+	UpperMemory   string `json:"upper_memory,omitempty"`
+}
+
+// VPAState represents a VerticalPodAutoscaler resource.
+type VPAState struct {
+	Name            string                       `json:"name"`
+	Namespace       string                       `json:"namespace"`
+	ScaleTargetKind string                       `json:"scale_target_kind"`
+	ScaleTargetName string                       `json:"scale_target_name"`
+	UpdateMode      string                       `json:"update_mode,omitempty"` // Off, Initial, Recreate, Auto
+	Recommendations []VPAContainerRecommendation `json:"recommendations,omitempty"`
+	Labels          map[string]string            `json:"labels,omitempty"`
 }

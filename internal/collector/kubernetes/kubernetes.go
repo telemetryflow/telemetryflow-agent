@@ -29,6 +29,7 @@ import (
 
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	gatewayv "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned"
@@ -47,7 +48,8 @@ type KubernetesCollector struct {
 
 	clientset     kubernetes.Interface
 	metricsClient metricsv.Interface
-	gatewayClient gatewayv.Interface
+	gatewayClient   gatewayv.Interface
+	dynamicClient  dynamic.Interface
 
 	mu       sync.RWMutex
 	running  bool
@@ -94,6 +96,14 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 		logger.Warn("Failed to create gateway-api client, Gateway/HTTPRoute state will be unavailable", zap.Error(err))
 	}
 
+	// Dynamic client for CRD-backed resources (VPA, etc.). Optional; collectors
+	// that use it must nil-check and graceful-degrade when unavailable.
+	dc, err := newDynamicClientset(conf.Kubeconfig, conf.Context)
+	if err != nil {
+		logger.Warn("Failed to create dynamic client, CRD-based collection (VPA) will be unavailable", zap.Error(err))
+		dc = nil
+	}
+
 	// Auto-detect cluster name if not configured
 	clusterName := conf.ClusterName
 	if clusterName == "" {
@@ -112,6 +122,7 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 		clientset:       cs,
 		metricsClient:   mc,
 		gatewayClient:   gc,
+		dynamicClient:   dc,
 		kubeletFetcher:  newKubeletStatsFetcher(cs),
 		cadvisorFetcher: newCAdvisorProxyFetcher(cs),
 	}, nil
@@ -296,7 +307,7 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 
 	// --- Helm Releases ---
 	{
-		helmMetrics, releases, err := collectHelmReleases(ctx, k.clientset, k.cfg, k.cfg.ClusterName)
+		helmMetrics, releases, err := collectHelmReleases(ctx, k.clientset, k.cfg, k.cfg.ClusterName, k.logger)
 		if err != nil {
 			k.logger.Warn("Failed to collect helm release state", zap.Error(err))
 		} else {
@@ -335,6 +346,19 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		} else {
 			allMetrics = append(allMetrics, metrics...)
 			state.HPAs = hpas
+		}
+	}
+
+	// --- VPA ---
+	// Gracefully no-ops when the autoscaling.k8s.io/v1 CRD is absent (no error,
+	// no log spam).  When VPAs exist, emits k8s.vpa.* metrics per container.
+	if k.cfg.VPA {
+		metrics, vpas, err := collectVPAs(ctx, k.clientset, k.dynamicClient, k.cfg, k.cfg.ClusterName, k.logger)
+		if err != nil {
+			k.logger.Warn("Failed to collect VPA metrics", zap.Error(err))
+		} else {
+			allMetrics = append(allMetrics, metrics...)
+			state.VPAs = vpas
 		}
 	}
 

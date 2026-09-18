@@ -1363,6 +1363,10 @@ type KubernetesCollectorConfig struct {
 	// POST /api/v2/monitoring/kubernetes/clusters.
 	ClusterID string `mapstructure:"cluster_id"`
 
+	// VPA enables VerticalPodAutoscaler collection (autoscaling.k8s.io/v1).
+	// Gracefully no-ops when the VPA CRD is absent from the cluster.
+	VPA bool `mapstructure:"vpa"`
+
 	// HPA enables HorizontalPodAutoscaler collection (current/desired replicas, conditions)
 	HPA bool `mapstructure:"hpa"`
 
@@ -2819,7 +2823,8 @@ func DefaultConfig() *Config {
 				ResourceCounts:    true,
 				Network:           true,
 				MetricsAPI:        true,
-				HPA:               true,
+				VPA:               true,
+					HPA:               true,
 				PDB:               true,
 				PodLogs:           true,
 				PodLogsTailLines:  100,
