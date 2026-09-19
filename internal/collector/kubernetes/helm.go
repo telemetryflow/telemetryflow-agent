@@ -17,11 +17,11 @@ package kubernetes
 
 import (
 	"bytes"
-	"fmt"
 	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"time"
 

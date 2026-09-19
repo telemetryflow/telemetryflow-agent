@@ -48,8 +48,8 @@ type KubernetesCollector struct {
 
 	clientset     kubernetes.Interface
 	metricsClient metricsv.Interface
-	gatewayClient   gatewayv.Interface
-	dynamicClient  dynamic.Interface
+	gatewayClient gatewayv.Interface
+	dynamicClient dynamic.Interface
 
 	mu       sync.RWMutex
 	running  bool

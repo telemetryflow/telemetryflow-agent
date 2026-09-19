@@ -2824,7 +2824,7 @@ func DefaultConfig() *Config {
 				Network:           true,
 				MetricsAPI:        true,
 				VPA:               true,
-					HPA:               true,
+				HPA:               true,
 				PDB:               true,
 				PodLogs:           true,
 				PodLogsTailLines:  100,
