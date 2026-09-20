@@ -385,6 +385,13 @@ kubernetes:
           flow_export: false
           hubble_address: "hubble-relay.kube-system.svc.cluster.local:80"
           hubble_tls_enabled: false
+        # L7 RED (Coroot/Pixie-style per-pod request/error/latency via eBPF).
+        # Emits k8s.pod.l7.requests/errors/latency. DISABLED by default — before
+        # enabling: build the L7 BPF object (bpf2go on Linux), and mount
+        # /var/lib/kubelet/pods (ro) into the DaemonSet for pod-name resolution
+        # (/proc is already mounted). Needs kernel 5.8+ with BTF.
+        l7:
+          enabled: false
 
     prometheus_server:
       enabled: true
