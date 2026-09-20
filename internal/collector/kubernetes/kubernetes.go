@@ -70,6 +70,11 @@ type KubernetesCollector struct {
 	// cadvisorFetcher retrieves /metrics/cadvisor from each node's kubelet
 	// via the API server proxy. Used for CPU throttle metrics.
 	cadvisorFetcher CAdvisorProxyFunc
+
+	// podNetCounters tracks per-pod cumulative network byte counters between
+	// consecutive kubelet summary scrapes for rate computation in collectPodDiskNetwork.
+	// Guarded by mu.
+	podNetCounters map[string]*podNetworkCounter
 }
 
 // NewKubernetesCollector creates a new Kubernetes collector.
@@ -125,6 +130,7 @@ func NewKubernetesCollector(cfg config.KubernetesCollectorConfig, logger *zap.Lo
 		dynamicClient:   dc,
 		kubeletFetcher:  newKubeletStatsFetcher(cs),
 		cadvisorFetcher: newCAdvisorProxyFetcher(cs),
+		podNetCounters:  make(map[string]*podNetworkCounter),
 	}, nil
 }
 
@@ -416,6 +422,15 @@ func (k *KubernetesCollector) Collect(ctx context.Context) ([]collector.Metric, 
 		} else {
 			allMetrics = append(allMetrics, metrics...)
 			state.NetworkStats = netStats
+		}
+
+		// Per-pod ephemeral storage and network I/O rate (Service Map disk/network columns).
+		// Gated on Pods config; reuses the nodeNames already computed above.
+		if k.cfg.Pods {
+			k.mu.Lock()
+			podDiskNetMetrics := collectPodDiskNetwork(ctx, k.kubeletFetcher, nodeNames, k.cfg.ClusterName, k.cfg, k.logger, k.podNetCounters, time.Now())
+			k.mu.Unlock()
+			allMetrics = append(allMetrics, podDiskNetMetrics...)
 		}
 
 		// Volume stats (PVC usage from Kubelet /stats/summary)
