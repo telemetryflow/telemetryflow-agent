@@ -41,3 +41,4 @@ package ebpf
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel,bpfeb -cc clang -type sched_key -type sched_val scheduler bpf/scheduler.bpf.c -- -I bpf
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel,bpfeb -cc clang -type mem_key -type mem_val memory bpf/memory.bpf.c -- -I bpf
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel,bpfeb -cc clang -type tcpstate_key -type tcpstate_val tcpstate bpf/tcpstate.bpf.c -- -I bpf
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel,bpfeb -cc clang -type l7_conn_key -type l7_stat_val -type l7_event l7 bpf/l7.bpf.c -- -I bpf

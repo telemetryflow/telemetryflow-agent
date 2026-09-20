@@ -52,3 +52,26 @@ ebpf:
     collect_l7_flows: false
     collect_drops: true
     collect_policies: true
+
+  # -------------------------------------------------------------------------
+  # L7 RED Collector (eBPF-based Layer-7 Request/Error/Latency)
+  # Coroot/Pixie-style per-pod HTTP RED metrics without app instrumentation.
+  #
+  # DISABLED BY DEFAULT — safe to deploy; zero overhead when off.
+  #
+  # Requirements when enabling:
+  #   - Linux kernel >= 5.8 (BPF ring buffer)
+  #   - CAP_BPF + CAP_SYS_ADMIN (or run as root)
+  #   - clang on build host for: go generate ./internal/collector/ebpf/...
+  #   - The agent DaemonSet must mount /proc and /var/lib/kubelet/pods (read-only)
+  #     to enable pid→pod resolution via cgroup path inspection.
+  #
+  # Emitted metrics (labels: pod, namespace, cluster, protocol):
+  #   k8s.pod.l7.requests  — counter: HTTP requests per interval
+  #   k8s.pod.l7.errors    — counter: HTTP 5xx responses per interval
+  #   k8s.pod.l7.latency   — gauge:   average request→response latency (nanoseconds)
+  #
+  # Protocols parsed: http1 (HTTP/1.x method + status line detection)
+  # Protocols stubbed (TODO): grpc, mysql, redis, postgresql
+  l7:
+    enabled: false

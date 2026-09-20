@@ -103,6 +103,14 @@ func (c *EBPFCollector) collectAll(ctx context.Context) []collector.Metric {
 		}
 	}
 
+	if c.cfg.raw.L7.Enabled {
+		if m, err := c.collectL7(ctx); err != nil {
+			c.logger.Debug("L7 RED sub-collector error", zap.Error(err))
+		} else {
+			metrics = append(metrics, m...)
+		}
+	}
+
 	return metrics
 }
 

@@ -100,5 +100,6 @@ func (cc *collectorConfig) hasAnySubCollector() bool {
 		cc.raw.CollectScheduler ||
 		cc.raw.CollectMemory ||
 		cc.raw.CollectTCPEvents ||
-		cc.raw.Cilium.Enabled
+		cc.raw.Cilium.Enabled ||
+		cc.raw.L7.Enabled
 }

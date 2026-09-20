@@ -56,6 +56,10 @@ type bpfPrograms struct {
 
 	// TCP State maps
 	tcpstateStats *ebpf.Map
+
+	// L7 RED maps (HTTP/1.x request/error/latency per pid+fd)
+	// Managed separately via l7Maps package-level var; listed here for close.
+	l7Stats *ebpf.Map
 }
 
 // programs holds the currently loaded BPF programs.
@@ -131,6 +135,15 @@ func (c *EBPFCollector) loadProgramsLinux() error {
 		}
 	}
 
+	if c.cfg.raw.L7.Enabled {
+		if err := c.loadL7Programs(progs); err != nil {
+			c.logger.Warn("Failed to load L7 BPF programs, disabling", zap.Error(err))
+		} else if l7Maps != nil {
+			progs.l7Stats = l7Maps.stats
+			progs.links = append(progs.links, l7Maps.links...)
+		}
+	}
+
 	programs = progs
 	c.logger.Info("eBPF programs loaded successfully",
 		zap.Int("links", len(progs.links)),
@@ -159,6 +172,7 @@ func (c *EBPFCollector) closeProgramsLinux() {
 		programs.memStats,
 		programs.tcpstateStats,
 	)
+	closeL7Programs()
 
 	programs = nil
 	c.logger.Debug("eBPF programs closed")

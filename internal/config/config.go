@@ -1242,8 +1242,23 @@ type EBPFCollectorConfig struct {
 	// Labels are additional labels applied to all eBPF metrics
 	Labels map[string]string `mapstructure:"labels"`
 
+	// L7 contains eBPF-based Layer-7 RED (Request/Error/Latency) collector settings.
+	// Disabled by default; requires Linux 5.8+, CAP_BPF, and clang for BPF compilation.
+	L7 L7CollectorConfig `mapstructure:"l7"`
+
 	// Cilium contains Cilium Hubble integration settings
 	Cilium CiliumCollectorConfig `mapstructure:"cilium"`
+}
+
+// L7CollectorConfig contains settings for the eBPF-based L7 RED collector.
+// The collector attaches to sys_enter/exit_read/write tracepoints to observe
+// per-connection HTTP/1.x traffic without any application instrumentation.
+//
+// Feature flag: ebpf.l7.enabled (default: false — completely inert when off).
+type L7CollectorConfig struct {
+	// Enabled gates the L7 collector. Default false.
+	// When false, no BPF programs are loaded and zero CPU/memory is consumed.
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // CiliumCollectorConfig contains Cilium Hubble gRPC client settings.
