@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/badge/Version-1.3.3-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.46.0-blueviolet)](https://opentelemetry.io/)
 [![Coverage](https://img.shields.io/badge/Coverage-91.3%25-green.svg)](CHANGELOG.md)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -18,7 +18,7 @@
 
 ---
 
-Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.47.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
+Enterprise-grade telemetry collection agent built on **OpenTelemetry Go SDK v1.46.0**. Provides comprehensive system monitoring with metrics collection, heartbeat monitoring, and OTLP telemetry export for the **TelemetryFlow Platform**.
 
 This agent works as the **client-side counterpart** to the TelemetryFlow Backend Agent Module (NestJS), providing:
 
@@ -29,17 +29,17 @@ This agent works as the **client-side counterpart** to the TelemetryFlow Backend
 
 ## TelemetryFlow Ecosystem
 
-TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same OpenTelemetry SDK version:
+TFO-Agent is part of the TelemetryFlow ecosystem, built on the OpenTelemetry Go SDK:
 
 ```mermaid
 graph LR
     subgraph "TelemetryFlow Ecosystem v1.4.2"
         subgraph "Instrumentation"
-            SDK[TFO-Go-SDK<br/>OTEL SDK v1.47.0]
+            SDK[TFO-Go-SDK<br/>OTEL SDK v1.43.0]
         end
 
         subgraph "Collection"
-            AGENT[TFO-Agent<br/>OTEL SDK v1.47.0]
+            AGENT[TFO-Agent<br/>OTEL SDK v1.46.0]
         end
 
         subgraph "Processing"
@@ -60,15 +60,15 @@ graph LR
 
 | Component         | Version | OTEL Base          | Description                 |
 | ----------------- | ------- | ------------------ | --------------------------- |
-| **TFO-Agent**     | v1.3.3  | SDK v1.47.0        | Telemetry collection agent  |
-| **TFO-Go-SDK**    | v1.3.0  | SDK v1.47.0        | Go instrumentation SDK      |
+| **TFO-Agent**     | v1.3.3  | SDK v1.46.0        | Telemetry collection agent  |
+| **TFO-Go-SDK**    | v1.3.0  | SDK v1.43.0        | Go instrumentation SDK      |
 | **TFO-Collector** | v1.3.0  | Collector v0.151.0 | Central telemetry collector |
 
 ## Features
 
 ### OpenTelemetry Core
 
-- **OpenTelemetry SDK v1.47.0**: Built on standard OTEL Go SDK (aligned with TFO-Go-SDK)
+- **OpenTelemetry SDK v1.46.0**: Built on standard OTEL Go SDK
 - **OTLP Export**: OpenTelemetry Protocol for metrics, logs, and traces
 - **Multi-Signal Support**: Metrics, logs, and traces collection
 

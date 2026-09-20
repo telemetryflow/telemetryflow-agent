@@ -62,7 +62,7 @@ const (
 	SupportURL = "https://docs.telemetryflow.id"
 
 	// OTELSDKVersion is the OpenTelemetry SDK version this agent is based on
-	OTELSDKVersion = "1.47.0"
+	OTELSDKVersion = "1.46.0"
 )
 
 // Build-time variables (set via ldflags)

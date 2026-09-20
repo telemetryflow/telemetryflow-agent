@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/badge/Version-1.3.3-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.46.0-blueviolet)](https://opentelemetry.io/)
 [![Coverage](https://img.shields.io/badge/Coverage-91.3%25-green.svg)](CHANGELOG.md)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -59,6 +59,24 @@ behavior is off by default.
 
 - Helm chart bumped to `1.1.0` (new `ebpf.cilium` values block); `appVersion`
   `1.3.3`.
+- **OpenTelemetry SDK v1.44.0 → v1.46.0** (latest, 2026-08-25) with the full
+  exporter module set aligned: `otlpmetricgrpc`/`otlpmetrichttp` v1.44.0 →
+  v1.46.0, `otlploghttp` v0.20.0 → v0.22.0, `otlploggrpc`/`sdk/log`/`log`
+  v0.21.0 → v0.22.0. The previous partial bump left `go build ./...` broken
+  (`otlploghttp` v0.20.0 is incompatible with otel core ≥ v1.45.0).
+
+### Fixed
+
+- `NewKubernetesCollectorForTest` did not initialize `podNetCounters`, causing
+  a nil-map panic in `collectPodDiskNetwork` when the fake kubelet summary
+  returned pod network stats.
+- Corrected OTEL SDK version references across README, CONTRIBUTING, SECURITY,
+  CODE_OF_CONDUCT, docs, Makefile, Dockerfile, docker-compose, and
+  `internal/version` (`OTELSDKVersion`): they claimed a nonexistent v1.47.0.
+  The Version History table now reflects the SDK actually shipped per release
+  (1.3.x → v1.44.0, 1.2.0/1.1.10 → v1.43.0, 1.1.9 → v1.40.0) and includes the
+  previously missing 1.3.3 row. README no longer claims SDK-version alignment
+  with TFO-Go-SDK (currently v1.43.0).
 
 ## [1.3.2] - 2026-08-29
 
@@ -1269,12 +1287,13 @@ Six new output plugins under `internal/exporter/`, all registered via
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.3.2   | 2026-08-29 | v1.47.0  | Stability fix (RCA-20260828-001): retry-buffer memory leak + CPU busy-loop — buffer.max_entries memory bound, stop-on-first-failure retry backoff, effective MaxRetries on disk path, in-memory queue metrics budget; new buffer.max_entries / max_retries / retry_interval knobs; Helm chart 1.0.0                                                                                |
-| 1.3.1   | 2026-08-24 | v1.47.0  | Security patch: runtime image minimization (perl-base, apt, tar, openssl CLI purged) clearing the 2026-08 Trivy alert batch; unfixable CVEs documented in .trivyignore with reachability analysis                                                                                                                                                                                     |
-| 1.3.0   | 2026-08-24 | v1.47.0  | Plugin system + pipeline engine (M1), network monitoring collectors (M2), logs & self-observability (M3), database & app collectors (M4), multi-output (M5); SNMP IF-MIB interface monitoring; Gateway API collector tests; coverage integration update                                                                                                                              |
-| 1.2.0   | 2026-05-14 | v1.47.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes                                                                                                                                                                                                                          |
-| 1.1.10  | 2026-04-28 | v1.47.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration                                                                              |
-| 1.1.9   | 2026-03-20 | v1.47.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |
+| 1.3.3   | 2026-09-15 | v1.44.0  | Helm release discovery (`helm_releases` cluster-sync payload, `k8s.helm.release.count`); opt-in Cilium/Hubble pod-to-pod network-flow ingestion (feature-flagged, OFF by default); Helm chart 1.1.0                                                                                                                                                                                                                                                |
+| 1.3.2   | 2026-08-29 | v1.44.0  | Stability fix (RCA-20260828-001): retry-buffer memory leak + CPU busy-loop — buffer.max_entries memory bound, stop-on-first-failure retry backoff, effective MaxRetries on disk path, in-memory queue metrics budget; new buffer.max_entries / max_retries / retry_interval knobs; Helm chart 1.0.0                                                                                |
+| 1.3.1   | 2026-08-24 | v1.44.0  | Security patch: runtime image minimization (perl-base, apt, tar, openssl CLI purged) clearing the 2026-08 Trivy alert batch; unfixable CVEs documented in .trivyignore with reachability analysis                                                                                                                                                                                     |
+| 1.3.0   | 2026-08-24 | v1.44.0  | Plugin system + pipeline engine (M1), network monitoring collectors (M2), logs & self-observability (M3), database & app collectors (M4), multi-output (M5); SNMP IF-MIB interface monitoring; Gateway API collector tests; coverage integration update                                                                                                                              |
+| 1.2.0   | 2026-05-14 | v1.43.0  | Docker security hardening (dist-upgrade, libssh2 removal); CVE-2026-7598, CVE-2026-42010, CVE-2026-33845, CVE-2026-5435, CVE-2026-6238, CVE-2026-6276 fixes                                                                                                                                                                                                                          |
+| 1.1.10  | 2026-04-28 | v1.43.0  | Aurora collector (AWS SDK); ClickHouse collector; MySQL/MariaDB collector (InnoDB, replication, Galera, query analytics, MariaDB-specific sub-collectors); Aurora build fixes; lint compliance (errcheck, govet, ineffassign, staticcheck, unused) across all DB collectors; TimescaleDB test migration                                                                              |
+| 1.1.9   | 2026-03-20 | v1.40.0  | K8s network resources (Services/Endpoints/Ingresses); NetworkPolicy collector + Network Flow Exporter; API Server & CoreDNS metrics scrapers; Fluent Bit log collector; Prometheus Remote Write Receiver; KSM gap fields (5); Pod QoS/status metrics; Node network rx/tx/drop metrics; 4 new K8s test files; license headers; eBPF build constraint fixes; Helm rename; gRPC v1.79.3 |
 | 1.1.8   | 2026-03-09 | v1.40.0  | HPA/PDB/pod-logs sub-collectors; Kubelet summary ephemeral + working set; Go 1.26 + security fixes; 17 collector docs                                                                                                                                                                                                                                                                |
 | 1.1.7   | 2026-03-08 | v1.40.0  | Stable agent identity via UUIDv5 host fingerprint; K8s provider detection (15 providers); fix SyncKubernetesState                                                                                                                                                                                                                                                                    |
 | 1.1.6   | 2026-02-21 | v1.40.0  | Go 1.25.7, OTEL SDK v1.40.0, build-tag lint fixes, errcheck/staticcheck cleanup                                                                                                                                                                                                                                                                                                      |

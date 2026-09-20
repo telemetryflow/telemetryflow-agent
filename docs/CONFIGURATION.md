@@ -1,7 +1,7 @@
 # TelemetryFlow Agent Configuration Reference
 
 - **Version:** 1.3.3
-- **OTEL SDK Version:** 1.47.0
+- **OTEL SDK Version:** 1.46.0
 - **Last Updated:** July 2026
 
 ---
