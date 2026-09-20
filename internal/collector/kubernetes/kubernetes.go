@@ -585,10 +585,11 @@ func NewKubernetesCollectorForTest(
 		conf.ClusterName = "test-cluster"
 	}
 	return &KubernetesCollector{
-		cfg:           conf,
-		logger:        logger.Named(collectorName),
-		clientset:     cs,
-		metricsClient: mc,
+		cfg:            conf,
+		logger:         logger.Named(collectorName),
+		clientset:      cs,
+		metricsClient:  mc,
+		podNetCounters: make(map[string]*podNetworkCounter),
 	}
 }
 
