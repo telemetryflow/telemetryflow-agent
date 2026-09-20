@@ -38,8 +38,8 @@ import (
 // l7BPFMaps holds references to the loaded L7 BPF maps.
 // Populated by loadL7Programs; nil when L7 is not loaded.
 type l7BPFMaps struct {
-	stats  *ebpf.Map // l7_stats: l7ConnKey → l7StatVal
-	links  []link.Link
+	stats *ebpf.Map // l7_stats: l7ConnKey → l7StatVal
+	links []link.Link
 }
 
 // l7Maps is the package-level singleton, set only when loadL7Programs succeeds.
