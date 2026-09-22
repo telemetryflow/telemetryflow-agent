@@ -36,7 +36,7 @@ telemetryflow:
 
   tls:
     enabled: false
-    # skip_verify: true   # dev/staging only
+    skip_verify: true
     # ca_file: /path/to/ca.crt
 
   timeout: 30s
@@ -76,7 +76,7 @@ collectors:
   # collector. Requires the fluent-bit binary in PATH (binary_path
   # auto-detects) — on Docker use the tfo-agent image, which bundles it.
   fluent_bit:
-    enabled: true
+    enabled: false
     binary_path: ""                     # auto-detect from PATH
     config_dir: /tmp/tfo-agent-fluentbit
     flush_interval: 5
