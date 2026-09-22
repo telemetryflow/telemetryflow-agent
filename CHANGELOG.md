@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.3-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.4-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.46.0-blueviolet)](https://opentelemetry.io/)
@@ -25,6 +25,49 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.3.4] - 2026-09-22
+
+Stability & dependency-alignment release: heartbeat reliability fix, OTEL SDK
+and gopsutil dependency updates, documentation version corrections. No
+breaking changes.
+
+### Changed
+
+- **OpenTelemetry SDK v1.44.0 → v1.46.0** (latest, 2026-08-25) with the full
+  exporter module set aligned: `otlpmetricgrpc`/`otlpmetrichttp` v1.44.0 →
+  v1.46.0, `otlploghttp` v0.20.0 → v0.22.0, `otlploggrpc`/`sdk/log`/`log`
+  v0.21.0 → v0.22.0. The previous partial bump left `go build ./...` broken
+  (`otlploghttp` v0.20.0 is incompatible with otel core ≥ v1.45.0).
+- **gopsutil v3.24.5 → v4.26.8** (latest). `host.SensorsTemperatures` moved to
+  the `sensors` package (`nodeexporter/thermal.go`).
+- Helm chart bumped to `1.1.1`; `appVersion` `1.3.4`.
+
+### Fixed
+
+- **Heartbeat never reached the backend on hosts with slow system-info
+  collection** (e.g. macOS): the request timeout context was created *before*
+  local `GetSystemInfoStatic()` collection, which can take 6–25s (per-process
+  sysctl scan + blocking CPU sample). The deadline expired during collection
+  and every heartbeat failed with `context deadline exceeded`, leaving the
+  agent invisible/offline on the platform (version shown as `v0.0.0`). System
+  info is now collected under its own 15s budget *before* the request timeout
+  is armed; on budget expiry the heartbeat is still sent without system info
+  and the background collection fills the cache for the next beat.
+- System-info collection performance: the per-process status/thread scan
+  (2 sysctl calls per PID) is now bounded by a 2s budget, and the total CPU
+  usage sample switched from a blocking 1s `cpu.Percent(time.Second, …)` to
+  the non-blocking package-level diff.
+- `NewKubernetesCollectorForTest` did not initialize `podNetCounters`, causing
+  a nil-map panic in `collectPodDiskNetwork` when the fake kubelet summary
+  returned pod network stats.
+- Corrected OTEL SDK version references across README, CONTRIBUTING, SECURITY,
+  CODE_OF_CONDUCT, docs, Makefile, Dockerfile, docker-compose, and
+  `internal/version` (`OTELSDKVersion`): they claimed a nonexistent v1.47.0.
+  The Version History table now reflects the SDK actually shipped per release
+  (1.3.x → v1.44.0, 1.2.0/1.1.10 → v1.43.0, 1.1.9 → v1.40.0) and includes the
+  previously missing 1.3.3 row. README no longer claims SDK-version alignment
+  with TFO-Go-SDK (currently v1.43.0).
 
 ## [1.3.3] - 2026-09-15
 
@@ -59,39 +102,6 @@ behavior is off by default.
 
 - Helm chart bumped to `1.1.0` (new `ebpf.cilium` values block); `appVersion`
   `1.3.3`.
-- **gopsutil v3.24.5 → v4.26.8** (latest). `host.SensorsTemperatures` moved to
-  the `sensors` package (`nodeexporter/thermal.go`).
-- **OpenTelemetry SDK v1.44.0 → v1.46.0** (latest, 2026-08-25) with the full
-  exporter module set aligned: `otlpmetricgrpc`/`otlpmetrichttp` v1.44.0 →
-  v1.46.0, `otlploghttp` v0.20.0 → v0.22.0, `otlploggrpc`/`sdk/log`/`log`
-  v0.21.0 → v0.22.0. The previous partial bump left `go build ./...` broken
-  (`otlploghttp` v0.20.0 is incompatible with otel core ≥ v1.45.0).
-
-### Fixed
-
-- **Heartbeat never reached the backend on hosts with slow system-info
-  collection** (e.g. macOS): the request timeout context was created *before*
-  local `GetSystemInfoStatic()` collection, which can take 6–25s (per-process
-  sysctl scan + blocking CPU sample). The deadline expired during collection
-  and every heartbeat failed with `context deadline exceeded`, leaving the
-  agent invisible/offline on the platform (version shown as `v0.0.0`). System
-  info is now collected under its own 15s budget *before* the request timeout
-  is armed; on budget expiry the heartbeat is still sent without system info
-  and the background collection fills the cache for the next beat.
-- System-info collection performance: the per-process status/thread scan
-  (2 sysctl calls per PID) is now bounded by a 2s budget, and the total CPU
-  usage sample switched from a blocking 1s `cpu.Percent(time.Second, …)` to
-  the non-blocking package-level diff.
-- `NewKubernetesCollectorForTest` did not initialize `podNetCounters`, causing
-  a nil-map panic in `collectPodDiskNetwork` when the fake kubelet summary
-  returned pod network stats.
-- Corrected OTEL SDK version references across README, CONTRIBUTING, SECURITY,
-  CODE_OF_CONDUCT, docs, Makefile, Dockerfile, docker-compose, and
-  `internal/version` (`OTELSDKVersion`): they claimed a nonexistent v1.47.0.
-  The Version History table now reflects the SDK actually shipped per release
-  (1.3.x → v1.44.0, 1.2.0/1.1.10 → v1.43.0, 1.1.9 → v1.40.0) and includes the
-  previously missing 1.3.3 row. README no longer claims SDK-version alignment
-  with TFO-Go-SDK (currently v1.43.0).
 
 ## [1.3.2] - 2026-08-29
 
@@ -1302,6 +1312,7 @@ Six new output plugins under `internal/exporter/`, all registered via
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.3.4   | 2026-09-22 | v1.46.0  | Heartbeat reliability fix (timeout decoupled from slow system-info collection); OTEL SDK v1.46.0 with aligned exporter modules; gopsutil v4.26.8; OTEL SDK version-reference corrections; Helm chart 1.1.1                                                                                                                                                                                                                                           |
 | 1.3.3   | 2026-09-15 | v1.44.0  | Helm release discovery (`helm_releases` cluster-sync payload, `k8s.helm.release.count`); opt-in Cilium/Hubble pod-to-pod network-flow ingestion (feature-flagged, OFF by default); Helm chart 1.1.0                                                                                                                                                                                                                                                |
 | 1.3.2   | 2026-08-29 | v1.44.0  | Stability fix (RCA-20260828-001): retry-buffer memory leak + CPU busy-loop — buffer.max_entries memory bound, stop-on-first-failure retry backoff, effective MaxRetries on disk path, in-memory queue metrics budget; new buffer.max_entries / max_retries / retry_interval knobs; Helm chart 1.0.0                                                                                |
 | 1.3.1   | 2026-08-24 | v1.44.0  | Security patch: runtime image minimization (perl-base, apt, tar, openssl CLI purged) clearing the 2026-08 Trivy alert batch; unfixable CVEs documented in .trivyignore with reachability analysis                                                                                                                                                                                     |

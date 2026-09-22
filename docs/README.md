@@ -28,7 +28,7 @@ TFO-Agent is fully aligned with the TelemetryFlow ecosystem, sharing the same Op
 
 ```mermaid
 graph LR
-    subgraph "TelemetryFlow Ecosystem v1.3.3"
+    subgraph "TelemetryFlow Ecosystem v1.3.4"
         subgraph "Instrumentation"
             SDK[TFO-Go-SDK<br/>OTEL SDK v1.43.0]
         end

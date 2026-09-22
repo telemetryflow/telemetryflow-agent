@@ -84,7 +84,7 @@ spec:
 
       containers:
         - name: tfo-agent
-          image: telemetryflow/telemetryflow-agent:1.3.3
+          image: telemetryflow/telemetryflow-agent:1.3.4
           imagePullPolicy: Always
 
           args:
