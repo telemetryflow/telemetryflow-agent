@@ -31,13 +31,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/load"
-	"github.com/shirou/gopsutil/v3/mem"
-	"github.com/shirou/gopsutil/v3/net"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/load"
+	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
 	"go.uber.org/zap"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
@@ -449,8 +449,9 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 		}
 	}
 
-	// Total CPU usage
-	percentages, err := cpu.Percent(time.Second, false)
+	// Total CPU usage (non-blocking: uses the package-level diff since the
+	// previous call instead of sleeping for a full sampling interval).
+	percentages, err := cpu.Percent(0, false)
 	if err == nil && len(percentages) > 0 {
 		info.CPUUsage = percentages[0]
 	}
@@ -808,10 +809,19 @@ func (c *HostCollector) GetSystemInfo() (*collector.SystemInfo, error) {
 	// ==========================================================================
 	// Process Information
 	// ==========================================================================
+	// The per-process scan issues 2 sysctl calls per PID, which is slow on
+	// macOS with hundreds of processes. The scan is bounded so collection
+	// latency stays predictable; counts become approximations when the
+	// budget is exhausted.
+	const processScanBudget = 2 * time.Second
+	scanDeadline := time.Now().Add(processScanBudget)
 	procs, err := process.Processes()
 	if err == nil {
 		info.ProcessCount = uint64(len(procs))
 		for _, p := range procs {
+			if time.Now().After(scanDeadline) {
+				break
+			}
 			status, err := p.Status()
 			if err != nil {
 				continue

@@ -24,7 +24,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v4/cpu"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )

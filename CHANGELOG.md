@@ -59,6 +59,8 @@ behavior is off by default.
 
 - Helm chart bumped to `1.1.0` (new `ebpf.cilium` values block); `appVersion`
   `1.3.3`.
+- **gopsutil v3.24.5 → v4.26.8** (latest). `host.SensorsTemperatures` moved to
+  the `sensors` package (`nodeexporter/thermal.go`).
 - **OpenTelemetry SDK v1.44.0 → v1.46.0** (latest, 2026-08-25) with the full
   exporter module set aligned: `otlpmetricgrpc`/`otlpmetrichttp` v1.44.0 →
   v1.46.0, `otlploghttp` v0.20.0 → v0.22.0, `otlploggrpc`/`sdk/log`/`log`
@@ -67,6 +69,19 @@ behavior is off by default.
 
 ### Fixed
 
+- **Heartbeat never reached the backend on hosts with slow system-info
+  collection** (e.g. macOS): the request timeout context was created *before*
+  local `GetSystemInfoStatic()` collection, which can take 6–25s (per-process
+  sysctl scan + blocking CPU sample). The deadline expired during collection
+  and every heartbeat failed with `context deadline exceeded`, leaving the
+  agent invisible/offline on the platform (version shown as `v0.0.0`). System
+  info is now collected under its own 15s budget *before* the request timeout
+  is armed; on budget expiry the heartbeat is still sent without system info
+  and the background collection fills the cache for the next beat.
+- System-info collection performance: the per-process status/thread scan
+  (2 sysctl calls per PID) is now bounded by a 2s budget, and the total CPU
+  usage sample switched from a blocking 1s `cpu.Percent(time.Second, …)` to
+  the non-blocking package-level diff.
 - `NewKubernetesCollectorForTest` did not initialize `podNetCounters`, causing
   a nil-map panic in `collectPodDiskNetwork` when the fake kubelet summary
   returned pod network stats.

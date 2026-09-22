@@ -207,20 +207,36 @@ type HeartbeatStats struct {
 	ErrorCount   int       `json:"errorCount"`
 }
 
+// sysInfoCollectionBudget bounds local system-info collection so a slow
+// collection (e.g. per-process sysctl scans on macOS) cannot starve the
+// heartbeat itself. When exceeded, the heartbeat is sent without system
+// info; the abandoned collection keeps running in the background and fills
+// the package-level cache, so the next heartbeat picks it up.
+const sysInfoCollectionBudget = 15 * time.Second
+
 // sendHeartbeat sends a single heartbeat
 func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
-	// Create timeout context
-	ctx, cancel := context.WithTimeout(ctx, h.config.Timeout)
-	defer cancel()
-
 	var sysInfo *api.SystemInfoPayload
 
 	if h.config.IncludeSystemInfo {
-		info, err := system.GetSystemInfoStatic()
-		if err != nil {
-			h.logger.Debug("Failed to collect system info", zap.Error(err))
-		} else {
-			sysInfo = mapSystemInfoToPayload(info, h.config.Tags, h.config.Labels)
+		ch := make(chan *api.SystemInfoPayload, 1)
+		go func() {
+			info, err := system.GetSystemInfoStatic()
+			if err != nil {
+				h.logger.Debug("Failed to collect system info", zap.Error(err))
+				ch <- nil
+				return
+			}
+			ch <- mapSystemInfoToPayload(info, h.config.Tags, h.config.Labels)
+		}()
+
+		select {
+		case payload := <-ch:
+			sysInfo = payload
+		case <-time.After(sysInfoCollectionBudget):
+			h.logger.Warn("System info collection exceeded budget; sending heartbeat without system info",
+				zap.Duration("budget", sysInfoCollectionBudget),
+			)
 		}
 	}
 
@@ -245,6 +261,11 @@ func (h *Heartbeat) sendHeartbeat(ctx context.Context) error {
 			sysInfo.CollectorStates[i] = payload
 		}
 	}
+
+	// Create the request timeout only after local collection so the full
+	// timeout is available for the HTTP round-trip.
+	ctx, cancel := context.WithTimeout(ctx, h.config.Timeout)
+	defer cancel()
 
 	// Send heartbeat
 	err := h.config.Client.Heartbeat(ctx, h.config.AgentID, sysInfo)

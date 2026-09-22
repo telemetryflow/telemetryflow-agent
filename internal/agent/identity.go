@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v4/host"
 	"go.uber.org/zap"
 )
 

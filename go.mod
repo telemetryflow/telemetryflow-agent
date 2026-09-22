@@ -40,7 +40,6 @@ require (
 	github.com/prometheus/client_golang v1.23.2 // Prometheus client
 	github.com/prometheus/client_model v0.6.2 // Prometheus data model
 	github.com/prometheus/common v0.70.0 // Prometheus common utilities
-	github.com/shirou/gopsutil/v3 v3.24.5 // System metrics (CPU, memory, disk, network)
 	github.com/spf13/cobra v1.10.2 // CLI framework
 	github.com/spf13/viper v1.21.0 // Configuration management
 
@@ -132,7 +131,6 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
-	github.com/shoenig/go-m1cpu v0.2.2 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
@@ -183,6 +181,7 @@ require (
 	github.com/miekg/dns v1.1.72
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/prometheus/prometheus v0.313.1
+	github.com/shirou/gopsutil/v4 v4.26.8
 	github.com/testcontainers/testcontainers-go v0.43.0
 	github.com/xdg-go/scram v1.2.0
 	go.mongodb.org/mongo-driver/v2 v2.8.0
@@ -210,7 +209,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
-	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/ebitengine/purego v0.10.2 // indirect
 	github.com/go-openapi/swag/cmdutils v0.28.0 // indirect
 	github.com/go-openapi/swag/conv v0.28.0 // indirect
 	github.com/go-openapi/swag/fileutils v0.28.0 // indirect
@@ -248,7 +247,6 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/shirou/gopsutil/v4 v4.26.5 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect

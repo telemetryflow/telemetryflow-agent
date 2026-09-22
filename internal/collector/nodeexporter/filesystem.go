@@ -23,7 +23,7 @@ package nodeexporter
 import (
 	"fmt"
 
-	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v4/disk"
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/collector"
 )
