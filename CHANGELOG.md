@@ -32,6 +32,14 @@ Stability & dependency-alignment release: heartbeat reliability fix, OTEL SDK
 and gopsutil dependency updates, documentation version corrections. No
 breaking changes.
 
+### Added
+
+- Startup auth diagnostics: the agent now logs the active backend endpoint,
+  a masked API key ID, and whether the key came from the config file or the
+  `TELEMETRYFLOW_API_KEY_ID` environment variable — and warns loudly when
+  credentials are empty (e.g. unexpanded `${TELEMETRYFLOW_API_KEY_ID}`
+  placeholder) instead of surfacing the problem as heartbeat 401s.
+
 ### Changed
 
 - **OpenTelemetry SDK v1.44.0 → v1.46.0** (latest, 2026-08-25) with the full

@@ -141,6 +141,47 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 	return NewWithConfigFile(cfg, logger, "")
 }
 
+// logAuthConfig logs which API credentials the agent will use and where
+// they came from. The secret is never logged; the key ID is masked to its
+// first 8 characters — enough to identify the key, not enough to use it.
+func logAuthConfig(cfg *config.Config, logger *zap.Logger) {
+	keyID := cfg.GetEffectiveAPIKeyID()
+	secret := cfg.GetEffectiveAPIKeySecret()
+
+	source := "config file"
+	switch {
+	case keyID == "":
+		source = "missing"
+	case keyID == os.Getenv("TELEMETRYFLOW_API_KEY_ID") && os.Getenv("TELEMETRYFLOW_API_KEY_ID") != "":
+		source = "env TELEMETRYFLOW_API_KEY_ID"
+	}
+
+	masked := "(empty)"
+	if keyID != "" {
+		if len(keyID) > 8 {
+			masked = keyID[:8] + "..."
+		} else {
+			masked = keyID[:4] + "..."
+		}
+	}
+
+	fields := []zap.Field{
+		zap.String("backend_endpoint", cfg.GetBackendEndpoint()),
+		zap.String("api_key_id", masked),
+		zap.String("api_key_source", source),
+	}
+
+	if keyID == "" || secret == "" {
+		logger.Warn("API credentials incomplete — heartbeat and ingestion will fail with 401. "+
+			"Set telemetryflow.api_key_id/api_key_secret in the config, or the "+
+			"TELEMETRYFLOW_API_KEY_ID/TELEMETRYFLOW_API_KEY_SECRET environment variables.",
+			fields...,
+		)
+		return
+	}
+	logger.Info("API client credentials", fields...)
+}
+
 // NewWithConfigFile creates a new agent instance with a known config file path for hot reload.
 func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string) (*Agent, error) {
 	// Resolve a stable agent ID — deterministic via host fingerprint when not explicitly set.
@@ -166,6 +207,12 @@ func NewWithConfigFile(cfg *config.Config, logger *zap.Logger, configFile string
 		},
 		Logger: logger,
 	})
+
+	// Surface the active credentials at startup so auth mismatches (empty
+	// key from an unexpanded ${TELEMETRYFLOW_API_KEY_ID} placeholder, or an
+	// env var overriding the config file with a key from a different
+	// platform) are immediately visible instead of surfacing as 401s.
+	logAuthConfig(cfg, logger)
 
 	// Create heartbeat exporter
 	heartbeat := exporter.NewHeartbeat(exporter.HeartbeatConfig{
