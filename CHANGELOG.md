@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.4-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.5-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.46.0-blueviolet)](https://opentelemetry.io/)
@@ -24,6 +24,45 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
+## [1.3.5] - 2026-10-04
+
+Database-collector version-compatibility release: the PostgreSQL, MySQL, MSSQL,
+MongoDB and TimescaleDB collectors now run across a wide span of server versions
+without errored/dropped metrics. Server version is detected once and cached per
+instance (no per-cycle version queries). No breaking changes.
+
+### Fixed
+
+- **PostgreSQL collector — PG 14→18 compatibility.** `pg_stat_bgwriter`
+  checkpoint columns moved to `pg_stat_checkpointer` (PG17), `pg_stat_wal`
+  write/sync columns moved to `pg_stat_io` (PG18), and
+  `pg_stat_progress_vacuum.max_dead_tuples`/`num_dead_tuples` became
+  `max_dead_tuple_bytes`/`num_dead_item_ids` (PG17). These raised
+  `column does not exist` on PG18, silently dropping bgwriter/WAL/vacuum
+  self-monitoring metrics. Added version-aware SQL builders keyed on the cached
+  `server_version_num`. Applies to both the instance and RDS collectors.
+- **MySQL collector.** `SELECT VERSION()` was re-queried every collection cycle;
+  it is now detected once and cached per instance (matching PostgreSQL/MSSQL).
+  Replication metrics now read the MySQL 8.4 column names
+  (`Replica_IO_Running`/`Replica_SQL_Running`/`Seconds_Behind_Source`) alongside
+  the legacy `Slave_*`/`Seconds_Behind_Master`, so lag/io/sql survive the
+  `SHOW REPLICA STATUS` rename.
+- **MongoDB collector.** Admission-ticket metrics now read
+  `serverStatus().queues.execution` (MongoDB 7.0+) and fall back to
+  `wiredTiger.concurrentTransactions` (< 7.0).
+- **TimescaleDB collector.** The removed
+  `timescaledb_information.compressed_hypertable_stats` view falls back to the
+  `hypertable_compression_stats()` function on modern TimescaleDB 2.x.
+- **MSSQL collector.** `max_dop`/`max_grant_kb` (`sys.dm_exec_query_stats`) are
+  absent on SQL Server 2016 RTM (added in 2016 SP1) and errored the query-stats
+  batch there; the unused `max_dop` was dropped from the instance query and the
+  QAN query retries with literal `0`s on column error.
+
+### Changed
+
+- Helm chart (`telemetryflow-agent`) bumped to `1.1.2`; `appVersion` `1.3.5`.
 
 
 ## [1.3.4] - 2026-09-22
@@ -1320,6 +1359,7 @@ Six new output plugins under `internal/exporter/`, all registered via
 
 | Version | Date       | OTEL SDK | Description                                                                                                                                                                                                                                                                                                                                                                          |
 | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.3.5   | 2026-10-04 | v1.46.0  | DB-collector version compatibility: PostgreSQL PG14-18 (pg_stat_checkpointer/pg_stat_io/vacuum byte columns), MySQL 8.4 replication column rename + cached version, MongoDB 7.0 queues.execution tickets, TimescaleDB hypertable_compression_stats() fallback, MSSQL 2016-RTM max_dop/max_grant_kb guard; Helm chart 1.1.2                                                                                                                              |
 | 1.3.4   | 2026-09-22 | v1.46.0  | Heartbeat reliability fix (timeout decoupled from slow system-info collection); OTEL SDK v1.46.0 with aligned exporter modules; gopsutil v4.26.8; OTEL SDK version-reference corrections; Helm chart 1.1.1                                                                                                                                                                                                                                           |
 | 1.3.3   | 2026-09-15 | v1.44.0  | Helm release discovery (`helm_releases` cluster-sync payload, `k8s.helm.release.count`); opt-in Cilium/Hubble pod-to-pod network-flow ingestion (feature-flagged, OFF by default); Helm chart 1.1.0                                                                                                                                                                                                                                                |
 | 1.3.2   | 2026-08-29 | v1.44.0  | Stability fix (RCA-20260828-001): retry-buffer memory leak + CPU busy-loop — buffer.max_entries memory bound, stop-on-first-failure retry backoff, effective MaxRetries on disk path, in-memory queue metrics budget; new buffer.max_entries / max_retries / retry_interval knobs; Helm chart 1.0.0                                                                                |

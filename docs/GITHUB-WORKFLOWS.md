@@ -54,8 +54,8 @@ workflow_dispatch:
 
 ```bash
 # Create and push a version tag
-git tag v1.3.4
-git push origin v1.3.4
+git tag v1.3.5
+git push origin v1.3.5
 ```
 
 #### Manual Release
@@ -153,8 +153,8 @@ workflow_dispatch:
 git push origin main
 
 # Create version tag - builds version tags
-git tag v1.3.4
-git push origin v1.3.4
+git tag v1.3.5
+git push origin v1.3.5
 ```
 
 #### Manual Build
@@ -171,11 +171,11 @@ git push origin v1.3.4
 ```bash
 # GitHub Container Registry
 docker pull ghcr.io/{owner}/telemetryflow-agent:latest
-docker pull ghcr.io/{owner}/telemetryflow-agent:1.3.4
+docker pull ghcr.io/{owner}/telemetryflow-agent:1.3.5
 
 # Docker Hub
 docker pull telemetryflow/telemetryflow-agent:latest
-docker pull telemetryflow/telemetryflow-agent:1.3.4
+docker pull telemetryflow/telemetryflow-agent:1.3.5
 ```
 
 ### Security Features
@@ -305,7 +305,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     subgraph "Git Tag"
-        T[v1.3.4]
+        T[v1.3.5]
     end
 
     subgraph "Generated Docker Tags"
