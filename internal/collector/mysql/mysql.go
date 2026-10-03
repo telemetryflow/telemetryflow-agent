@@ -172,8 +172,13 @@ func (c *MySQLCollector) collectInstance(ctx context.Context, inst *mysqlInstanc
 		return nil, err
 	}
 
-	if err := c.detectFlavor(ctx, inst, db); err != nil {
-		c.logger.Debug("Flavor detection failed", zap.String("instance", inst.config.Name), zap.Error(err))
+	// Detect server version/flavor ONCE per instance and cache it (mirrors the
+	// PostgreSQL/MSSQL collectors). Re-querying SELECT VERSION() every collection
+	// cycle is wasteful and the value never changes for a live connection.
+	if inst.version == "" {
+		if err := c.detectFlavor(ctx, inst, db); err != nil {
+			c.logger.Debug("Flavor detection failed", zap.String("instance", inst.config.Name), zap.Error(err))
+		}
 	}
 
 	labels := instanceLabels(inst)

@@ -73,16 +73,30 @@ func collectReplicationStatus(ctx context.Context, db *sql.DB, labels map[string
 	return allMetrics, rows.Err()
 }
 
+// replColumn returns the first present column value among the given names.
+// MySQL 8.4 renamed the replication-status columns (SHOW REPLICA STATUS):
+// Seconds_Behind_Master→Seconds_Behind_Source, Slave_IO_Running→Replica_IO_Running,
+// Slave_SQL_Running→Replica_SQL_Running. Reading both keeps the metrics populated
+// across 5.7/8.0 (legacy names) and 8.4+ (new names) without a version query.
+func replColumn(colMap map[string]string, names ...string) (string, bool) {
+	for _, n := range names {
+		if val, ok := colMap[n]; ok {
+			return val, true
+		}
+	}
+	return "", false
+}
+
 func parseReplicationRow(colMap map[string]string, labels map[string]string) []collector.Metric {
 	var metrics []collector.Metric
 
-	if val, ok := colMap["Seconds_Behind_Master"]; ok {
+	if val, ok := replColumn(colMap, "Seconds_Behind_Master", "Seconds_Behind_Source"); ok {
 		if f := parseFloat(val); f >= 0 {
 			metrics = append(metrics, makeMetric("db.mysql.replication.lag_seconds", f, collector.MetricTypeGauge, labels))
 		}
 	}
 
-	if val, ok := colMap["Slave_IO_Running"]; ok {
+	if val, ok := replColumn(colMap, "Slave_IO_Running", "Replica_IO_Running"); ok {
 		v := 0.0
 		if strings.EqualFold(val, "Yes") {
 			v = 1
@@ -90,7 +104,7 @@ func parseReplicationRow(colMap map[string]string, labels map[string]string) []c
 		metrics = append(metrics, makeMetric("db.mysql.replication.io_running", v, collector.MetricTypeGauge, labels))
 	}
 
-	if val, ok := colMap["Slave_SQL_Running"]; ok {
+	if val, ok := replColumn(colMap, "Slave_SQL_Running", "Replica_SQL_Running"); ok {
 		v := 0.0
 		if strings.EqualFold(val, "Yes") {
 			v = 1

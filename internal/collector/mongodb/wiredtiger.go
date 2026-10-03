@@ -44,8 +44,19 @@ func collectWiredTiger(ctx context.Context, api mongoAPI, labels map[string]stri
 		}
 	}
 
-	// Concurrency ticket metrics
-	if concurrency, ok := wt["concurrentTransactions"].(bson.M); ok {
+	// Concurrency ticket metrics. MongoDB 7.0+ relocated the authoritative
+	// read/write admission-ticket stats from wiredTiger.concurrentTransactions to
+	// the top-level serverStatus().queues.execution.{read,write}; on 7.0+ the old
+	// WiredTiger path can be absent/empty. Prefer queues.execution, then fall back
+	// to the pre-7.0 location so tickets stay populated on 6.0 and 7.0+ without a
+	// version query (the field shape — available/out/totalTickets — is identical).
+	concurrency, _ := wt["concurrentTransactions"].(bson.M)
+	if queues, ok := result["queues"].(bson.M); ok {
+		if exec, ok := queues["execution"].(bson.M); ok {
+			concurrency = exec
+		}
+	}
+	if concurrency != nil {
 		if read, ok := concurrency["read"].(bson.M); ok {
 			all = append(all,
 				gauge(prefix+"tickets.read.available", float64(asInt(read["available"])), labels),

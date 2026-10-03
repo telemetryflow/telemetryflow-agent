@@ -156,7 +156,14 @@ func (c *QANMSSQLCollector) collectInstance(ctx context.Context, inst *qanMssqlI
 		limit = 200
 	}
 
-	query := fmt.Sprintf(`
+	// sys.dm_exec_query_stats.max_dop / max_grant_kb were added in SQL Server
+	// 2016 SP1; they are absent on 2016 RTM (and 2014/2012), where referencing
+	// them errors the whole batch. Try the real columns first and, on failure,
+	// fall back to literal 0s (identical SELECT shape → same scan loop) so QAN
+	// keeps working on older servers without a version query.
+	const maxCols = "MAX(qs.max_dop) AS max_dop,\n\t\t\tMAX(qs.max_grant_kb) AS max_grant_kb"
+	const zeroCols = "0 AS max_dop,\n\t\t\tCAST(0 AS FLOAT) AS max_grant_kb"
+	queryTmpl := `
 		SELECT TOP %d
 			LOWER(CONVERT(VARCHAR(64), qs.query_hash, 2)) AS query_hash,
 			SUM(qs.execution_count) AS execution_count,
@@ -166,15 +173,18 @@ func (c *QANMSSQLCollector) collectInstance(ctx context.Context, inst *qanMssqlI
 			SUM(qs.total_physical_reads) AS total_physical_reads,
 			SUM(qs.total_logical_writes) AS total_logical_writes,
 			SUM(qs.row_count) AS row_count,
-			MAX(qs.max_dop) AS max_dop,
-			MAX(qs.max_grant_kb) AS max_grant_kb
+			%s
 		FROM sys.dm_exec_query_stats qs WITH (NOLOCK)
 		GROUP BY qs.query_hash
-		ORDER BY SUM(qs.total_elapsed_time) DESC`, limit)
+		ORDER BY SUM(qs.total_elapsed_time) DESC`
 
-	rows, err := db.QueryContext(ctx2, query)
+	rows, err := db.QueryContext(ctx2, fmt.Sprintf(queryTmpl, limit, maxCols))
 	if err != nil {
-		return nil, fmt.Errorf("query dm_exec_query_stats: %w", err)
+		c.logger.Debug("max_dop/max_grant_kb unavailable (pre-2016 SP1), retrying without them", zap.Error(err))
+		rows, err = db.QueryContext(ctx2, fmt.Sprintf(queryTmpl, limit, zeroCols))
+		if err != nil {
+			return nil, fmt.Errorf("query dm_exec_query_stats: %w", err)
+		}
 	}
 	defer func() { _ = rows.Close() }()
 

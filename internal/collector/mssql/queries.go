@@ -25,8 +25,7 @@ func collectQueryStats(ctx context.Context, db *sql.DB, labels map[string]string
 			AVG(qs.total_worker_time / NULLIF(qs.execution_count, 0)) / 1000.0 as avg_cpu_ms,
 			MAX(qs.max_elapsed_time) / 1000.0 as max_elapsed_ms,
 			MAX(qs.max_worker_time) / 1000.0 as max_cpu_ms,
-			MAX(qs.max_logical_reads) as max_logical_reads,
-			MAX(qs.max_dop) as max_dop
+			MAX(qs.max_logical_reads) as max_logical_reads
 		FROM sys.dm_exec_query_stats qs
 		GROUP BY qs.query_hash
 		ORDER BY SUM(qs.total_elapsed_time) DESC
@@ -41,11 +40,14 @@ func collectQueryStats(ctx context.Context, db *sql.DB, labels map[string]string
 		var queryHash []byte
 		var planCount, totalExecs int
 		var totalElapsedMs, totalCpuMs, totalLogicalReads, totalPhysicalReads, totalLogicalWrites float64
-		var avgElapsedMs, avgCpuMs, maxElapsedMs, maxCpuMs, maxLogicalReads, maxDop float64
+		var avgElapsedMs, avgCpuMs, maxElapsedMs, maxCpuMs, maxLogicalReads float64
+		// NOTE: max_dop was intentionally dropped from the query — it was scanned
+		// but never emitted, and the column is absent on SQL Server 2016 RTM
+		// (added in 2016 SP1), which otherwise errors the whole batch there.
 		if err := rows.Scan(
 			&queryHash, &planCount, &totalExecs,
 			&totalElapsedMs, &totalCpuMs, &totalLogicalReads, &totalPhysicalReads, &totalLogicalWrites,
-			&avgElapsedMs, &avgCpuMs, &maxElapsedMs, &maxCpuMs, &maxLogicalReads, &maxDop,
+			&avgElapsedMs, &avgCpuMs, &maxElapsedMs, &maxCpuMs, &maxLogicalReads,
 		); err != nil {
 			continue
 		}

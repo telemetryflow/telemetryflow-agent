@@ -354,9 +354,9 @@ func TestCollectHappyPath(t *testing.T) {
 			AddRow("backup", 1, "succeeded", 130, 20240101, 120000, 20240102, 120000))
 
 	// query stats
-	qCols := []string{"query_hash", "plan_count", "total_executions", "total_elapsed_ms", "total_cpu_ms", "total_logical_reads", "total_physical_reads", "total_logical_writes", "avg_elapsed_ms", "avg_cpu_ms", "max_elapsed_ms", "max_cpu_ms", "max_logical_reads", "max_dop"}
+	qCols := []string{"query_hash", "plan_count", "total_executions", "total_elapsed_ms", "total_cpu_ms", "total_logical_reads", "total_physical_reads", "total_logical_writes", "avg_elapsed_ms", "avg_cpu_ms", "max_elapsed_ms", "max_cpu_ms", "max_logical_reads"}
 	mock.ExpectQuery("dm_exec_query_stats").WillReturnRows(
-		sqlmock.NewRows(qCols).AddRow([]byte{0xAB}, 1, 10, 100.0, 80.0, 500.0, 10.0, 20.0, 10.0, 8.0, 50.0, 40.0, 500.0, 4.0))
+		sqlmock.NewRows(qCols).AddRow([]byte{0xAB}, 1, 10, 100.0, 80.0, 500.0, 10.0, 20.0, 10.0, 8.0, 50.0, 40.0, 500.0))
 
 	// query store
 	mock.ExpectQuery("database_query_store_query").WillReturnRows(
@@ -731,11 +731,11 @@ func TestFmtNullString(t *testing.T) {
 
 func TestCollectQueryStats(t *testing.T) {
 	db, mock := newMock(t)
-	cols := []string{"query_hash", "plan_count", "total_executions", "total_elapsed_ms", "total_cpu_ms", "total_logical_reads", "total_physical_reads", "total_logical_writes", "avg_elapsed_ms", "avg_cpu_ms", "max_elapsed_ms", "max_cpu_ms", "max_logical_reads", "max_dop"}
+	cols := []string{"query_hash", "plan_count", "total_executions", "total_elapsed_ms", "total_cpu_ms", "total_logical_reads", "total_physical_reads", "total_logical_writes", "avg_elapsed_ms", "avg_cpu_ms", "max_elapsed_ms", "max_cpu_ms", "max_logical_reads"}
 	mock.ExpectQuery("dm_exec_query_stats").WillReturnRows(
 		sqlmock.NewRows(cols).
-			AddRow([]byte{0xAB, 0xCD}, 2, 100, 1000.0, 800.0, 5000.0, 100.0, 200.0, 10.0, 8.0, 50.0, 40.0, 500.0, 4.0).
-			AddRow("bad", 1, 1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)) // scan err
+			AddRow([]byte{0xAB, 0xCD}, 2, 100, 1000.0, 800.0, 5000.0, 100.0, 200.0, 10.0, 8.0, 50.0, 40.0, 500.0).
+			AddRow("bad", 1, 1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)) // scan err
 	m, err := mssql.CollectQueryStatsExported(context.Background(), db, baseLabels(), nop())
 	require.NoError(t, err)
 	assert.NotNil(t, findMetric(m, "mssql.query.total_executions"))

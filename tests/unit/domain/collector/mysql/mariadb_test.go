@@ -223,6 +223,32 @@ func TestParseReplicationRowWithChannel(t *testing.T) {
 	}
 }
 
+// MySQL 8.4 renamed SHOW REPLICA STATUS columns: Seconds_Behind_Master→
+// Seconds_Behind_Source, Slave_IO_Running→Replica_IO_Running, Slave_SQL_Running→
+// Replica_SQL_Running. The parser must read the new names too (else metric loss).
+func TestParseReplicationRowMySQL84Columns(t *testing.T) {
+	labels := map[string]string{"mysql_instance": "test"}
+	colMap := map[string]string{
+		"Seconds_Behind_Source": "7",
+		"Replica_IO_Running":     "Yes",
+		"Replica_SQL_Running":    "Yes",
+	}
+	metrics := mysql.ParseReplicationRowExport(colMap, labels)
+
+	lag := findMetric(metrics, "db.mysql.replication.lag_seconds")
+	if lag == nil || lag.Value != 7 {
+		t.Error("lag_seconds should read Seconds_Behind_Source on MySQL 8.4")
+	}
+	ioRunning := findMetric(metrics, "db.mysql.replication.io_running")
+	if ioRunning == nil || ioRunning.Value != 1 {
+		t.Error("io_running should read Replica_IO_Running on MySQL 8.4")
+	}
+	sqlRunning := findMetric(metrics, "db.mysql.replication.sql_running")
+	if sqlRunning == nil || sqlRunning.Value != 1 {
+		t.Error("sql_running should read Replica_SQL_Running on MySQL 8.4")
+	}
+}
+
 func TestParseReplicationRowNotRunning(t *testing.T) {
 	labels := map[string]string{"mysql_instance": "test"}
 	colMap := map[string]string{

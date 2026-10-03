@@ -13,7 +13,17 @@ func collectCompression(ctx context.Context, pool PgxQuerier, labels map[string]
 	ctx2, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	query := `
+	// TimescaleDB compression stats are version-divergent:
+	//   • Legacy (early 2.x and 1.x): the view
+	//     timescaledb_information.compressed_hypertable_stats.
+	//   • Modern 2.x: that view was removed; stats come from the function
+	//     hypertable_compression_stats(<hypertable>), enumerated over the stable
+	//     internal catalog _timescaledb_catalog.hypertable (schema_name/table_name
+	//     have been stable across the whole 2.x line).
+	// Both queries return the SAME 6-column shape so the scan loop is identical.
+	// Try the legacy view first; on failure (view absent on modern TS) fall back
+	// to the function form — no version query needed.
+	const legacyQuery = `
 		SELECT
 			cs.hypertable_schema,
 			cs.hypertable_name,
@@ -24,9 +34,27 @@ func collectCompression(ctx context.Context, pool PgxQuerier, labels map[string]
 		FROM timescaledb_information.compressed_hypertable_stats cs
 		GROUP BY cs.hypertable_schema, cs.hypertable_name`
 
-	rows, err := pool.Query(ctx2, query)
+	const modernQuery = `
+		SELECT
+			h.schema_name,
+			h.table_name,
+			COALESCE(s.before_compression_total_bytes, 0) AS before_total,
+			COALESCE(s.after_compression_total_bytes, 0) AS after_total,
+			COALESCE(s.number_compressed_chunks, 0) AS compressed_chunks,
+			COALESCE(s.total_chunks, 0) - COALESCE(s.number_compressed_chunks, 0) AS uncompressed_chunks
+		FROM _timescaledb_catalog.hypertable h
+		LEFT JOIN LATERAL hypertable_compression_stats(
+			format('%I.%I', h.schema_name, h.table_name)::regclass
+		) s ON true
+		WHERE s.total_chunks IS NOT NULL`
+
+	rows, err := pool.Query(ctx2, legacyQuery)
 	if err != nil {
-		return nil, err
+		logger.Debug("compressed_hypertable_stats view unavailable, using hypertable_compression_stats()", zap.Error(err))
+		rows, err = pool.Query(ctx2, modernQuery)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer rows.Close()
 
