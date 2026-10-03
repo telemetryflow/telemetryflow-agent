@@ -237,11 +237,25 @@ func CollectTransactionMetricsExported(ctx context.Context, q PgxQuerier, inst *
 }
 
 func CollectBgWriterMetricsExported(ctx context.Context, q PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
-	return collectBgWriterMetrics(ctx, q, labels)
+	return collectBgWriterMetrics(ctx, q, 0, labels)
 }
 
 func CollectWALMetricsExported(ctx context.Context, q PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
-	return collectWALMetrics(ctx, q, labels)
+	return collectWALMetrics(ctx, q, 0, labels)
+}
+
+// Version-aware exported variants (for PostgreSQL 16/17/18 compatibility tests).
+
+func CollectBgWriterMetricsVersionExported(ctx context.Context, q PgxQuerier, version int, labels map[string]string) ([]collector.Metric, error) {
+	return collectBgWriterMetrics(ctx, q, version, labels)
+}
+
+func CollectWALMetricsVersionExported(ctx context.Context, q PgxQuerier, version int, labels map[string]string) ([]collector.Metric, error) {
+	return collectWALMetrics(ctx, q, version, labels)
+}
+
+func CollectVacuumProgressVersionExported(ctx context.Context, q PgxQuerier, version int, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+	return collectVacuumProgress(ctx, q, version, labels, logger)
 }
 
 func CollectDatabaseSizeMetricsExported(ctx context.Context, q PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
@@ -329,7 +343,7 @@ func CollectVacuumWorkersExported(ctx context.Context, q PgxQuerier, labels map[
 }
 
 func CollectVacuumProgressExported(ctx context.Context, q PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
-	return collectVacuumProgress(ctx, q, labels, logger)
+	return collectVacuumProgress(ctx, q, 0, labels, logger)
 }
 
 func CollectXIDAgeExported(ctx context.Context, q PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
@@ -404,11 +418,11 @@ func CollectRDSTransactionMetricsExported(ctx context.Context, q PgxQuerier, ins
 }
 
 func CollectRDSBgWriterMetricsExported(ctx context.Context, q PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
-	return collectRDSBgWriterMetrics(ctx, q, labels)
+	return collectRDSBgWriterMetrics(ctx, q, 0, labels)
 }
 
 func CollectRDSWALMetricsExported(ctx context.Context, q PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
-	return collectRDSWALMetrics(ctx, q, labels)
+	return collectRDSWALMetrics(ctx, q, 0, labels)
 }
 
 func CollectRDSLockMetricsExported(ctx context.Context, q PgxQuerier, labels map[string]string) ([]collector.Metric, error) {

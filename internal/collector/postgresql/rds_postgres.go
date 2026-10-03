@@ -424,7 +424,7 @@ func (c *RDSPostgreSQLCollector) collectRDSActivityMetrics(ctx context.Context, 
 	}
 
 	// pg_stat_bgwriter: checkpoint stats, buffer stats
-	bgMetrics, err := collectRDSBgWriterMetrics(ctx, pool, labels)
+	bgMetrics, err := collectRDSBgWriterMetrics(ctx, pool, inst.version, labels)
 	if err != nil {
 		c.logger.Debug("RDS bgwriter metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
 	} else {
@@ -433,7 +433,7 @@ func (c *RDSPostgreSQLCollector) collectRDSActivityMetrics(ctx context.Context, 
 
 	// pg_stat_wal: WAL records, bytes, buffers, sync time (PostgreSQL 14+)
 	if hasRDSWalStats(inst) {
-		walMetrics, err := collectRDSWALMetrics(ctx, pool, labels)
+		walMetrics, err := collectRDSWALMetrics(ctx, pool, inst.version, labels)
 		if err != nil {
 			c.logger.Debug("RDS WAL metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
 		} else {
@@ -752,7 +752,7 @@ func collectRDSTransactionMetrics(ctx context.Context, pool PgxQuerier, inst *rd
 }
 
 // collectRDSBgWriterMetrics collects checkpoint and buffer stats from pg_stat_bgwriter.
-func collectRDSBgWriterMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSBgWriterMetrics(ctx context.Context, pool PgxQuerier, version int, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -761,20 +761,7 @@ func collectRDSBgWriterMetrics(ctx context.Context, pool PgxQuerier, labels map[
 	var bufCkpt, bufClean, bufBackend int64
 	var maxwrittenClean, bufBackendFsync, bufAlloc int64
 
-	err := pool.QueryRow(ctx2, `
-		SELECT
-			checkpoints_timed,
-			checkpoints_req,
-			checkpoint_write_time,
-			checkpoint_sync_time,
-			buffers_checkpoint,
-			buffers_clean,
-			buffers_backend,
-			maxwritten_clean,
-			buffers_backend_fsync,
-			buffers_alloc
-		FROM pg_stat_bgwriter
-	`).Scan(
+	err := pool.QueryRow(ctx2, bgWriterQuery(version)).Scan(
 		&cpTimed, &cpReq, &cpWriteTime, &cpSyncTime,
 		&bufCkpt, &bufClean, &bufBackend,
 		&maxwrittenClean, &bufBackendFsync, &bufAlloc,
@@ -798,7 +785,7 @@ func collectRDSBgWriterMetrics(ctx context.Context, pool PgxQuerier, labels map[
 }
 
 // collectRDSWALMetrics collects WAL metrics from pg_stat_wal (PostgreSQL 14+).
-func collectRDSWALMetrics(ctx context.Context, pool PgxQuerier, labels map[string]string) ([]collector.Metric, error) {
+func collectRDSWALMetrics(ctx context.Context, pool PgxQuerier, version int, labels map[string]string) ([]collector.Metric, error) {
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -806,18 +793,7 @@ func collectRDSWALMetrics(ctx context.Context, pool PgxQuerier, labels map[strin
 	var walBytes int64
 	var walWriteTime, walSyncTime float64
 
-	err := pool.QueryRow(ctx2, `
-		SELECT
-			wal_records,
-			wal_fpi,
-			wal_bytes,
-			wal_buffers_full,
-			wal_write,
-			wal_sync,
-			wal_write_time,
-			wal_sync_time
-		FROM pg_stat_wal
-	`).Scan(
+	err := pool.QueryRow(ctx2, walStatsQuery(version)).Scan(
 		&walRecords, &walFpi, &walBytes,
 		&walBuffersFull, &walWrite, &walSync,
 		&walWriteTime, &walSyncTime,

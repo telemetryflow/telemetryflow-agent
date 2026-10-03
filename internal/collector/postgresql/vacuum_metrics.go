@@ -45,7 +45,7 @@ func collectVacuumMetrics(ctx context.Context, pool PgxQuerier, inst *pgInstance
 	}
 
 	// --- b) Vacuum progress ---
-	if m, err := collectVacuumProgress(ctx2, pool, labels, logger); err != nil {
+	if m, err := collectVacuumProgress(ctx2, pool, inst.version, labels, logger); err != nil {
 		logger.Debug("vacuum progress query failed", zap.Error(err))
 	} else {
 		all = append(all, m...)
@@ -118,18 +118,8 @@ func collectVacuumWorkers(ctx context.Context, pool PgxQuerier, labels map[strin
 }
 
 // collectVacuumProgress reports progress of running vacuums from pg_stat_progress_vacuum.
-func collectVacuumProgress(ctx context.Context, pool PgxQuerier, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
-	const q = `SELECT relid::regclass::text AS table_name,
-	                  phase,
-	                  heap_blks_total,
-	                  heap_blks_scanned,
-	                  heap_blks_vacuumed,
-	                  index_vacuum_count,
-	                  max_dead_tuples,
-	                  num_dead_tuples
-	           FROM pg_stat_progress_vacuum`
-
-	rows, err := pool.Query(ctx, q)
+func collectVacuumProgress(ctx context.Context, pool PgxQuerier, version int, labels map[string]string, logger *zap.Logger) ([]collector.Metric, error) {
+	rows, err := pool.Query(ctx, vacuumProgressQuery(version))
 	if err != nil {
 		return nil, fmt.Errorf("vacuum progress: %w", err)
 	}
@@ -163,9 +153,22 @@ func collectVacuumProgress(ctx context.Context, pool PgxQuerier, labels map[stri
 			makeMetric("db.postgresql.vacuum.heap_blks_scanned", float64(scanned), collector.MetricTypeGauge, detailLabels),
 			makeMetric("db.postgresql.vacuum.heap_blks_vacuumed", float64(vacuumed), collector.MetricTypeGauge, detailLabels),
 			makeMetric("db.postgresql.vacuum.index_vacuum_count", float64(idxVacCount), collector.MetricTypeGauge, detailLabels),
+			// numDead is num_dead_tuples (<PG17) or num_dead_item_ids (PG17+) —
+			// both a count of collected dead tuples, so the metric stays stable.
 			makeMetric("db.postgresql.vacuum.num_dead_tuples", float64(numDead), collector.MetricTypeGauge, detailLabels),
-			makeMetric("db.postgresql.vacuum.max_dead_tuples", float64(maxDead), collector.MetricTypeGauge, detailLabels),
 		)
+		// PG17+ replaced the max_dead_tuples COUNT budget with a byte budget
+		// (max_dead_tuple_bytes); emit under a version-appropriate metric name so
+		// the value's unit is never misrepresented.
+		if vacuumDeadTupleBytes(version) {
+			metrics = append(metrics,
+				makeMetric("db.postgresql.vacuum.max_dead_tuple_bytes", float64(maxDead), collector.MetricTypeGauge, detailLabels),
+			)
+		} else {
+			metrics = append(metrics,
+				makeMetric("db.postgresql.vacuum.max_dead_tuples", float64(maxDead), collector.MetricTypeGauge, detailLabels),
+			)
+		}
 	}
 	return metrics, rows.Err()
 }
