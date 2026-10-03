@@ -230,8 +230,8 @@ func TestParseReplicationRowMySQL84Columns(t *testing.T) {
 	labels := map[string]string{"mysql_instance": "test"}
 	colMap := map[string]string{
 		"Seconds_Behind_Source": "7",
-		"Replica_IO_Running":     "Yes",
-		"Replica_SQL_Running":    "Yes",
+		"Replica_IO_Running":    "Yes",
+		"Replica_SQL_Running":   "Yes",
 	}
 	metrics := mysql.ParseReplicationRowExport(colMap, labels)
 
