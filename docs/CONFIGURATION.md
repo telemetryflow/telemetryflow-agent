@@ -1,14 +1,14 @@
 # TelemetryFlow Agent Configuration Reference
 
-- **Version:** 1.3.5
+- **Version:** 1.3.6
 - **OTEL SDK Version:** 1.46.0
-- **Last Updated:** July 2026
+- **Last Updated:** November 2026
 
 ---
 
 ## Overview
 
-TelemetryFlow Agent uses a custom YAML configuration format with `enabled` flags for easy feature toggling. Built on the standard OpenTelemetry Go SDK v1.40.0, the agent maintains TelemetryFlow identity and branding while leveraging OTEL SDK capabilities for telemetry collection and export.
+TelemetryFlow Agent uses a custom YAML configuration format with `enabled` flags for easy feature toggling. Built on the standard OpenTelemetry Go SDK v1.46.0, the agent maintains TelemetryFlow identity and branding while leveraging OTEL SDK capabilities for telemetry collection and export.
 
 Starting with v1.2.1, the agent introduces a new `telemetryflow` configuration section that aligns with TFO-Collector for unified platform configuration.
 
@@ -90,7 +90,7 @@ When connecting to TFO-Collector, the agent automatically sends these headers:
 # =============================================================================
 # TelemetryFlow Agent Configuration
 # =============================================================================
-# Version: 1.3.5
+# Version: 1.3.6
 # Format: Custom YAML (not standard OTEL format)
 # =============================================================================
 

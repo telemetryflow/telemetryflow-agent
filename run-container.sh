@@ -16,10 +16,10 @@
 #
 # Examples:
 #   ./run-container.sh                  # Build + tag (default)
-#   ./run-container.sh -t 2.0.0         # Build with custom tag
+#   ./run-container.sh -t 1.3.6         # Build with custom tag
 #   ./run-container.sh -p               # Push only (no build)
 #   ./run-container.sh -c               # Build, tag, push
-#   ./run-container.sh -c -t 2.0.0      # Complete with custom tag
+#   ./run-container.sh -c -t 1.3.6      # Complete with custom tag
 #   ./run-container.sh -m               # Multi-arch build + tag
 #   ./run-container.sh -m -c            # Multi-arch build + push
 #
@@ -34,7 +34,7 @@ set -euo pipefail
 # Config
 # ---------------------------------------------------------------------------
 IMAGE="telemetryflow/telemetryflow-agent"
-VERSION="1.3.5"
+VERSION="1.3.6"
 COMMIT=$(git rev-parse --short HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -67,10 +67,10 @@ Options:
 
 Examples:
   $0                  # Build + tag (default)
-  $0 -t 2.0.0         # Build with custom tag
+  $0 -t 1.3.6         # Build with custom tag
   $0 -p               # Push only (no build)
   $0 -c               # Build, tag, push
-  $0 -c -t 2.0.0      # Complete with custom tag
+  $0 -c -t 1.3.6      # Complete with custom tag
   $0 -m               # Multi-arch build + tag
   $0 -m -c            # Multi-arch build + push
 EOF

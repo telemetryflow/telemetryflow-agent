@@ -271,7 +271,7 @@ sequenceDiagram
     "containerRuntime": "docker",
     "cloudProvider": "aws",
     "cloudRegion": "us-west-2",
-    "agentVersion": "1.2.2",
+    "agentVersion": "1.3.6",
     "agentUptime": 86400
   }
 }
@@ -531,7 +531,7 @@ graph TD
 graph LR
     subgraph "TelemetryFlow Ecosystem"
         SDK[TFO-GO-SDK<br/>v1.1.4]
-        AGENT[TFO-Agent<br/>v1.3.5]
+        AGENT[TFO-Agent<br/>v1.3.6]
         COLL[TFO-Collector<br/>v1.1.4]
     end
 

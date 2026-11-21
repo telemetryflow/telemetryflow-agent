@@ -49,7 +49,7 @@ require (
 	github.com/stretchr/testify v1.12.1 // Test assertions
 
 	// -------------------------------------------------------------------------
-	// OpenTelemetry SDK v1.40.0
+	// OpenTelemetry SDK v1.46.0
 	// See: https://github.com/open-telemetry/opentelemetry-go
 	// -------------------------------------------------------------------------
 	go.opentelemetry.io/otel v1.46.0 // OTEL core API

@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `appVersion` 1.3.6 / chart `1.1.3`, and image tags in the k8s manifests,
   docker-compose, example configs and release workflows.
 
+### Security
+
+- Bumped `golang.org/x/net` → **0.62.0** and `golang.org/x/mod` → **0.41.0** to
+  patch HIGH-severity transitive CVEs (trivy `fs --scanners vuln` clean).
+
 ## [1.3.5] - 2026-10-04
 
 Database-collector version-compatibility release: the PostgreSQL, MySQL, MSSQL,

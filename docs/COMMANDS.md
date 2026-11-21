@@ -1,7 +1,7 @@
 # TelemetryFlow Agent CLI Commands
 
-- **Version:** 1.3.5
-- **Last Updated:** July 2026
+- **Version:** 1.3.6
+- **Last Updated:** November 2026
 
 ---
 
@@ -9,7 +9,7 @@
 
 TelemetryFlow Agent provides a Cobra-based CLI with multiple commands for different operations. This document describes all available commands and their options.
 
-> **1.3.1 note.** `config validate` and `config show` now run the
+> **1.3.6 note.** `config validate` and `config show` now run the
 > migration framework on the raw config bytes and apply `${VAR}` env
 > expansion plus `@{store:key}` secret resolution before parsing. The
 > `plugins` and `test` commands listed in the roadmap below are planned for
@@ -124,7 +124,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
                        \//_____/      \/     \/
 
   ══════════════════════════════════════════════════════════════════════════════
-    TelemetryFlow Agent v1.3.5
+    TelemetryFlow Agent v1.3.6
     AI-Powered Observability & Incident Response Management (IRM) Platform
   ══════════════════════════════════════════════════════════════════════════════
     Platform     darwin/arm64
@@ -140,7 +140,7 @@ Starts the TelemetryFlow Agent with the specified configuration.
     Copyright (c) 2024-2026 Telemetri Data Indonesia
   ══════════════════════════════════════════════════════════════════════════════
 
-{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.2.2"}
+{"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Starting TelemetryFlow Agent","version":"1.3.6"}
 {"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Configuration loaded","file":"configs/tfo-agent.yaml"}
 {"level":"info","ts":"2026-06-19T10:00:00Z","msg":"Agent started","id":"agent-001","hostname":"server-01"}
 ```
@@ -179,7 +179,7 @@ Displays version and build information.
 
 # Short version only
 ./build/tfo-agent version --short
-# Output: 1.2.2
+# Output: 1.3.6
 
 # JSON format
 ./build/tfo-agent version --json
@@ -188,7 +188,7 @@ Displays version and build information.
 **Output (Default):**
 
 ```
-TelemetryFlow Agent v1.3.5
+TelemetryFlow Agent v1.3.6
 
   Build Information
   ─────────────────────────────────────────────
@@ -215,7 +215,7 @@ TelemetryFlow Agent v1.3.5
 {
   "product": "TelemetryFlow Agent",
   "description": "Enterprise telemetry collection agent",
-  "version": "1.2.2",
+  "version": "1.3.6",
   "git_commit": "abc1234",
   "git_branch": "main",
   "build_time": "2026-06-19T10:00:00Z",
@@ -241,12 +241,12 @@ flags are omitted. Full reference: [DEPLOYMENT-TRACKING.md](./DEPLOYMENT-TRACKIN
 
 ```bash
 # One-shot success report
-tfo-agent deploy --service checkout --version 2.6.0 --status success \
+tfo-agent deploy --service checkout --version 1.3.6 --status success \
   --provider github --commit "$GIT_SHA" --ref main
 
 # With an explicit config + endpoint override
 tfo-agent deploy --config configs/examples/deployment.yaml \
-  --service api --version 2.6.0 --status success
+  --service api --version 1.3.6 --status success
 ```
 
 Required: `--service`, `--version`. Key flags: `--status`
@@ -482,7 +482,7 @@ Shows help for any command.
 The following commands are planned for the `1.4.0` release and are tracked
 in the master roadmap at
 `telemetryflow-platform-monolith/docs/tfo-agent-roadmap/`. They are built on
-top of the `1.3.0` plugin registry (`internal/plugin/registry.go`) and are
+top of the `1.3.6` plugin registry (`internal/plugin/registry.go`) and are
 documented here so operators can plan automation around the expected CLI
 surface. Flag names are provisional.
 
@@ -499,13 +499,13 @@ by `plugin.AllNames()` plus the per-type `*Names()` helpers.
 **Planned output:**
 
 ```
-TYPE        NAME                 DESCRIPTION                                   DEPRECATED
+TYPE        NAME                DESCRIPTION                                   DEPRECATED
 collector   system              Lightweight host metrics + SystemInfo
 collector   ping                ICMP probe (rtt, loss, ttl)
 collector   snmp                SNMP v1/v2c/v3 polling
 processor   filter              Rule-based keep/drop by name regex + labels
 processor   starlark            Embedded Starlark escape hatch
-output      otlp_http          OTLP/HTTP metric sink
+output      otlp_http           OTLP/HTTP metric sink
 output      prometheus_writer   Remote-write compatible sink
 ...
 ```

@@ -23,7 +23,7 @@ endpoint remains available for pipelines that don't run the agent.
 ```bash
 tfo-agent deploy \
   --service checkout \
-  --version 2.6.0 \
+  --version 1.3.6 \
   --status success \
   --provider github \
   --commit "$GITHUB_SHA" \
@@ -110,9 +110,9 @@ tfo-agent deploy --service worker --version "$BUILD_VERSION" --status "$RESULT" 
 Report the start and the end for lead-time/MTTR:
 
 ```bash
-tfo-agent deploy --service api --version 2.6.0 --status running   --external-id "$RUN_ID"
+tfo-agent deploy --service api --version 1.3.6 --status running   --external-id "$RUN_ID"
 # … deploy …
-tfo-agent deploy --service api --version 2.6.0 --status success   --external-id "$RUN_ID"
+tfo-agent deploy --service api --version 1.3.6 --status success   --external-id "$RUN_ID"
 ```
 
 ## Configuration
