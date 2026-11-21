@@ -22,6 +22,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -34,6 +35,7 @@ import (
 	"github.com/telemetryflow/telemetryflow-agent/internal/agent"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 	"github.com/telemetryflow/telemetryflow-agent/internal/deploy"
+	"github.com/telemetryflow/telemetryflow-agent/internal/rum"
 	"github.com/telemetryflow/telemetryflow-agent/internal/version"
 )
 
@@ -79,6 +81,7 @@ Usage:
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
 	rootCmd.AddCommand(deployCmd())
+	rootCmd.AddCommand(rumProxyCmd())
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path (default: searches for tfo-agent.yaml)")
@@ -262,6 +265,88 @@ Example:
 	f.StringVar(&startedAt, "started-at", "", "ISO 8601 start time")
 	f.StringVar(&finishedAt, "finished-at", "", "ISO 8601 finish time")
 	f.BoolVar(&insecure, "insecure", false, "skip TLS verification (self-signed platform certs)")
+
+	return cmd
+}
+
+// rumProxyCmd returns the rum-proxy command — a local Real User Monitoring
+// ingestion edge. Browsers running @telemetryflow/rum-web beacon to the agent's
+// /v1/rum/traces and /v1/rum/metrics; the agent forwards them to the platform
+// RUM edge. The upstream falls back to the agent config's backend endpoint.
+func rumProxyCmd() *cobra.Command {
+	var (
+		listen       string
+		upstream     string
+		allowOrigins []string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "rum-proxy",
+		Short: "Run a local RUM ingestion edge that forwards browser beacons to the platform",
+		Long: `Start a local Real User Monitoring edge. Browsers running the
+@telemetryflow/rum-web SDK beacon OTLP/JSON to this agent's /v1/rum/traces and
+/v1/rum/metrics; the agent forwards each beacon (body + public key + Origin) to
+the platform RUM edge. The platform still performs the public-key + origin auth;
+the agent adds a local origin allowlist and CORS.
+
+Example:
+  tfo-agent rum-proxy --listen :8319 \
+    --upstream https://ingest.telemetryflow.id \
+    --allow-origin https://app.example.com`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if upstream == "" {
+				if cfg, err := config.NewLoader().Load(cfgFile); err == nil && cfg != nil {
+					upstream = cfg.GetBackendEndpoint()
+				}
+			}
+			if len(allowOrigins) == 0 {
+				return fmt.Errorf("rum-proxy: at least one --allow-origin is required (use '*' to allow any)")
+			}
+
+			logger, err := initLogger(config.LoggingConfig{Level: logLevel, Format: logFormat})
+			if err != nil {
+				logger = zap.NewNop()
+			}
+			defer func() { _ = logger.Sync() }()
+
+			proxy, err := rum.NewProxy(upstream, allowOrigins, 15*time.Second, logger)
+			if err != nil {
+				return err
+			}
+
+			srv := &http.Server{
+				Addr:              listen,
+				Handler:           proxy.Handler(),
+				ReadHeaderTimeout: 10 * time.Second,
+			}
+
+			// Graceful shutdown on signal.
+			sigChan := make(chan os.Signal, 1)
+			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-sigChan
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = srv.Shutdown(ctx)
+			}()
+
+			logger.Info("RUM proxy listening",
+				zap.String("addr", listen),
+				zap.String("upstream", upstream),
+				zap.Strings("allow_origins", allowOrigins),
+			)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				return fmt.Errorf("rum-proxy: server error: %w", err)
+			}
+			logger.Info("RUM proxy stopped")
+			return nil
+		},
+	}
+
+	f := cmd.Flags()
+	f.StringVar(&listen, "listen", ":8319", "address to listen on for browser RUM beacons")
+	f.StringVar(&upstream, "upstream", "", "platform RUM edge base URL (default: agent config backend endpoint)")
+	f.StringArrayVar(&allowOrigins, "allow-origin", nil, "allowed browser origin (repeatable; '*' allows any)")
 
 	return cmd
 }

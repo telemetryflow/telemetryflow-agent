@@ -257,6 +257,24 @@ Required: `--service`, `--version`. Key flags: `--status`
 
 ---
 
+### tfo-agent rum-proxy
+
+Run a local Real User Monitoring ingestion edge. Browsers running
+`@telemetryflow/rum-web` beacon to the agent's `/v1/rum/traces` and
+`/v1/rum/metrics`; the agent forwards them to the platform RUM edge. Full
+reference: [RUM-EDGE.md](./RUM-EDGE.md).
+
+```bash
+tfo-agent rum-proxy --listen :8319 \
+  --upstream https://ingest.telemetryflow.id \
+  --allow-origin https://app.example.com
+```
+
+Flags: `--listen` (default `:8319`), `--upstream` (default: agent config
+`backend_endpoint`), `--allow-origin` (required, repeatable; `*` allows any).
+
+---
+
 ### tfo-agent config
 
 Configuration management parent command. Subcommands validate or render the

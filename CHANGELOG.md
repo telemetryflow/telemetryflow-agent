@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without a separate CLI. New `internal/deploy` package (`Reporter`, `Validate`)
   with table-driven + httptest coverage; illegal status/provider and missing
   service/version are rejected client-side before any request.
+- **RUM ingestion edge (`tfo-agent rum-proxy`)** — a local Real User Monitoring
+  edge. Browsers running `@telemetryflow/rum-web` beacon OTLP/JSON to the agent's
+  `/v1/rum/traces` and `/v1/rum/metrics`; the agent forwards each beacon (body +
+  public key + Origin, transparently) to the platform RUM edge and relays the
+  response (incl. rate-limit headers). The platform performs the authoritative
+  public-key + origin-allowlist auth; the agent adds a local origin allowlist
+  (defense-in-depth), CORS preflight, a 2 MiB body cap, and hop-by-hop header
+  stripping. New `internal/rum` package with httptest coverage.
 
 ### Changed
 
