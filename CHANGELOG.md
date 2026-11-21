@@ -7,7 +7,7 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.5-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.6-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
 [![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.46.0-blueviolet)](https://opentelemetry.io/)
@@ -25,6 +25,27 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.3.6] - 2026-11-21
+
+### Added
+
+- **Deployment reporting (`tfo-agent deploy`)** — report a software deployment to
+  the TelemetryFlow platform (Operations → Deployments). The agent POSTs a
+  canonical deployment record (service, version, status, provider, commit, actor,
+  url, timings) to `/api/v2/deployments`, authenticated by the agent's existing
+  ingestion key (`X-TelemetryFlow-Key-ID` / `-Key-Secret`) — tenant/project are
+  resolved server-side. Endpoint + key fall back to the agent config when flags
+  are omitted, so any pipeline already running `tfo-agent` can report deploys
+  without a separate CLI. New `internal/deploy` package (`Reporter`, `Validate`)
+  with table-driven + httptest coverage; illegal status/provider and missing
+  service/version are rejected client-side before any request.
+
+### Changed
+
+- Version bumped to **1.3.6** (source of truth `internal/version`), helm chart
+  `appVersion` 1.3.6 / chart `1.1.3`, and image tags in the k8s manifests,
+  docker-compose, example configs and release workflows.
 
 ## [1.3.5] - 2026-10-04
 

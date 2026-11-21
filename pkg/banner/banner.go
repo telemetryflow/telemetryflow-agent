@@ -44,7 +44,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		ProductName: "TelemetryFlow Agent",
-		Version:     "1.3.5",
+		Version:     "1.3.6",
 		Motto:       "AI-Powered Observability & Incident Response Management (IRM) Platform",
 		GitCommit:   "unknown",
 		BuildTime:   "unknown",

@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/telemetryflow/telemetryflow-agent/internal/agent"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
+	"github.com/telemetryflow/telemetryflow-agent/internal/deploy"
 	"github.com/telemetryflow/telemetryflow-agent/internal/version"
 )
 
@@ -76,6 +78,7 @@ Usage:
 	rootCmd.AddCommand(startCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
+	rootCmd.AddCommand(deployCmd())
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path (default: searches for tfo-agent.yaml)")
@@ -167,6 +170,99 @@ func configCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(validateCmd, showCmd)
+	return cmd
+}
+
+// deployCmd returns the deploy command — report a software deployment to the
+// TelemetryFlow platform (Operations → Deployments). Reuses the agent's
+// ingestion key + backend endpoint (overridable by flags), so any pipeline that
+// already runs tfo-agent can report deploys without a separate CLI.
+func deployCmd() *cobra.Command {
+	var (
+		endpoint, keyID, keySecret                          string
+		service, version, provider, externalID, environment string
+		status, commitSHA, commitRef, actor, pipelineURL    string
+		startedAt, finishedAt                               string
+		insecure                                            bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "deploy",
+		Short: "Report a software deployment to the TelemetryFlow platform",
+		Long: `Report a deployment (service + version + status) to TelemetryFlow
+(Operations → Deployments). Authenticated by the agent's ingestion key; the
+tenant/project are resolved server-side. Endpoint + key fall back to the agent
+config when the flags are omitted.
+
+Example:
+  tfo-agent deploy --service checkout --version 2.6.0 --status success \
+    --provider github --commit $GIT_SHA --ref main`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Config is optional for deploy — flags can supply everything. When a
+			// config loads, it fills any endpoint/key/timeout the flags omitted.
+			timeout := 30 * time.Second
+			if cfg, err := config.NewLoader().Load(cfgFile); err == nil && cfg != nil {
+				if endpoint == "" {
+					endpoint = cfg.GetBackendEndpoint()
+				}
+				if keyID == "" {
+					keyID = cfg.GetEffectiveAPIKeyID()
+				}
+				if keySecret == "" {
+					keySecret = cfg.GetEffectiveAPIKeySecret()
+				}
+				if t := cfg.GetEffectiveTimeout(); t > 0 {
+					timeout = t
+				}
+			}
+
+			reporter := deploy.NewReporter(endpoint, keyID, keySecret, timeout,
+				deploy.WithInsecureTLS(insecure))
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+
+			resp, err := reporter.Report(ctx, deploy.Request{
+				Service:     service,
+				Version:     version,
+				Provider:    provider,
+				ExternalID:  externalID,
+				Environment: environment,
+				Status:      status,
+				CommitSHA:   commitSHA,
+				CommitRef:   commitRef,
+				Actor:       actor,
+				URL:         pipelineURL,
+				StartedAt:   startedAt,
+				FinishedAt:  finishedAt,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Deployment recorded: id=%s status=%s created=%v\n",
+				resp.Data.DeploymentID, resp.Data.Status, resp.Data.Created)
+			return nil
+		},
+	}
+
+	f := cmd.Flags()
+	f.StringVar(&endpoint, "endpoint", "", "platform backend base URL (default: agent config)")
+	f.StringVar(&keyID, "key-id", "", "ingestion key id (tfk_…; default: agent config)")
+	f.StringVar(&keySecret, "key-secret", "", "ingestion key secret (tfs_…; default: agent config)")
+	f.StringVar(&service, "service", "", "service name (required)")
+	f.StringVar(&version, "version", "", "deployed version (required)")
+	f.StringVar(&provider, "provider", "", "source provider (github|gitlab|bitbucket|jenkins|aws|azure|argocd|cli)")
+	f.StringVar(&externalID, "external-id", "", "provider run/deployment id (dedup key; generated if empty)")
+	f.StringVar(&environment, "environment", "", "environment (default: production)")
+	f.StringVar(&status, "status", "", "status (queued|running|success|failed|rolled_back; default: success)")
+	f.StringVar(&commitSHA, "commit", "", "commit SHA")
+	f.StringVar(&commitRef, "ref", "", "commit ref / branch")
+	f.StringVar(&actor, "actor", "", "who triggered the deploy (hashed server-side)")
+	f.StringVar(&pipelineURL, "url", "", "link to the pipeline run (display only)")
+	f.StringVar(&startedAt, "started-at", "", "ISO 8601 start time")
+	f.StringVar(&finishedAt, "finished-at", "", "ISO 8601 finish time")
+	f.BoolVar(&insecure, "insecure", false, "skip TLS verification (self-signed platform certs)")
+
 	return cmd
 }
 
