@@ -268,7 +268,7 @@ If you see repeated warnings like:
 }
 ```
 
-this means every metric is being dropped during OTLP serialization. The root cause is a Go type mismatch: `buildAggregation()` in `internal/exporter/otlp_metric_bridge.go` must return **value** types (`metricdata.Gauge[float64]`, `metricdata.Sum[float64]`), not pointer types (`*metricdata.Gauge[float64]`). The OTel SDK v1.43.0 OTLP transform pipeline type-switches on value types — Go type switches do not match `*T` against `T`.
+this means every metric is being dropped during OTLP serialization. The root cause is a Go type mismatch: `buildAggregation()` in `internal/exporter/otlp_metric_bridge.go` must return **value** types (`metricdata.Gauge[float64]`, `metricdata.Sum[float64]`), not pointer types (`*metricdata.Gauge[float64]`). The OTel SDK v1.46.0 OTLP transform pipeline type-switches on value types — Go type switches do not match `*T` against `T`.
 
 Verify the fix is applied:
 

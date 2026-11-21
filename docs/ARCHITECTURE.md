@@ -422,7 +422,7 @@ graph TB
     end
 
     subgraph "Export"
-        OTLP_HTTP[OTLP HTTP Exporter<br/>otlpmetrichttp v1.43.0]
+        OTLP_HTTP[OTLP HTTP Exporter<br/>otlpmetrichttp v1.46.0]
         PROM_SVR[Prometheus Server<br/>:8888 /metrics]
     end
 
@@ -442,7 +442,7 @@ graph TB
 **Key design decisions:**
 
 - `MetricForwarder` is the sole collection driver — collectors' `Start()` only manages lifecycle (subprocesses, connections), `Collect()` is called by the forwarder loop.
-- `OTLPMetricBridge.Export()` converts `[]collector.Metric` into `metricdata.ResourceMetrics` using **value-type** aggregations (`metricdata.Gauge[float64]`, not pointers). The OTel SDK v1.43.0 transform pipeline type-switches on value types — pointer types are silently rejected as "unknown aggregation".
+- `OTLPMetricBridge.Export()` converts `[]collector.Metric` into `metricdata.ResourceMetrics` using **value-type** aggregations (`metricdata.Gauge[float64]`, not pointers). The OTel SDK v1.46.0 transform pipeline type-switches on value types — pointer types are silently rejected as "unknown aggregation".
 - Counter metrics use `CumulativeTemporality` (collectors report totals since process start, not per-interval deltas).
 
 ## Deployment Architecture
@@ -536,8 +536,8 @@ graph LR
     end
 
     subgraph "OpenTelemetry"
-        OTEL[OTel SDK<br/>v1.43.0]
-        PROTO[OTLP Proto<br/>v1.9.0]
+        OTEL[OTel SDK<br/>v1.46.0]
+        PROTO[OTLP Proto<br/>v1.11.0]
     end
 
     subgraph "Runtime"
