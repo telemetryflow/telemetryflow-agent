@@ -271,7 +271,7 @@ sequenceDiagram
     "containerRuntime": "docker",
     "cloudProvider": "aws",
     "cloudRegion": "us-west-2",
-    "agentVersion": "1.3.6",
+    "agentVersion": "1.3.7",
     "agentUptime": 86400
   }
 }
@@ -422,7 +422,7 @@ graph TB
     end
 
     subgraph "Export"
-        OTLP_HTTP[OTLP HTTP Exporter<br/>otlpmetrichttp v1.46.0]
+        OTLP_HTTP[OTLP HTTP Exporter<br/>otlpmetrichttp v1.47.0]
         PROM_SVR[Prometheus Server<br/>:8888 /metrics]
     end
 
@@ -442,7 +442,7 @@ graph TB
 **Key design decisions:**
 
 - `MetricForwarder` is the sole collection driver — collectors' `Start()` only manages lifecycle (subprocesses, connections), `Collect()` is called by the forwarder loop.
-- `OTLPMetricBridge.Export()` converts `[]collector.Metric` into `metricdata.ResourceMetrics` using **value-type** aggregations (`metricdata.Gauge[float64]`, not pointers). The OTel SDK v1.46.0 transform pipeline type-switches on value types — pointer types are silently rejected as "unknown aggregation".
+- `OTLPMetricBridge.Export()` converts `[]collector.Metric` into `metricdata.ResourceMetrics` using **value-type** aggregations (`metricdata.Gauge[float64]`, not pointers). The OTel SDK v1.47.0 transform pipeline type-switches on value types — pointer types are silently rejected as "unknown aggregation".
 - Counter metrics use `CumulativeTemporality` (collectors report totals since process start, not per-interval deltas).
 
 ## Deployment Architecture
@@ -531,12 +531,12 @@ graph TD
 graph LR
     subgraph "TelemetryFlow Ecosystem"
         SDK[TFO-GO-SDK<br/>v1.1.4]
-        AGENT[TFO-Agent<br/>v1.3.6]
+        AGENT[TFO-Agent<br/>v1.3.7]
         COLL[TFO-Collector<br/>v1.1.4]
     end
 
     subgraph "OpenTelemetry"
-        OTEL[OTel SDK<br/>v1.46.0]
+        OTEL[OTel SDK<br/>v1.47.0]
         PROTO[OTLP Proto<br/>v1.11.0]
     end
 

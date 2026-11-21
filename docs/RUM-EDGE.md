@@ -2,7 +2,7 @@
 
 > Run a local **Real User Monitoring** edge: browsers beacon web telemetry to a
 > nearby agent, which forwards it to the TelemetryFlow platform. Available since
-> **v1.3.6**.
+> **v1.3.7**.
 
 ## What it is
 

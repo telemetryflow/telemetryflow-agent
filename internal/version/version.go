@@ -62,13 +62,13 @@ const (
 	SupportURL = "https://docs.telemetryflow.id"
 
 	// OTELSDKVersion is the OpenTelemetry SDK version this agent is based on
-	OTELSDKVersion = "1.46.0"
+	OTELSDKVersion = "1.47.0"
 )
 
 // Build-time variables (set via ldflags)
 var (
 	// Version is the semantic version of the agent
-	Version = "1.3.6"
+	Version = "1.3.7"
 
 	// GitCommit is the git commit hash
 	GitCommit = "unknown"

@@ -1,9 +1,9 @@
 # TelemetryFlow Agent Development Guide
 
-- **Version:** 1.3.6
+- **Version:** 1.3.7
 - **Last Updated:** November 2026
 - **Go Version:** 1.26+
-- **OTEL SDK Version:** 1.46.0
+- **OTEL SDK Version:** 1.47.0
 
 ---
 
@@ -486,8 +486,8 @@ make tidy
 
 | Package                                 | Version | Purpose            |
 | --------------------------------------- | ------- | ------------------ |
-| go.opentelemetry.io/otel                | v1.46.0 | OpenTelemetry SDK  |
-| go.opentelemetry.io/otel/exporters/otlp | v1.46.0 | OTLP exporters     |
+| go.opentelemetry.io/otel                | v1.47.0 | OpenTelemetry SDK  |
+| go.opentelemetry.io/otel/exporters/otlp | v1.47.0 | OTLP exporters     |
 | github.com/spf13/cobra                  | v1.9.1  | CLI framework      |
 | github.com/spf13/viper                  | v1.20.1 | Configuration      |
 | go.uber.org/zap                         | v1.27.0 | Structured logging |
@@ -615,12 +615,12 @@ refactor: extract TLS config to helper function
 
 ```bash
 # Update version in internal/version/version.go
-const Version = "1.3.6"
+const Version = "1.3.7"
 
 # Update CHANGELOG.md
 # Create git tag
-git tag -a v1.3.6 -m "Release v1.3.6"
-git push origin v1.3.6
+git tag -a v1.3.7 -m "Release v1.3.7"
+git push origin v1.3.7
 ```
 
 ### Creating Release

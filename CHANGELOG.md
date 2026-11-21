@@ -7,10 +7,10 @@
 
   <h3>TelemetryFlow Agent (OTEL Agent)</h3>
 
-[![Version](https://img.shields.io/badge/Version-1.3.6-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.7-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org/)
-[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.46.0-blueviolet)](https://opentelemetry.io/)
+[![OTEL SDK](https://img.shields.io/badge/OpenTelemetry_SDK-1.47.0-blueviolet)](https://opentelemetry.io/)
 [![Coverage](https://img.shields.io/badge/Coverage-91.3%25-green.svg)](CHANGELOG.md)
 [![OpenTelemetry](https://img.shields.io/badge/OTLP-100%25%20Compliant-success?logo=opentelemetry)](https://opentelemetry.io/)
 
@@ -25,6 +25,28 @@ All notable changes to TelemetryFlow Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.1/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.3.7] - 2026-11-22
+
+### Security
+
+- **Patched OTEL-Go `AttributeValueLengthLimit` bypass** (CVE-2026-128085 /
+  GHSA-q7gw-24fr-5p69, moderate). Valid U+FFFD replacement runes were skipped by
+  the counting-based truncation fast path, so `AttributeValueLengthLimit` (and the
+  log `WithAttributeValueLengthLimit`) could be fully bypassed — a value of N
+  U+FFFD runes was stored verbatim regardless of the limit. Fixed by bumping the
+  OpenTelemetry Go SDK **1.46.0 → 1.47.0**, which also **stabilised the log
+  signal**: `go.opentelemetry.io/otel/log` + `otel/sdk/log` `v0.22.0 → v1.47.0`,
+  and the `otlplog` exporters (`otlploggrpc`/`otlploghttp`) `→ v0.23.0`. Affected
+  modules flagged by Dependabot (#34 `otel/sdk/log`, #35 `otel/sdk`, #36
+  `otel/trace`) are now ≥ the fixed `1.47.0`. `go build ./...` +
+  `go test ./internal/...` green; `go mod verify` clean.
+
+### Changed
+
+- Version bump **1.3.6 → 1.3.7**; `internal/version` OTEL SDK string
+  `1.46.0 → 1.47.0`; helm `appVersion`, image tags, `.env.example`,
+  docker-compose and docs updated to match.
 
 ## [1.3.6] - 2026-11-21
 

@@ -2,7 +2,7 @@
 
 > Report software deployments to the TelemetryFlow platform (**Operations →
 > Deployments**) directly from the agent — no separate CLI. Available since
-> **v1.3.6**.
+> **v1.3.7**.
 
 The agent already forwards **errors** to the platform as OTLP (span `exception`
 events + ERROR logs → TFO-Sentry); this page covers the complementary
@@ -23,7 +23,7 @@ endpoint remains available for pipelines that don't run the agent.
 ```bash
 tfo-agent deploy \
   --service checkout \
-  --version 1.3.6 \
+  --version 1.3.7 \
   --status success \
   --provider github \
   --commit "$GITHUB_SHA" \
@@ -110,9 +110,9 @@ tfo-agent deploy --service worker --version "$BUILD_VERSION" --status "$RESULT" 
 Report the start and the end for lead-time/MTTR:
 
 ```bash
-tfo-agent deploy --service api --version 1.3.6 --status running   --external-id "$RUN_ID"
+tfo-agent deploy --service api --version 1.3.7 --status running   --external-id "$RUN_ID"
 # … deploy …
-tfo-agent deploy --service api --version 1.3.6 --status success   --external-id "$RUN_ID"
+tfo-agent deploy --service api --version 1.3.7 --status success   --external-id "$RUN_ID"
 ```
 
 ## Configuration
