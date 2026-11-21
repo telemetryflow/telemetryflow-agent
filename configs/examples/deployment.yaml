@@ -1,0 +1,36 @@
+# =============================================================================
+# TelemetryFlow Agent — Deployment Tracking example config
+# -----------------------------------------------------------------------------
+# Minimal config so `tfo-agent deploy` can report deployments to the platform
+# (Operations → Deployments) using the agent's ingestion key. With this config
+# present, a pipeline only needs:
+#
+#   tfo-agent deploy --config deployment.yaml \
+#     --service checkout --version 2.6.0 --status success
+#
+# Every field below can still be overridden per-invocation with a flag
+# (--endpoint / --key-id / --key-secret / --service / --version / …).
+#
+# See docs/DEPLOYMENT-TRACKING.md for the full command reference.
+# =============================================================================
+
+telemetryflow:
+  # Platform REST API base. `deploy` POSTs to {backend_endpoint}/api/v2/deployments.
+  backend_endpoint: ${TELEMETRYFLOW_BACKEND_ENDPOINT:-https://api.telemetryflow.id}
+  endpoint: ${TELEMETRYFLOW_ENDPOINT:-https://api.telemetryflow.id}
+
+  # Ingestion key (the SAME key used for telemetry). Resolves the tenant/project
+  # server-side — never send tenant/project in the request. Keep these in env /
+  # a secret store, never committed.
+  api_key_id: ${TELEMETRYFLOW_API_KEY_ID}       # tfk_...
+  api_key_secret: ${TELEMETRYFLOW_API_KEY_SECRET} # tfs_...
+
+  # Optional: request timeout (default 30s) and TLS. Use --insecure only for
+  # self-signed platform certs in non-production.
+  timeout: ${TELEMETRYFLOW_TIMEOUT:-30s}
+  tls:
+    enabled: ${TELEMETRYFLOW_TLS_ENABLED:-true}
+
+logging:
+  level: ${LOG_LEVEL:-info}
+  format: ${LOG_FORMAT:-text}

@@ -232,6 +232,31 @@ TelemetryFlow Agent v1.3.5
 
 ---
 
+### tfo-agent deploy
+
+Report a software deployment to the TelemetryFlow platform (**Operations →
+Deployments**). Authenticated by the agent's ingestion key; tenant/project are
+resolved server-side. Endpoint + key fall back to the agent config when the
+flags are omitted. Full reference: [DEPLOYMENT-TRACKING.md](./DEPLOYMENT-TRACKING.md).
+
+```bash
+# One-shot success report
+tfo-agent deploy --service checkout --version 2.6.0 --status success \
+  --provider github --commit "$GIT_SHA" --ref main
+
+# With an explicit config + endpoint override
+tfo-agent deploy --config configs/examples/deployment.yaml \
+  --service api --version 2.6.0 --status success
+```
+
+Required: `--service`, `--version`. Key flags: `--status`
+(`queued|running|success|failed|rolled_back`, default `success`), `--provider`,
+`--external-id` (dedup key), `--environment`, `--commit`/`--ref`, `--actor`
+(hashed server-side), `--url`, `--started-at`/`--finished-at`,
+`--endpoint`/`--key-id`/`--key-secret`, `--insecure`.
+
+---
+
 ### tfo-agent config
 
 Configuration management parent command. Subcommands validate or render the
