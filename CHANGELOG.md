@@ -40,7 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the `otlplog` exporters (`otlploggrpc`/`otlploghttp`) `→ v0.23.0`. Affected
   modules flagged by Dependabot (#34 `otel/sdk/log`, #35 `otel/sdk`, #36
   `otel/trace`) are now ≥ the fixed `1.47.0`. `go build ./...` +
-  `go test ./internal/...` green; `go mod verify` clean.
+  `go test ./internal/...` green; `go mod verify` clean. (Also clears the Trivy
+  binary-scan alerts #611/#612/#613 on the next image build.)
+- **Fixed clear-text logging of credential material** (CodeQL #429/#430, high) in
+  `internal/agent/logAuthConfig`. The startup "API client credentials" log line
+  (and the incomplete-credentials warning) previously included the first 8 chars
+  of the API key ID. It now logs a short, non-reversible **SHA-256 fingerprint**
+  (`api_key_fingerprint`) instead — operators can still correlate which key is in
+  use, but no key material (not even a prefix) reaches the logs; the secret was
+  never logged.
 
 ### Changed
 

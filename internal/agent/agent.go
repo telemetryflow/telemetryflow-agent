@@ -21,6 +21,8 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -142,8 +144,10 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 }
 
 // logAuthConfig logs which API credentials the agent will use and where
-// they came from. The secret is never logged; the key ID is masked to its
-// first 8 characters — enough to identify the key, not enough to use it.
+// they came from. Neither the key ID nor the secret is logged in clear text;
+// instead a short, non-reversible SHA-256 fingerprint of the key ID is logged —
+// enough to correlate which key is in use across runs, with no key material
+// (not even a prefix) exposed in logs.
 func logAuthConfig(cfg *config.Config, logger *zap.Logger) {
 	keyID := cfg.GetEffectiveAPIKeyID()
 	secret := cfg.GetEffectiveAPIKeySecret()
@@ -156,18 +160,17 @@ func logAuthConfig(cfg *config.Config, logger *zap.Logger) {
 		source = "env TELEMETRYFLOW_API_KEY_ID"
 	}
 
-	masked := "(empty)"
+	// Log a non-reversible fingerprint, never the key ID itself (CodeQL
+	// clear-text-logging; the raw ID — even a prefix — is sensitive material).
+	keyFingerprint := "(empty)"
 	if keyID != "" {
-		if len(keyID) > 8 {
-			masked = keyID[:8] + "..."
-		} else {
-			masked = keyID[:4] + "..."
-		}
+		sum := sha256.Sum256([]byte(keyID))
+		keyFingerprint = "sha256:" + hex.EncodeToString(sum[:])[:12]
 	}
 
 	fields := []zap.Field{
 		zap.String("backend_endpoint", cfg.GetBackendEndpoint()),
-		zap.String("api_key_id", masked),
+		zap.String("api_key_fingerprint", keyFingerprint),
 		zap.String("api_key_source", source),
 	}
 
