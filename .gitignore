@@ -38,3 +38,9 @@ logs/
 .kiro*.out
 coverage*.out
 coverage*.html
+
+# Security scan outputs — never commit (published to GitHub Code Scanning via
+# upload-sarif in CI; a G101 snippet can embed a real secret into git history).
+*.sarif
+gosec-results*.sarif
+trivy-results*.sarif
