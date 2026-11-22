@@ -57,7 +57,7 @@ graph LR
 | ----------------- | ------- | ------------------ | --------------------------- |
 | **TFO-Agent**     | v1.3.7  | SDK v1.47.0        | Telemetry collection agent  |
 | **TFO-Go-SDK**    | v1.3.7  | SDK v1.47.0        | Go instrumentation SDK      |
-| **TFO-Collector** | v1.1.8  | Collector v0.153.0 | Central telemetry collector |
+| **TFO-Collector** | v1.4.0  | Collector v0.165.0 | Central telemetry collector |
 
 This alignment ensures:
 

@@ -532,7 +532,7 @@ graph LR
     subgraph "TelemetryFlow Ecosystem"
         SDK[TFO-GO-SDK<br/>v1.1.4]
         AGENT[TFO-Agent<br/>v1.3.7]
-        COLL[TFO-Collector<br/>v1.1.4]
+        COLL[TFO-Collector<br/>v1.4.0]
     end
 
     subgraph "OpenTelemetry"
