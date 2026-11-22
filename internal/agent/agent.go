@@ -21,8 +21,6 @@ package agent
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -144,10 +142,10 @@ func New(cfg *config.Config, logger *zap.Logger) (*Agent, error) {
 }
 
 // logAuthConfig logs which API credentials the agent will use and where
-// they came from. Neither the key ID nor the secret is logged in clear text;
-// instead a short, non-reversible SHA-256 fingerprint of the key ID is logged —
-// enough to correlate which key is in use across runs, with no key material
-// (not even a prefix) exposed in logs.
+// they came from. No key material is logged — not the key ID, not the secret,
+// not a prefix, and not a hash derived from them. Only whether a key is present
+// and which source it came from is recorded, which is all an operator needs to
+// diagnose "are credentials configured?" without any sensitive data in logs.
 func logAuthConfig(cfg *config.Config, logger *zap.Logger) {
 	keyID := cfg.GetEffectiveAPIKeyID()
 	secret := cfg.GetEffectiveAPIKeySecret()
@@ -160,17 +158,12 @@ func logAuthConfig(cfg *config.Config, logger *zap.Logger) {
 		source = "env TELEMETRYFLOW_API_KEY_ID"
 	}
 
-	// Log a non-reversible fingerprint, never the key ID itself (CodeQL
-	// clear-text-logging; the raw ID — even a prefix — is sensitive material).
-	keyFingerprint := "(empty)"
-	if keyID != "" {
-		sum := sha256.Sum256([]byte(keyID))
-		keyFingerprint = "sha256:" + hex.EncodeToString(sum[:])[:12]
-	}
-
+	// Never log the key ID, a prefix, or a hash of it. A hash of the key would
+	// still be sensitive-data-derived (and a fast hash over a credential trips
+	// CodeQL go/weak-sensitive-data-hashing), so we log only presence + source.
 	fields := []zap.Field{
 		zap.String("backend_endpoint", cfg.GetBackendEndpoint()),
-		zap.String("api_key_fingerprint", keyFingerprint),
+		zap.Bool("api_key_present", keyID != ""),
 		zap.String("api_key_source", source),
 	}
 
