@@ -51,6 +51,34 @@ func newClientAPI(client *mongo.Client) clientAPI {
 	return clientAPI{client: client}
 }
 
+// apiFactory produces a mongoAPI for a given instance. The default connects via
+// ensureConnection and wraps the client with newClientAPI; it is overridable
+// through SetAPIFactoryExported so tests can inject a fake and drive the
+// per-instance orchestration (collectInstance / collectAllCollStats /
+// collectAllQueryMetrics) without a live MongoDB. Production is unchanged.
+var apiFactory = defaultAPIFactory
+
+func defaultAPIFactory(ctx context.Context, c *MongoDBCollector, inst *mongoInstance) (mongoAPI, error) {
+	client, err := c.ensureConnection(ctx, inst)
+	if err != nil {
+		return nil, err
+	}
+	return newClientAPI(client), nil
+}
+
+// SetAPIFactoryExported overrides the MongoDB API factory used by the collect
+// orchestration. Passing nil restores the production factory. Intended for
+// tests only (inject a fake MongoAPI).
+func SetAPIFactoryExported(fn func() (MongoAPI, error)) {
+	if fn == nil {
+		apiFactory = defaultAPIFactory
+		return
+	}
+	apiFactory = func(context.Context, *MongoDBCollector, *mongoInstance) (mongoAPI, error) {
+		return fn()
+	}
+}
+
 func (a clientAPI) RunCommand(ctx context.Context, db string, cmd interface{}, out interface{}) error {
 	return a.client.Database(db).RunCommand(ctx, cmd).Decode(out)
 }

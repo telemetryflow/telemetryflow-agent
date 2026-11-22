@@ -142,11 +142,10 @@ func (c *MongoDBCollector) Collect(ctx context.Context) ([]collector.Metric, err
 }
 
 func (c *MongoDBCollector) collectInstance(ctx context.Context, inst *mongoInstance) ([]collector.Metric, error) {
-	client, err := c.ensureConnection(ctx, inst)
+	api, err := apiFactory(ctx, c, inst)
 	if err != nil {
 		return nil, err
 	}
-	api := newClientAPI(client)
 
 	labels := instanceLabels(inst)
 	var all []collector.Metric
@@ -215,11 +214,11 @@ func (c *MongoDBCollector) collectInstance(ctx context.Context, inst *mongoInsta
 func (c *MongoDBCollector) collectAllQueryMetrics(ctx context.Context) ([]collector.Metric, error) {
 	var all []collector.Metric
 	for _, inst := range c.instances {
-		client, err := c.ensureConnection(ctx, inst)
+		api, err := apiFactory(ctx, c, inst)
 		if err != nil {
 			continue
 		}
-		metrics, err := collectQueryMetrics(ctx, newClientAPI(client), inst, instanceLabels(inst), c.logger)
+		metrics, err := collectQueryMetrics(ctx, api, inst, instanceLabels(inst), c.logger)
 		if err != nil {
 			c.logger.Warn("Query metrics failed", zap.String("instance", inst.config.Name), zap.Error(err))
 			continue
@@ -232,11 +231,11 @@ func (c *MongoDBCollector) collectAllQueryMetrics(ctx context.Context) ([]collec
 func (c *MongoDBCollector) collectAllCollStats(ctx context.Context) ([]collector.Metric, error) {
 	var all []collector.Metric
 	for _, inst := range c.instances {
-		client, err := c.ensureConnection(ctx, inst)
+		api, err := apiFactory(ctx, c, inst)
 		if err != nil {
 			continue
 		}
-		metrics, err := collectCollStats(ctx, newClientAPI(client), inst, instanceLabels(inst), c.logger)
+		metrics, err := collectCollStats(ctx, api, inst, instanceLabels(inst), c.logger)
 		if err != nil {
 			c.logger.Warn("CollStats failed", zap.String("instance", inst.config.Name), zap.Error(err))
 			continue
