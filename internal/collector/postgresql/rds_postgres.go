@@ -57,7 +57,7 @@ type RDSPostgreSQLCollector struct {
 // rdsPgInstance holds per-instance state for an RDS PostgreSQL connection.
 type rdsPgInstance struct {
 	config          config.RDSPostgreSQLInstanceConfig
-	pool            *pgxpool.Pool
+	pool            PgxPool
 	version         int
 	versionStr      string
 	prevCounters    map[string]uint64
@@ -278,7 +278,7 @@ func rdsTLSConfig(caBundlePath string) (*tls.Config, error) {
 }
 
 // ensureRDSConnection establishes or reuses a connection pool for an RDS instance.
-func (c *RDSPostgreSQLCollector) ensureRDSConnection(ctx context.Context, inst *rdsPgInstance) (*pgxpool.Pool, error) {
+func (c *RDSPostgreSQLCollector) ensureRDSConnection(ctx context.Context, inst *rdsPgInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		if err := inst.pool.Ping(ctx); err == nil {
 			return inst.pool, nil
@@ -324,7 +324,7 @@ func (c *RDSPostgreSQLCollector) ensureRDSConnection(ctx context.Context, inst *
 	ctx2, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.NewWithConfig(ctx2, poolCfg)
+	pool, err := newPool(ctx2, poolCfg)
 	if err != nil {
 		c.advanceRDSBackoff(inst)
 		return nil, fmt.Errorf("rds_postgresql %s: create pool: %w", inst.config.Name, err)

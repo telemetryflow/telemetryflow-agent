@@ -34,6 +34,28 @@ import (
 // reEnvVar matches ${ENV_VAR} or ${ENV_VAR:-default} patterns.
 var reEnvVar = regexp.MustCompile(`\$\{([^}]+)\}`)
 
+// defaultNewPool is the production pool factory backed by pgxpool.
+func defaultNewPool(ctx context.Context, cfg *pgxpool.Config) (PgxPool, error) {
+	return pgxpool.NewWithConfig(ctx, cfg)
+}
+
+// newPool creates a PgxPool from a parsed pool config. It defaults to the real
+// pgxpool implementation and is overridable via SetPoolFactoryExported so tests
+// can inject a pgxmock pool and exercise ensureConnection + the per-instance
+// orchestration without a live database. Production behavior is unchanged.
+var newPool = defaultNewPool
+
+// SetPoolFactoryExported overrides the pool factory used by ensureConnection
+// across all PostgreSQL collectors in this package. Passing nil restores the
+// production pgxpool factory. Intended for tests only (inject a pgxmock pool).
+func SetPoolFactoryExported(fn func(ctx context.Context, cfg *pgxpool.Config) (PgxPool, error)) {
+	if fn == nil {
+		newPool = defaultNewPool
+		return
+	}
+	newPool = fn
+}
+
 // resolveEnvVars replaces ${ENV_VAR} patterns in s with the corresponding
 // environment variable value. Supports ${VAR:-default} syntax. If the
 // variable is not set and no default is provided, the pattern is replaced
@@ -81,7 +103,7 @@ func buildConnString(cfg config.PostgreSQLInstanceConfig) string {
 	return dsn
 }
 
-func (c *PostgreSQLCollector) ensureConnection(ctx context.Context, inst *pgInstance) (*pgxpool.Pool, error) {
+func (c *PostgreSQLCollector) ensureConnection(ctx context.Context, inst *pgInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		if err := inst.pool.Ping(ctx); err == nil {
 			return inst.pool, nil
@@ -114,7 +136,7 @@ func (c *PostgreSQLCollector) ensureConnection(ctx context.Context, inst *pgInst
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.NewWithConfig(ctx2, poolCfg)
+	pool, err := newPool(ctx2, poolCfg)
 	if err != nil {
 		c.advanceBackoff(inst)
 		return nil, fmt.Errorf("postgresql %s: create pool: %w", inst.config.Name, err)

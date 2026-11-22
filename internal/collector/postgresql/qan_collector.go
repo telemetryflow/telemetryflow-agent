@@ -59,7 +59,7 @@ type QANConfig struct {
 // qanPgInstance holds per-instance state including the delta cache.
 type qanPgInstance struct {
 	config       config.PostgreSQLInstanceConfig
-	pool         *pgxpool.Pool
+	pool         PgxPool
 	prevSnapshot map[string]*pgStatStatementsSnapshot // keyed by queryid
 	prevTime     time.Time
 	version      int // server_version_num, detected lazily (0 until known)
@@ -378,7 +378,7 @@ func (c *QANPostgreSQLCollector) collectQANBuckets(ctx context.Context, pool Pgx
 	return buckets, nil
 }
 
-func (c *QANPostgreSQLCollector) ensureConnection(ctx context.Context, inst *qanPgInstance) (*pgxpool.Pool, error) {
+func (c *QANPostgreSQLCollector) ensureConnection(ctx context.Context, inst *qanPgInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		return inst.pool, nil
 	}
@@ -396,7 +396,7 @@ func (c *QANPostgreSQLCollector) ensureConnection(ctx context.Context, inst *qan
 	cfg.MaxConns = 3
 	cfg.MinConns = 1
 
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	pool, err := newPool(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
