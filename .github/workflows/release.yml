@@ -269,6 +269,11 @@ jobs:
           URL:            ${{ env.HOMEPAGE }}
           Source0:        %{name}-%{version}.tar.gz
 
+          # The Go binary is built with -ldflags "-s -w" (stripped), so there is no
+          # debug info to extract. Disable the automatic -debuginfo subpackage, which
+          # would otherwise fail with "Empty %files file debugfiles.list".
+          %global debug_package %{nil}
+
           # Note: BuildArch is intentionally omitted - we package pre-built binaries
           # The target architecture is specified via rpmbuild --target flag
 
