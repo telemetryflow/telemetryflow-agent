@@ -247,7 +247,7 @@ jobs:
           # Copy config
           mkdir -p rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/configs
           cp configs/tfo-agent.yaml rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/configs/
-          cp configs/tfo-agent-complete.yaml rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/configs/
+          cp configs/tfo-agent.complete.yaml rpmbuild/SOURCES/${{ env.BINARY_NAME }}-${VERSION}/configs/
 
           # Create tarball
           cd rpmbuild/SOURCES
@@ -399,7 +399,7 @@ jobs:
 
           # Copy config
           cp configs/tfo-agent.yaml ${PKG_DIR}/etc/tfo-agent/
-          cp configs/tfo-agent-complete.yaml ${PKG_DIR}/etc/tfo-agent/
+          cp configs/tfo-agent.complete.yaml ${PKG_DIR}/etc/tfo-agent/
 
       - name: Create DEB control files
         env:
@@ -548,7 +548,7 @@ jobs:
 
           # Copy config
           cp configs/tfo-agent.yaml ${PKG_DIR}/
-          cp configs/tfo-agent-complete.yaml ${PKG_DIR}/
+          cp configs/tfo-agent.complete.yaml ${PKG_DIR}/
 
           # Create install script
           cat > ${PKG_DIR}/install.ps1 << 'EOF'
@@ -572,7 +572,7 @@ jobs:
           # Copy files
           Copy-Item -Path ".\tfo-agent.exe" -Destination "$InstallDir\tfo-agent.exe" -Force
           Copy-Item -Path ".\tfo-agent.yaml" -Destination "$ConfigDir\tfo-agent.yaml" -Force
-          Copy-Item -Path ".\tfo-agent-complete.yaml" -Destination "$ConfigDir\tfo-agent-complete.yaml" -Force
+          Copy-Item -Path ".\tfo-agent.complete.yaml" -Destination "$ConfigDir\tfo-agent.complete.yaml" -Force
 
           # Add to PATH
           $envPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
@@ -700,7 +700,7 @@ jobs:
 
           # Copy config
           cp configs/tfo-agent.yaml "${DMG_DIR}/"
-          cp configs/tfo-agent-complete.yaml "${DMG_DIR}/"
+          cp configs/tfo-agent.complete.yaml "${DMG_DIR}/"
 
           # Create install script
           cat > "${DMG_DIR}/install.sh" << 'EOF'
@@ -728,7 +728,7 @@ jobs:
 
           if [ ! -f "${CONFIG_DIR}/tfo-agent.yaml" ]; then
             sudo cp tfo-agent.yaml "${CONFIG_DIR}/"
-            sudo cp tfo-agent-complete.yaml "${CONFIG_DIR}/"
+            sudo cp tfo-agent.complete.yaml "${CONFIG_DIR}/"
           fi
 
           # Create LaunchDaemon
@@ -889,7 +889,7 @@ jobs:
              "${TAR_DIR}/${{ env.BINARY_NAME }}"
           chmod +x "${TAR_DIR}/${{ env.BINARY_NAME }}"
           cp configs/tfo-agent.yaml "${TAR_DIR}/"
-          cp configs/tfo-agent-complete.yaml "${TAR_DIR}/"
+          cp configs/tfo-agent.complete.yaml "${TAR_DIR}/"
           cp README.md "${TAR_DIR}/" 2>/dev/null || true
           cp LICENSE "${TAR_DIR}/" 2>/dev/null || true
 
