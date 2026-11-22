@@ -15,6 +15,28 @@ import (
 
 var reEnvVar = regexp.MustCompile(`\$\{([^}]+)\}`)
 
+// defaultNewPool is the production pool factory backed by pgxpool.
+func defaultNewPool(ctx context.Context, cfg *pgxpool.Config) (PgxPool, error) {
+	return pgxpool.NewWithConfig(ctx, cfg)
+}
+
+// newPool creates a PgxPool from a parsed pool config. Defaults to the real
+// pgxpool implementation; overridable via SetPoolFactoryExported so tests can
+// inject a pgxmock pool and exercise ensureConnection + per-instance
+// orchestration without a live database. Production behavior is unchanged.
+var newPool = defaultNewPool
+
+// SetPoolFactoryExported overrides the pool factory used by ensureConnection
+// across the CockroachDB collectors in this package. Passing nil restores the
+// production pgxpool factory. Intended for tests only.
+func SetPoolFactoryExported(fn func(ctx context.Context, cfg *pgxpool.Config) (PgxPool, error)) {
+	if fn == nil {
+		newPool = defaultNewPool
+		return
+	}
+	newPool = fn
+}
+
 func resolveEnvVars(s string) string {
 	return reEnvVar.ReplaceAllStringFunc(s, func(match string) string {
 		inner := match[2 : len(match)-1]
@@ -57,7 +79,7 @@ func buildConnString(cfg config.CockroachDBInstanceConfig) string {
 	return dsn
 }
 
-func (c *CockroachDBCollector) ensureConnection(ctx context.Context, inst *crdbInstance) (*pgxpool.Pool, error) {
+func (c *CockroachDBCollector) ensureConnection(ctx context.Context, inst *crdbInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		if err := inst.pool.Ping(ctx); err == nil {
 			return inst.pool, nil
@@ -90,7 +112,7 @@ func (c *CockroachDBCollector) ensureConnection(ctx context.Context, inst *crdbI
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.NewWithConfig(ctx2, poolCfg)
+	pool, err := newPool(ctx2, poolCfg)
 	if err != nil {
 		c.advanceBackoff(inst)
 		return nil, fmt.Errorf("cockroachdb %s: create pool: %w", inst.config.Name, err)

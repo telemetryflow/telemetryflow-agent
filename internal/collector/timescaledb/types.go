@@ -3,13 +3,12 @@ package timescaledb
 import (
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/telemetryflow/telemetryflow-agent/internal/config"
 )
 
 type tsdbInstance struct {
 	config     config.TimescaleDBInstanceConfig
-	pool       *pgxpool.Pool
+	pool       PgxPool
 	pgVersion  int
 	pgVersionS string
 	tsdbVer    string

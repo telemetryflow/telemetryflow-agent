@@ -42,7 +42,7 @@ type QANCockroachDBConfig struct {
 
 type qanCrdbInstance struct {
 	config       config.CockroachDBInstanceConfig
-	pool         *pgxpool.Pool
+	pool         PgxPool
 	prevSnapshot map[string]*crdbSnapshot
 	prevTime     time.Time
 }
@@ -244,7 +244,7 @@ func (c *QANCockroachDBCollector) collectInstanceRows(ctx context.Context, pool 
 	return buckets, nil
 }
 
-func (c *QANCockroachDBCollector) ensureConnection(ctx context.Context, inst *qanCrdbInstance) (*pgxpool.Pool, error) {
+func (c *QANCockroachDBCollector) ensureConnection(ctx context.Context, inst *qanCrdbInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		return inst.pool, nil
 	}
@@ -268,7 +268,7 @@ func (c *QANCockroachDBCollector) ensureConnection(ctx context.Context, inst *qa
 	}
 	cfg.MaxConns = 3
 	cfg.MinConns = 1
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	pool, err := newPool(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}

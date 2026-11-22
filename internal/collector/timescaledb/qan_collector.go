@@ -45,7 +45,7 @@ type QANTimescaleDBConfig struct {
 
 type qanTsInstance struct {
 	config       config.TimescaleDBInstanceConfig
-	pool         *pgxpool.Pool
+	pool         PgxPool
 	prevSnapshot map[string]*tsSnapshot
 	prevTime     time.Time
 }
@@ -258,7 +258,7 @@ func collectQANBuckets(ctx context.Context, q PgxQuerier, inst *qanTsInstance, t
 	return buckets, nil
 }
 
-func (c *QANTimescaleDBCollector) ensureConnection(ctx context.Context, inst *qanTsInstance) (*pgxpool.Pool, error) {
+func (c *QANTimescaleDBCollector) ensureConnection(ctx context.Context, inst *qanTsInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		return inst.pool, nil
 	}
@@ -274,7 +274,7 @@ func (c *QANTimescaleDBCollector) ensureConnection(ctx context.Context, inst *qa
 	}
 	cfg.MaxConns = 3
 	cfg.MinConns = 1
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	pool, err := newPool(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}

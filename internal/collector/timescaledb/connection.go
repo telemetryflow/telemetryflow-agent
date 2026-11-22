@@ -57,7 +57,29 @@ func buildConnString(cfg config.TimescaleDBInstanceConfig) string {
 	return dsn
 }
 
-func (c *TimescaleDBCollector) ensureConnection(ctx context.Context, inst *tsdbInstance) (*pgxpool.Pool, error) {
+// defaultNewPool is the production pool factory backed by pgxpool.
+func defaultNewPool(ctx context.Context, cfg *pgxpool.Config) (PgxPool, error) {
+	return pgxpool.NewWithConfig(ctx, cfg)
+}
+
+// newPool creates a PgxPool from a parsed pool config. Defaults to the real
+// pgxpool implementation; overridable via SetPoolFactoryExported so tests can
+// inject a pgxmock pool and exercise ensureConnection + per-instance
+// orchestration without a live database. Production behavior is unchanged.
+var newPool = defaultNewPool
+
+// SetPoolFactoryExported overrides the pool factory used by ensureConnection
+// across the TimescaleDB collectors in this package. Passing nil restores the
+// production pgxpool factory. Intended for tests only.
+func SetPoolFactoryExported(fn func(ctx context.Context, cfg *pgxpool.Config) (PgxPool, error)) {
+	if fn == nil {
+		newPool = defaultNewPool
+		return
+	}
+	newPool = fn
+}
+
+func (c *TimescaleDBCollector) ensureConnection(ctx context.Context, inst *tsdbInstance) (PgxPool, error) {
 	if inst.pool != nil {
 		if err := inst.pool.Ping(ctx); err == nil {
 			return inst.pool, nil
@@ -90,7 +112,7 @@ func (c *TimescaleDBCollector) ensureConnection(ctx context.Context, inst *tsdbI
 	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.NewWithConfig(ctx2, poolCfg)
+	pool, err := newPool(ctx2, poolCfg)
 	if err != nil {
 		c.advanceBackoff(inst)
 		return nil, fmt.Errorf("timescaledb %s: create pool: %w", inst.config.Name, err)
