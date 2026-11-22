@@ -66,12 +66,15 @@ func hasExecTimeColumns(inst *pgInstance) bool {
 	return inst.version >= 130000
 }
 
-// PG15+ (pg_stat_statements 1.10) removed blk_read_time / blk_write_time and
-// split them into shared_/local_/temp_blk_*_time. Querying the old names raises
-// SQLSTATE 42703 ("column does not exist"), which broke QAN collection entirely
-// on PG15+ (e.g. PG18). Detect the version so callers can select the right cols.
+// PostgreSQL 17 (pg_stat_statements 1.11) renamed blk_read_time / blk_write_time
+// to shared_blk_read_time / shared_blk_write_time and added the local_/temp_
+// split counters. PG16 and earlier ship pg_stat_statements <= 1.10, which still
+// exposes the original blk_read_time / blk_write_time — so querying the shared_
+// names there raises SQLSTATE 42703 ("column does not exist") and breaks QAN
+// collection entirely (the exact failure seen on postgres:16). Gate on
+// server_version_num >= 170000 (PG17 is the release that ships 1.11).
 func hasSplitBlkTimeColumns(versionNum int) bool {
-	return versionNum >= 150000
+	return versionNum >= 170000
 }
 
 // blkTimeColumns returns the pg_stat_statements block-I/O timing columns aliased
